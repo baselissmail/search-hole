@@ -9,7 +9,7 @@ Many gateway processes (one or more per host, plus probe siblings) and an on-dem
 
 | Driver | Status | Native? | Notes |
 |---|---|---|---|
-| `node:sqlite` | Unflagged from 22.13 (Stability 1.1, prints `ExperimentalWarning` on 22); **release candidate from 24.15** and on 26; Node 26.11 renamed `DatabaseSync` → `Database` (old name kept as an alias) | No | Also implemented by **Bun 1.4.4**, so one API covers Node 22/24/26 and a future Bun binary |
+| `node:sqlite` (also present in Claude Desktop's Electron Node 24.22, verified by symbol inspection) | Unflagged from 22.13 (Stability 1.1, prints `ExperimentalWarning` on 22); **release candidate from 24.15** and on 26; Node 26.11 renamed `DatabaseSync` → `Database` (old name kept as an alias) | No | Also implemented by **Bun 1.4.4**, so one API covers Node 22/24/26 and a future Bun binary |
 | `better-sqlite3` 13.0.3 | Stable; **moved to N-API**; 8 prebuilds inside the npm tarball; no install script | Yes (`.node` files, about 2 MB each) | Survives `--ignore-scripts`; a bundle must ship `prebuilds/` next to it and pass `nativeBinding` |
 | `bun:sqlite` | Stable in Bun | No | Only if we ship Bun binaries (deferred, ADR-0002) |
 

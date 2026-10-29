@@ -12,7 +12,9 @@
 Principle 3 adds: the model can never change rules itself. Verified hook facts ([platform-facts-claude-code-runtime.md](../research/platform-facts-claude-code-runtime.md) §D; re-checked in the live docs on 2026-10-30):
 
 - **`mcp_tool` hooks** (v2.1.118+): `{"type":"mcp_tool","server":"plugin:<plugin>:<server>","tool":"…","input":{…}}`.
-  - String inputs support `${path}` substitution from the hook's JSON input. The docs show `${tool_input.file_path}`; **top-level fields such as `${session_id}` are undocumented, so this is a spike**.
+  - String inputs support `${path}` substitution from the hook's JSON input. **Verified on 2.1.312:** `${session_id}`, `${tool_name}`, `${tool_input.query}` and `${tool_input.command}` work, missing paths become `""`, and `${agent_type}` is `""` for the main agent ([spikes-2026-10-30.md](../research/spikes-2026-10-30.md) §1).
+  - **Also verified:** an `mcp_tool` hook can call a tool marked `_meta.ui.visibility: ["app"]`, which Claude Code hides from the model.
+  - **Also verified:** SessionStart `mcp_tool` hooks don't run at startup (no MCP context), and UserPromptSubmit fires before any model tool call.
   - The tool's text is parsed like command stdout.
   - **If the server isn't connected, the hook gives a non-blocking error and execution continues** (fail-open by design).
   - On blocking events, Claude Code waits for a connecting server up to `MCP_TIMEOUT`.
@@ -56,6 +58,10 @@ Principle 3 adds: the model can never change rules itself. Verified hook facts (
   }
 }
 ```
+
+### 0. The `hook` tool is invisible to the model
+
+`hook` is registered with `_meta.ui.visibility: ["app"]`. Claude Code hides it from the model's tool list and still routes `mcp_tool` hooks to it (verified). The forgery defences below therefore guard against a future host behaving differently, not against today's Claude Code.
 
 ### 1. Turn bracketing and session keys (forge-resistant)
 
@@ -142,7 +148,7 @@ That covers `onFailure` (2.1.295), the 4,096-character `instructions` cap (2.1.2
   - Windows shell-failure risk.
 - **Bash-only hooks with state files** (nightshift style). These have the same correlation and race problems.
 - **Reading the transcript in Stop.** Rejected: it is written asynchronously (ADR-0005).
-- **Hiding `hook` from the model.** Not possible in Claude Code. It is mitigated by turn bracketing and the narrow, logged side effects in point 1.
+- **A model-visible `hook` tool.** It was the original plan when hiding seemed impossible. Rejected now that the spike showed app-only visibility works in Claude Code (point 0).
 
 ## Consequences
 
@@ -150,11 +156,18 @@ That covers `onFailure` (2.1.295), the 4,096-character `instructions` cap (2.1.2
 - Matching `Bash|Edit|Write` puts an in-process string check on every such call: a local MCP round-trip of a few ms. Plugin evals measure it.
 - Cursor and Codex hooks have their own event schemas and are designed in P7. Cursor also loads this Claude plugin, which is handled by host detection (ADR-0012).
 
-## Validate early (P0 spike, before P3)
+## Validate early
 
-1. Substitution of `${session_id}`, `${source}`, `${agent_type}`, `${tool_name}` and `${tool_input.*}` in `mcp_tool` `input`, and that UserPromptSubmit fires before any tool call.
-2. A deny via `mcp_tool` steers the model to `search` (plugin evals vs a no-plugin baseline). The deny-loop breaker frees a subagent without our tool.
-3. The Stop `systemMessage` shows once per searching turn and never triggers continuation.
-4. Fail-open on macOS, Linux and Windows (with and without Git Bash): the gateway is down, the engine unknown, or all engines failing.
-5. The preflight's literal hooks.json command runs through `sh -c`, Git Bash and `powershell -Command` with `node` removed from PATH, and prints the systemMessage.
-6. A forged `hook({event:"SessionStart"})` from the model mid-turn is rejected and logged.
+**Done in the 2026-10-30 spike** (Claude Code 2.1.312, macOS; [spikes-2026-10-30.md](../research/spikes-2026-10-30.md) §1):
+- ✅ the substitutions;
+- ✅ UserPromptSubmit fires before any tool call;
+- ✅ a deny steers the model to `search` (one-shot test);
+- ✅ the Stop `systemMessage` shows once, with no continuation;
+- ✅ the preflight runs via `sh` from the literal hooks.json command;
+- ✅ an app-only `hook` is hidden from the model but callable by hooks.
+
+**Still to do, before or in P3:**
+1. Steering measured over many cases in plugin evals against a no-plugin baseline. The deny-loop breaker frees a subagent without our tool. `${source}` substitution on SessionStart after `/clear`.
+2. Fail-open on macOS, Linux and Windows (with and without Git Bash): the gateway is down, the engine unknown, or all engines failing.
+3. The preflight via Git Bash and `powershell -Command` with `node` removed from PATH.
+4. Re-run the spike on the minimum supported version (2.1.296).

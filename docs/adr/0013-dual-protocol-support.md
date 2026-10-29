@@ -9,7 +9,7 @@ P2 asks for a spike first: find out what each target host speaks, and serve both
 
 | Host (version checked) | Era today | Negotiation |
 |---|---|---|
-| Claude Code CLI 2.1.312 | **dual** | `server/discover` probe (stdio default since 2.1.292), legacy fallback; Anthropic can pin servers to legacy; `MCP_PROTOCOL_NEGOTIATION=legacy` opt-out |
+| Claude Code CLI 2.1.312 | **dual** | `server/discover` probe **in-process on the same stdio connection** (verified in the spike: no sibling process), legacy fallback on `-32601`; Anthropic can pin servers to legacy; `MCP_PROTOCOL_NEGOTIATION=legacy` opt-out |
 | Claude Desktop (local stdio / `.mcpb`) | **dual** | discover probe in a disposable sibling process, else `initialize` [reports] |
 | claude.ai connectors | **dual** | discover first, falls back to `initialize`; state-only MRTR broken [reports] |
 | ChatGPT | **2026 only** (no `initialize` fallback, per 3 reports) | discover |

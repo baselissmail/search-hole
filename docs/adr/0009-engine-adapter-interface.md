@@ -145,9 +145,9 @@ type ParseOutcome =
 
 ### v1 adapters
 
-- **P1:** SearXNG and Brave.
-- **P1.x:** Tavily, Exa, Mojeek, Kagi (marked "preview"; personalization double-applies with our rules, which the receipt notes), and Marginalia.
-- **Not shipped:** DuckDuckGo and SerpApi (no official API or terms risk).
+- **P1:** SearXNG, Brave and **Tavily** (the no-Docker, no-card default; ADR-0017).
+- **P1.x:** Exa, Mojeek, Kagi (marked "preview"; personalization double-applies with our rules, which the receipt notes), and Marginalia.
+- **Not shipped:** DuckDuckGo and SerpApi (no official API or terms risk), and Marginalia's shared `public` key as a default (exhausted in the spike; a personal key is fine).
 - **Per-engine quirks are documented in each adapter's header and covered by fixtures:**
   - Brave: `X-Subscription-Token`, `text_decorations=false`, record `query.altered`;
   - Tavily: always send `include_published_date: true`;

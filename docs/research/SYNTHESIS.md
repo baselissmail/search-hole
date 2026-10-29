@@ -2,7 +2,7 @@
 
 > **Date:** 2026-10-30. **Scope:** MASTER_PLAN.md §10 and §11 P0.
 > **Inputs:** 31 shallow-cloned reference repos (commits pinned in [`_refs-table.md`](_refs-table.md)), Basel's own smart-doctor, and three platform-fact checks against live primary sources: [MCP and hosts](platform-facts-mcp.md), [Claude Code and runtime](platform-facts-claude-code-runtime.md), [engines, lists and versions](platform-facts-engines-lists-versions.md). Name and domain availability and the local toolchain versions were checked on 2026-10-29 and are recorded in [`STATUS.md`](../../STATUS.md).
-> **Outputs:** this file and [ADRs 0001–0015](../adr/README.md).
+> **Outputs:** this file, [ADRs 0001–0017](../adr/README.md) and the [2026-10-30 spikes](spikes-2026-10-30.md).
 
 ## 1. Method and confidence
 
@@ -37,7 +37,7 @@
    - `UserPromptSubmit` and `Stop` bracket each turn, so receipts map to turns and forged model calls can't re-key sessions.
 
    → [ADR-0014](../adr/0014-claude-code-hook-integration.md).
-4. **`apply_rule` with `visibility: ["app"]` is only hidden on hosts that render MCP Apps.** The Claude Code CLI, Codex and Zed would expose it to the model. Fix: register it only for Apps-rendering host profiles, and require a panel-only HMAC action token. → [ADR-0012](../adr/0012-mcp-tool-surface-and-output-limits.md).
+4. **App-only tools (`visibility: ["app"]`) are hidden from the model only on hosts that implement it.** **Verified in the 2026-10-30 spike:** Claude Code 2.1.312 hides them *and* lets `mcp_tool` hooks call them, so the internal `hook` tool is invisible to the model. Codex and Zed are unverified and assumed to expose them, so `apply_rule` is registered only on host profiles known to hide it or to render a panel, and it requires a panel-only HMAC token. → [ADR-0012](../adr/0012-mcp-tool-surface-and-output-limits.md), [spikes](spikes-2026-10-30.md).
 5. **The protocol has no session, and the spec forbids treating a process as one.** One process per conversation is false in almost every host: Desktop runs separate copies plus probe siblings, and Claude Code servers outlive sessions. Sessions are resolved per request from host keys (`openai/session`, `vscode.conversationId`, `agent-session-id`, the hook `session_id`), and receipts are server-minted handles. → ADR-0005.
 6. **Claude Code supplies no Node, and standalone binaries are impractical today:**
    - Bun binaries are about 90–110 MB per platform, so 8 targets come to about 0.8 GB.
@@ -256,6 +256,12 @@ CI needs a **current** Claude Code (≥ 2.1.296) for `validate --strict --json` 
 
 ## 8. Risks and early spikes (ordered)
 
+**Status 2026-10-30 ([spikes-2026-10-30.md](spikes-2026-10-30.md)):**
+- #1 is mostly done: substitution, UserPromptSubmit ordering, deny steering, Stop line, hidden `hook` and `alwaysLoad` are all verified. Multi-case evals and Windows remain.
+- #2 is done at symbol level (Electron 44.9.3 / Node 24.22.0 includes `node:sqlite`). A runtime `.mcpb` test remains for P5.
+- SearXNG-in-Docker with our overlay is verified live.
+- Marginalia's shared key is exhausted, so it is not a default.
+
 1. **`mcp_tool` hook substitution** of `${session_id}`, `${source}`, `${agent_type}`, `${tool_name}` and `${tool_input.*}`; UserPromptSubmit firing before any tool call; and whether a deny steers the model (ADR-0014). If it fails, fall back to Node command hooks plus a heartbeat file.
 2. **`node:sqlite` inside Claude Desktop's Electron Node** (a test `.mcpb` printing `process.version`; ADR-0002/0003). If it's absent, the `.mcpb` gets better-sqlite3 prebuilds.
 3. **The SSE rowid tail** under 8 writers (ADR-0004).
@@ -280,6 +286,14 @@ CI needs a **current** Claude Code (≥ 2.1.296) for `validate --strict --json` 
 - The research notes describe GPL, AGPL and EUPL mechanisms in prose only (checked by the verification pass).
 
 ## 10. Questions for Basel (MASTER_PLAN §13)
+
+> **2026-10-30 update.** Basel asked the builder to check these and choose the most useful options.
+> - Q2 (licence) → [ADR-0016](../adr/0016-licensing.md).
+> - Q3 (first run) → [ADR-0017](../adr/0017-first-run-and-default-engines.md). The spikes changed the recommendation from Marginalia to Docker SearXNG plus a free, no-card Tavily key.
+> - Q4: personal GitHub, prepared but not pushed.
+> - Q1: needs Basel's npm account and a registrar, so placeholder packages are prepared in `distribution/npm-reserve/` (see STATUS.md).
+>
+> The original questions follow, kept for the record.
 
 1. **Name follow-through.** Both npm names (`search-hole`, `searchhole`) and the GitHub repo `baselissmail/search-hole` are free.
    - **`searchhole.com` is taken** by an unrelated live site ("Search Hole — research-backed guidance for everyday decisions").

@@ -15,7 +15,9 @@
   - output warns at 10k tokens and caps at 25k (`MAX_MCP_OUTPUT_TOKENS`);
   - text over 50k characters is persisted to a file unless `_meta["anthropic/maxResultSizeChars"]` *raises* that threshold.
 - **2026-07-28 rules:** `instructions` travel only in `server/discover` (2026) or `initialize` (2025). Every result needs `resultType`. Lists, `resources/read` and discover need `ttlMs`/`cacheScope`. `tools/list` must not vary per connection ([mcp-spec.md](../research/mcp-spec.md)).
-- **`_meta.ui.visibility: ["app"]`** hides a tool only on hosts that implement MCP Apps. **The Claude Code CLI, Codex and Zed don't, so an app-only tool is visible to and callable by the model there** ([platform-facts-mcp.md](../research/platform-facts-mcp.md) §3).
+- **`_meta.ui.visibility: ["app"]`:** the spec says hosts must hide such tools from the model.
+  - **Verified in the 2026-10-30 spike:** Claude Code 2.1.312 **hides** app-only tools from the model's tool list, and **`mcp_tool` hooks can still call them** ([spikes-2026-10-30.md](../research/spikes-2026-10-30.md) §1).
+  - Codex and Zed don't implement Apps, and whether they hide such tools is **unverified**, so we assume they expose them ([platform-facts-mcp.md](../research/platform-facts-mcp.md) §3).
 - **Not every Apps host offers `serverTools`.** Goose and Gemini lack `app.callServerTool`, and Cursor sent no style variables in MCPJam's probes ([mcpjam-inspector.md](../research/mcpjam-inspector.md), unverified note).
 - **Cursor IDE loads Claude marketplace plugins**, and the Claude Desktop Code tab renders Apps for Claude Code sessions ([nightshift.md](../research/nightshift.md); [platform-facts-mcp.md](../research/platform-facts-mcp.md) §3).
 - **SDK v2 specifics** ([mcp-typescript-sdk.md](../research/mcp-typescript-sdk.md)):
@@ -40,8 +42,8 @@ The profile selects which internal tools are registered. The tool list is consta
 | `fetch` | all | yes | the safe fetcher |
 | `receipt` | all | yes | receipts; carries the MCP App UI |
 | `suggest_rule` | all | yes | queue a rule proposal for the user |
-| `apply_rule` | `claude-desktop`, `vscode`, `cursor` (hosts that render Apps *and* offer `serverTools`); `goose` only after a P2 probe confirms `serverTools`; later the v2 connector | `visibility: ["app"]` | panel buttons only |
-| `hook` | `claude-code` only | yes (Claude Code can't hide tools); described as internal | answers search-hole's own hooks (ADR-0014) |
+| `apply_rule` | `claude-desktop`, `vscode`, `cursor` (hosts that render Apps *and* offer `serverTools`); `claude-code` (hidden there, verified; usable by the Desktop Code tab's panel); `goose` only after a P2 probe confirms `serverTools`; later the v2 connector. **Never** `codex` or `zed` until they're shown to hide app-only tools | `visibility: ["app"]` | panel buttons only |
+| `hook` | `claude-code` only | **no**: `visibility: ["app"]`, hidden from the model in Claude Code (verified 2.1.312), still callable by `mcp_tool` hooks | answers search-hole's own hooks (ADR-0014) |
 
 Registration order is fixed (`search`, `fetch`, `receipt`, `suggest_rule`, then internal tools), so `tools/list` stays byte-stable for prompt caching.
 
@@ -77,7 +79,7 @@ Registration order is fixed (`search`, `fetch`, `receipt`, `suggest_rule`, then 
 - **`hook`** (claude-code only)
   - input: `{ event: 'SessionStart'|'UserPromptSubmit'|'PreToolUse'|'Stop', sessionId, source?, agentType?, toolName?, query?, command?, filePath? }`
   - It returns hook JSON as text (ADR-0014).
-  - It is **not read-only**: it may open or close the turn receipt and re-key the session label. Both are guarded by turn bracketing and logged (ADR-0014 point 1).
+  - It is **not read-only**: it may open or close the turn receipt and re-key the session label. Both are guarded by turn bracketing and logged (ADR-0014 point 1), as defence in depth even though the model can't see the tool.
 
 ### Annotations (set explicitly on every tool; the defaults are pessimistic)
 
@@ -149,7 +151,9 @@ Principle 3 says the model can never change rules. The boundaries are:
   - JSON-RPC errors are only for protocol faults. We never invent codes in the reserved range.
 - **Cancellation:** `ctx.mcpReq.signal` is passed into every engine and fetch call. A cancelled search is logged as `cancelled`.
 - **Progress:** `deep` sends `notifications/progress` when a `progressToken` is present.
-- **Claude Code:** `_meta["anthropic/alwaysLoad"]: true` on `search` only, so the model sees it without a tool-search step. No `maxResultSizeChars` is needed: our 8k-token `fetch` cap stays under the default 50k-character persist threshold, and a test asserts it.
+- **Claude Code:**
+  - `_meta["anthropic/alwaysLoad"]: true` on `search` only, so the model sees it without a tool-search step (verified in the spike).
+  - Claude Code sends `_meta["claudecode/toolUseId"]` on every `tools/call`. It is stored on `searches` and `fetches` rows, linking each to the transcript's `tool_use` id. No `maxResultSizeChars` is needed: our 8k-token `fetch` cap stays under the default 50k-character persist threshold, and a test asserts it.
 - **Cache hints:**
   - `tools/list` and `server/discover`: `ttlMs: 3_600_000`, `cacheScope: 'private'`, because descriptions include the configured engine list;
   - the `ui://` receipt resource: `ttlMs: 86_400_000`, `cacheScope: 'public'`, versioned URI;
@@ -170,6 +174,6 @@ Principle 3 says the model can never change rules. The boundaries are:
 
 ## Consequences
 
-- Five model-visible tools in Claude Code (four plus `hook`) and four elsewhere. `apply_rule` exists only where a panel can actually call it.
+- Four model-visible tools on every host. The internal tools (`hook`, `apply_rule`) are app-only, and are registered only on host profiles known to hide them or to render a panel that uses them.
 - A CI job dumps `tools/list` per host profile and diffs it against a checked-in snapshot. Any description change is a reviewed diff, together with its token count.
 - `mcp-inspector --cli … --method tools/list --strict` runs in CI in both eras. `--strict` fails only on error-severity findings, so CI also parses the findings and **fails on any portability warning** (`type-union`, `untyped-schema`, `remote-ref`) ([mcp-inspector.md](../research/mcp-inspector.md)).

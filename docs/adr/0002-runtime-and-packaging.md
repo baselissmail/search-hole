@@ -62,7 +62,7 @@ The gateway is a stdio MCP server that each host spawns. §4 lists three options
 
 ## Validate early
 
-- **P0/P1 spike:** a throwaway `.mcpb` that reports `process.version` and `typeof require('node:sqlite').DatabaseSync` from Claude Desktop on macOS and Windows. If `node:sqlite` is missing in Desktop's Node, use the better-sqlite3 13 fallback (N-API prebuilds) for the `.mcpb` only (ADR-0003).
+- **Done (2026-10-30, macOS):** Desktop's Electron 44.9.3 embeds Node v24.22.0 with `node:sqlite` compiled in (symbol inspection; [spikes-2026-10-30.md](../research/spikes-2026-10-30.md) §2). **Remaining (P5):** a throwaway `.mcpb` that reports `process.version` and `typeof require('node:sqlite').DatabaseSync` at runtime, on macOS and Windows. If `node:sqlite` is missing in Desktop's Node, use the better-sqlite3 13 fallback (N-API prebuilds) for the `.mcpb` only (ADR-0003).
 - **P0/P1 spike:** on a machine with no Node, point a test plugin's `mcpServers` at a `.mcpb` and see whether Claude Code starts it (settles option c).
 - **P3:** install the plugin from the `archive` source on a machine with no Node and confirm the preflight message, then install Node, reconnect, and confirm it works.
 - **P3:** confirm Claude Code honours `onFailure` on the preflight hook (needs v2.1.295 or later; the dev machine runs 2.1.97 and must be updated).

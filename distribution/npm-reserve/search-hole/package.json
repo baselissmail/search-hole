@@ -1,0 +1,11 @@
+{
+  "name": "search-hole",
+  "version": "0.0.1",
+  "description": "Reserved for search-hole: a local, open-source search gateway for AI assistants (MCP). Pre-release placeholder; no code yet.",
+  "license": "Apache-2.0",
+  "author": "Basel Issmail <basel.issmail@gmail.com>",
+  "homepage": "https://github.com/baselissmail/search-hole",
+  "repository": { "type": "git", "url": "git+https://github.com/baselissmail/search-hole.git" },
+  "keywords": ["mcp", "search", "ai", "privacy", "blocklist"],
+  "files": ["README.md"]
+}

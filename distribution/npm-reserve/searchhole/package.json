@@ -1,0 +1,10 @@
+{
+  "name": "searchhole",
+  "version": "0.0.1",
+  "description": "Alias reservation for search-hole. Install `search-hole` instead.",
+  "license": "Apache-2.0",
+  "author": "Basel Issmail <basel.issmail@gmail.com>",
+  "homepage": "https://github.com/baselissmail/search-hole",
+  "repository": { "type": "git", "url": "git+https://github.com/baselissmail/search-hole.git" },
+  "files": ["README.md"]
+}

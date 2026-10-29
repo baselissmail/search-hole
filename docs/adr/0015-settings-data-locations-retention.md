@@ -43,8 +43,8 @@ version: 1
 engines:
   searxng:    { enabled: true, url: "http://127.0.0.1:8888", timeoutMs: 6000, weight: 1.0, pushdown: off }
   brave:      { enabled: true, plan: free-credit, caps: { day: 300, month: 900 }, pushdown: blocks, storageRights: false }
-  marginalia: { enabled: false, key: public }          # "public" = the shared key, not a secret
-fallback: [searxng, brave, marginalia]
+  tavily:     { enabled: true, caps: { day: 300, month: 900 } }   # no-Docker default (ADR-0017)
+fallback: [searxng, tavily, brave, exa]
 profiles_default: standard
 retention: { days: 90 }                                # per-table defaults below
 ui: { port: 7341, idleMinutes: 30 }
