@@ -8,7 +8,7 @@ Checklist per MASTER_PLAN.md §11. Decisions taken without asking Basel are note
 - [x] Name availability checked (2026-10-29):
   - npm `search-hole`: free · npm `searchhole`: free. **Not reserved yet.** Placeholder packages are ready in `distribution/npm-reserve/` (needs Basel's npm login; commands in its README).
   - GitHub `baselissmail/search-hole`: free. No `search-hole` or `searchhole` user/org exists.
-  - Domains: `searchhole.com` is **taken** (Namecheap, registered 2025-04-03; a live, unrelated site "Search Hole — research-backed guidance for everyday decisions"). Unregistered: `searchhole.dev`, `searchhole.app`, `searchhole.io`, `searchhole.org`, `search-hole.com`, `search-hole.dev`, `search-hole.app`, `search-hole.io`, `search-hole.org`. Recommendation: `search-hole.dev` (Basel registers).
+  - Domains (not needed; recorded for reference): `searchhole.com` is **taken** (Namecheap, registered 2025-04-03; a live, unrelated site "Search Hole — research-backed guidance for everyday decisions"). Unregistered: `searchhole.dev`, `searchhole.app`, `searchhole.io`, `searchhole.org`, `search-hole.com`, `search-hole.dev`, `search-hole.app`, `search-hole.io`, `search-hole.org`.
 - [x] Reference repos cloned to `research/refs/` (git-ignored). Commits pinned in `docs/research/_refs-table.md`.
 - [x] Research notes in `docs/research/`: 31 reference repos plus smart-doctor, and 3 platform-fact checks. 25 are adversarially verified; the other 10 had their load-bearing claims spot-checked (see SYNTHESIS §1).
 - [x] `docs/research/SYNTHESIS.md`
@@ -39,6 +39,8 @@ Checklist per MASTER_PLAN.md §11. Decisions taken without asking Basel are note
 | 2026-10-30 | §13 Q2: Apache-2.0 for code and docs, CC0-1.0 for first-party lists, DCO (Basel can still flip this before the first outside contribution) | ADR-0016, `LICENSE`, `lists/LICENSE` |
 | 2026-10-30 | §13 Q3: no scraping and no shared keys; SearXNG via Docker (asks once), otherwise a guided free Tavily key (no card); Tavily joins P1 | ADR-0017 |
 | 2026-10-30 | §13 Q4: personal GitHub `baselissmail/search-hole`; no remote until Basel says so | — |
+| 2026-10-30 | No domain: not needed for a local tool | — |
+| 2026-10-30 | Claude Code default is `builtin` mode: filter Claude's own WebSearch via hooks (spike verified); engines optional there, still required on Desktop, claude.ai, ChatGPT, VS Code and Zed | ADR-0018 |
 
 ## Dev environment to update before P1
 
@@ -48,6 +50,6 @@ Checklist per MASTER_PLAN.md §11. Decisions taken without asking Basel are note
 
 ## Waiting on Basel
 
-- Publish the two npm placeholders (`distribution/npm-reserve/README.md`) and register a domain (recommended: `search-hole.dev`).
-- Optional: a free Tavily key (no card) for the live adapter check in P1. Set it with `searchhole keys set tavily` once that command exists, or as `TAVILY_API_KEY`.
+- Publish the two npm placeholders (`distribution/npm-reserve/README.md`). No domain is needed: search-hole is local, and docs can live on GitHub Pages as smart-doctor's do. Revisit only for a landing page or the v2/v3 hosted connector.
+- Optional: a free Tavily key (no card) for the live adapter check in P1. Not needed for Claude Code use (ADR-0018 built-in mode).
 - Say if you'd prefer MIT over Apache-2.0 (free to switch before outside contributions).

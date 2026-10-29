@@ -1,0 +1,65 @@
+# ADR-0018: Claude Code default: filter the built-in search (no engine needed)
+
+- **Status:** Accepted (2026-10-30). Supersedes the Claude Code parts of ADR-0014 point 2 (WebSearch steering) and ADR-0017 points 1–2 (first run).
+- **Related:** [0014](0014-claude-code-hook-integration.md), [0017](0017-first-run-and-default-engines.md), [0009](0009-engine-adapter-interface.md), [spikes §6](../research/spikes-2026-10-30.md)
+
+## Context
+
+Basel asked why a user would need SearXNG or Tavily at all. The earlier design assumed search-hole had to *replace* the assistant's search with an engine we call. The 2026-10-30 spike showed that in Claude Code we can **govern the built-in WebSearch instead**:
+
+- **Before the search:** a `PreToolUse` hook's `updatedInput` can add `blocked_domains` (and `allowed_domains`). Anthropic's search applies them server-side.
+- **After the search:** a `PostToolUse` hook's `updatedToolOutput` can remove results before the model sees them. Verified: the model never saw the stripped sites.
+- **What we can see:** the built-in result contains titles and URLs, plus a summary text written by the search step. It has no snippets and no dates.
+
+## Decision
+
+**search-hole has two modes per host. In Claude Code the default is `builtin`.**
+
+| | `builtin` (Claude Code default) | `engines` (other hosts' default; opt-in in Claude Code) |
+|---|---|---|
+| Who searches | Claude's own WebSearch | engines the user chose (SearXNG, Tavily, Brave, …) |
+| Setup | **none** (works at install) | Docker or a key (ADR-0017) |
+| Blocking | domain blocks → `blocked_domains` (clean, server-side); regex, path and list rules → stripped in PostToolUse | full pipeline (ADR-0008/0010) |
+| Pins, raise, lower | reorder the result list; mark pins | full RRF weighting |
+| Allowlist mode | `allowed_domains` | profile `defaultAction: block` |
+| Log, dashboard, receipts | yes (queries, kept/hidden with rules) | yes |
+| Snippets and dates in receipts | **no** (only from pages the model opens with our `fetch`, or via WebFetch metadata where available) | yes (engine dates) |
+| Engine choice, multi-engine fusion, `deep` | no | yes |
+
+1. **Claude Code hooks in `builtin` mode** (still answered by the gateway through `mcp_tool` hooks; ADR-0014 points 0–1, 3–7 unchanged):
+   - **PreToolUse(WebSearch):**
+     - run query hygiene (block or redact);
+     - resolve the profile;
+     - inject the user's and list domain blocks into `blocked_domains`, user tiers first, up to the cap found in the spike;
+     - **allow**: no deny, no steering.
+   - **PostToolUse(WebSearch):**
+     - decide every result with the full rules engine and drop hidden ones;
+     - reorder for pins, then raise/lower;
+     - if any result was removed *only* in PostToolUse, the summary text is replaced by "(summary withheld: it may cite sources your rules hid)";
+     - add one short `additionalContext` line ("search-hole hid 3 results by your rules; receipt rcpt_…");
+     - log everything.
+   - **PreToolUse(WebFetch):** deny blocked domains (real block, with the rule in the reason).
+   - **PostToolUse(WebFetch):** log the opened source for the receipt.
+2. **`engines` mode in Claude Code** is chosen by the user (`/search-hole:engine searxng`, or `settings.yaml` `hosts.claude-code.mode: engines`). It restores the ADR-0014 point 2 behaviour: deny WebSearch while an engine is healthy, and steer to our `search`. Our `search` and `fetch` MCP tools stay available in both modes, for when the user asks for a specific engine or for `deep`.
+3. **Fail-safe:** if the gateway isn't connected, `mcp_tool` hooks fail open and WebSearch runs unfiltered. The Stop line says "search-hole wasn't running for this search" when it can tell.
+4. **Other hosts are unchanged.** Claude Desktop, claude.ai, ChatGPT, VS Code and Zed offer no way to filter their built-in search, so search-hole there *is* the search tool and needs an engine (ADR-0017). Cursor and Codex hooks get the same spike in P7. If they support output rewriting, they get `builtin` mode too.
+5. **First run in Claude Code is now zero-config:** install the plugin and it works. `doctor` mentions engines only as an upgrade ("want snippets, dates, engine choice or `deep`? add SearXNG or a free Tavily key").
+
+## Alternatives considered
+
+- **Engines only** (the previous default). Rejected for Claude Code: it forces Docker or an account on every user, for a value (blocking, visibility) we can deliver without either.
+- **`builtin` everywhere.** Not possible: other hosts expose no output-rewriting hook.
+- **Rewriting the summary text sentence by sentence** to drop mentions of hidden sources. Rejected for v1: it is fragile. Withholding the summary is honest and safe.
+
+## Consequences
+
+- The Claude Code plugin is useful at install with zero setup. That restores the §1 "under 2 minutes" story without Docker or keys.
+- **Receipts in `builtin` mode have fewer facts.** No engine dates. Freshness rules can only use dates from opened pages. This is documented.
+- The PreToolUse and PostToolUse hooks become the hot path in Claude Code. They must answer in under 50 ms, which an in-process `mcp_tool` call does.
+- ADR-0014 point 2 (deny and steer) now applies only in `engines` mode. ADR-0017's flow applies to Claude Code only when the user opts into engines, and remains the default on other hosts.
+
+## Validate early (P2/P3)
+
+- The `blocked_domains` cap (and the behaviour when exceeded). The precedence: a user `allow` must remove that domain from `blocked_domains` even when a list blocks it.
+- Shape validation: a malformed `updatedToolOutput` is silently ignored by Claude Code. Tests must catch shape drift across Claude Code versions (a contract test on the recorded shape).
+- Plugin evals: blocked domains never reach the model; pins come first; zero-config install works.

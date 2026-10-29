@@ -1,6 +1,6 @@
 # ADR-0017: First run and default engines
 
-- **Status:** Accepted (2026-10-30). Answers MASTER_PLAN §13 question 3 from live spikes ([spikes-2026-10-30.md](../research/spikes-2026-10-30.md) §3–5).
+- **Status:** Accepted (2026-10-30); in Claude Code partly superseded by [ADR-0018](0018-claude-code-builtin-search-mode.md) (zero-config built-in mode; engines become an upgrade there). Answers MASTER_PLAN §13 question 3 from live spikes ([spikes-2026-10-30.md](../research/spikes-2026-10-30.md) §3–5).
 - **Related:** [0009](0009-engine-adapter-interface.md), [0014](0014-claude-code-hook-integration.md), [0015](0015-settings-data-locations-retention.md)
 
 ## Context

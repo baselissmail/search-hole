@@ -74,7 +74,7 @@ Principle 3 adds: the model can never change rules itself. Verified hook facts (
   - Every re-key and close is logged to the session's receipt history.
 - **Session-scope rules survive a re-key from the same `CLAUDE_PROJECT_DIR`.** They are dropped only on `SessionStart(source=clear)`, matching "a fresh conversation" (ADR-0005).
 
-### 2. PreToolUse on `WebSearch` / `WebFetch`: fail-open steering
+### 2. PreToolUse on `WebSearch` / `WebFetch`: fail-open steering (**`engines` mode only**; the default `builtin` mode filters instead, see [ADR-0018](0018-claude-code-builtin-search-mode.md))
 
 - **Deny `WebSearch` only if all of these hold:**
   - At least one engine in the plan this session's `search` would use (active profile plus fallback chain) is **`healthy`**: a successful call or probe within the last 10 minutes, and not suspended or capped (health states are defined in ADR-0009).
