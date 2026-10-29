@@ -1,0 +1,381 @@
+{
+  "_doc": "Normal developer queries that must NOT be blocked by default settings (ADR-0015 validate-early: false-positive checks). Each carries the reason it is safe.",
+  "cases": [
+    {
+      "query": "TypeError: Cannot read properties of undefined (reading 'map')",
+      "why": "error message"
+    },
+    {
+      "query": "error TS2307: Cannot find module '@types/node' or its corresponding type declarations.",
+      "why": "scoped package"
+    },
+    {
+      "query": "connect ECONNREFUSED 127.0.0.1:5432 postgres docker",
+      "why": "loopback is exempt by default"
+    },
+    {
+      "query": "getaddrinfo ENOTFOUND registry.npmjs.org",
+      "why": "public host"
+    },
+    {
+      "query": "npm ERR! code ERESOLVE unable to resolve dependency tree peer react@18.2.0",
+      "why": "package@version"
+    },
+    {
+      "query": "fatal: unable to access 'https://github.com/org/repo.git/': Could not resolve host: github.com",
+      "why": "public host in error"
+    },
+    {
+      "query": "ModuleNotFoundError: No module named 'numpy.core._multiarray_umath'",
+      "why": "python module path"
+    },
+    {
+      "query": "java.lang.NoClassDefFoundError: org/springframework/boot/SpringApplication",
+      "why": "java class path"
+    },
+    {
+      "query": "Error: listen EADDRINUSE: address already in use :::3000",
+      "why": "ipv6 wildcard with port"
+    },
+    {
+      "query": "panic: runtime error: invalid memory address or nil pointer dereference",
+      "why": "go panic"
+    },
+    {
+      "query": "ERR_PNPM_PEER_DEP_ISSUES Unmet peer dependencies",
+      "why": "error code"
+    },
+    {
+      "query": "Uncaught ReferenceError: process is not defined vite",
+      "why": "browser error"
+    },
+    {
+      "query": "rustc E0502 cannot borrow as mutable because it is also borrowed as immutable",
+      "why": "rust error"
+    },
+    {
+      "query": "ssh: connect to host github.com port 22: Connection timed out",
+      "why": "public host"
+    },
+    {
+      "query": "@types/node vs @types/bun conflict",
+      "why": "scoped packages"
+    },
+    {
+      "query": "@babel/preset-env targets browserslist",
+      "why": "scoped package"
+    },
+    {
+      "query": "react@18.2.0 vs react@19.0.0-rc.1 useEffect cleanup",
+      "why": "semver with prerelease"
+    },
+    {
+      "query": "typescript ^5.4.0 satisfies operator",
+      "why": "semver range"
+    },
+    {
+      "query": "pnpm add -D vitest@^1.6.0 @vitest/coverage-v8",
+      "why": "cli with versions"
+    },
+    {
+      "query": "semver 1.2.3-beta.4+build.5 precedence",
+      "why": "semver with build metadata"
+    },
+    {
+      "query": "node 22.13.0 sqlite experimental warning",
+      "why": "version"
+    },
+    {
+      "query": "git show 3b18e51 --stat",
+      "why": "short sha (7)"
+    },
+    {
+      "query": "git cherry-pick a1b2c3d4e5f6",
+      "why": "short sha (12)"
+    },
+    {
+      "query": "git revert 3b18e512dba79e4c8300dd08aeb37f8e728b8dad",
+      "why": "full sha-1 is a hash, not a secret"
+    },
+    {
+      "query": "commit 9fceb02d0ae598e95dc970b74767f19372d61af8 broke the build",
+      "why": "full sha-1"
+    },
+    {
+      "query": "docker image sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "why": "sha-256 digest"
+    },
+    {
+      "query": "md5 hash e99a18c428cb38d5f260853678922e03 reverse lookup",
+      "why": "md5 digest length"
+    },
+    {
+      "query": "what is uuid 550e8400-e29b-41d4-a716-446655440000 version 4",
+      "why": "uuid is an identifier"
+    },
+    {
+      "query": "Postgres uuid_generate_v4 returns 123e4567-e89b-12d3-a456-426614174000",
+      "why": "uuid"
+    },
+    {
+      "query": "pod my-app-7d9f8c6b5-x2k4q CrashLoopBackOff",
+      "why": "kubernetes pod name, many separators"
+    },
+    {
+      "query": "host.docker.internal not resolving on linux",
+      "why": "container DNS name"
+    },
+    {
+      "query": "kubernetes.default.svc.cluster.local dns resolution",
+      "why": "cluster DNS name"
+    },
+    {
+      "query": "my-service.default.svc.cluster.local connection refused",
+      "why": "cluster DNS name"
+    },
+    {
+      "query": "docker compose redis connection refused",
+      "why": "bare service word"
+    },
+    {
+      "query": "redis://redis:6379 ECONNREFUSED",
+      "why": "datastore URL with compose service name"
+    },
+    {
+      "query": "postgres://postgres:postgres@db:5432/app connection refused",
+      "why": "default credentials and compose service"
+    },
+    {
+      "query": "localhost:3000 not loading next.js",
+      "why": "localhost"
+    },
+    {
+      "query": "curl http://localhost:8080/health returns 502",
+      "why": "localhost URL"
+    },
+    {
+      "query": "mongodb://localhost:27017/test mongoose connect",
+      "why": "localhost, no credentials"
+    },
+    {
+      "query": "https://user:pass@example.com basic auth in url deprecated",
+      "why": "placeholder credentials"
+    },
+    {
+      "query": "https://user:password@example.com/path",
+      "why": "placeholder credentials"
+    },
+    {
+      "query": ".env.local not loaded next.js",
+      "why": "dotfile, not a host"
+    },
+    {
+      "query": "settings.local.json claude code",
+      "why": "file name, suffix is not last label"
+    },
+    {
+      "query": "tsconfig.json paths alias not resolving",
+      "why": "file name"
+    },
+    {
+      "query": "/Users/me/project/node_modules/.pnpm/react@18.2.0/node_modules/react/index.js",
+      "why": "file path"
+    },
+    {
+      "query": "src/components/shared/ui/Button/Button.tsx storybook story",
+      "why": "repo path"
+    },
+    {
+      "query": "node:internal/modules/cjs/loader:1228 throw err",
+      "why": "node internal frame"
+    },
+    {
+      "query": "com.acme.internal package-private access",
+      "why": "java package, not a host"
+    },
+    {
+      "query": "jdk.internal.misc.Unsafe InaccessibleObjectException",
+      "why": "java internal class"
+    },
+    {
+      "query": "getUserByEmailAddressAndPasswordHashFromDatabase typescript naming",
+      "why": "long camelCase identifier"
+    },
+    {
+      "query": "test_should_return_empty_list_when_user_has_no_orders pytest",
+      "why": "long snake_case identifier"
+    },
+    {
+      "query": "how-to-configure-nginx-reverse-proxy-with-ssl-2024",
+      "why": "long kebab slug"
+    },
+    {
+      "query": "sha512-Zk5MYsSqBvgGvCEHnLoK7BfrQ2vGOSKq+L2yJDhJ6L0FBMGSMnK4v0H9x0bUo7Y0Pr0nL2dAAb1dDnvjM7YHQ== npm integrity mismatch",
+      "why": "integrity hash"
+    },
+    {
+      "query": "2024-10-30T12:00:00.000Z iso 8601 parse javascript",
+      "why": "timestamp"
+    },
+    {
+      "query": "10.2.3 changelog breaking changes",
+      "why": "three-part version"
+    },
+    {
+      "query": "Windows 10.0.19045.0 build number",
+      "why": "version, octet out of range"
+    },
+    {
+      "query": "8.8.8.8 dns resolver",
+      "why": "public ip"
+    },
+    {
+      "query": "172.32.0.1 whois",
+      "why": "just outside 172.16/12"
+    },
+    {
+      "query": "192.169.0.1 who owns this",
+      "why": "just outside 192.168/16"
+    },
+    {
+      "query": "const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })",
+      "why": "template placeholder"
+    },
+    {
+      "query": "Authorization: Bearer <token> header format",
+      "why": "placeholder"
+    },
+    {
+      "query": "curl -H \"x-api-key: YOUR_API_KEY\" https://api.example.com",
+      "why": "placeholder key"
+    },
+    {
+      "query": "password=required validation error spring",
+      "why": "word, not a credential"
+    },
+    {
+      "query": "how to rotate an API key safely",
+      "why": "prose"
+    },
+    {
+      "query": "sk-learn vs scikit-learn import name",
+      "why": "short sk- word"
+    },
+    {
+      "query": "sk-learn-pipeline-column-transformer example",
+      "why": "sk- prefix without digits or entropy"
+    },
+    {
+      "query": "OPENAI_API_KEY environment variable not found",
+      "why": "name only, no value"
+    },
+    {
+      "query": "git@github.com:org/repo.git permission denied (publickey)",
+      "why": "scp-style remote"
+    },
+    {
+      "query": "ssh-keygen -t ed25519 -C \"me@example.com\"",
+      "why": "email on public domain"
+    },
+    {
+      "query": "-----BEGIN PRIVATE KEY----- header format pem",
+      "why": "header only, no key body"
+    },
+    {
+      "query": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9 decode header",
+      "why": "jwt header alone is not a token"
+    },
+    {
+      "query": "AKIAIOSFODNN7EXAMPLE aws docs example key",
+      "why": "documented example key"
+    },
+    {
+      "query": "jwt.verify error invalid signature jsonwebtoken",
+      "why": "prose"
+    },
+    {
+      "query": "CVE-2024-3094 xz backdoor",
+      "why": "identifier"
+    },
+    {
+      "query": "ffmpeg -i input.mp4 -c:v libx264 -crf 23 output.mp4",
+      "why": "cli"
+    },
+    {
+      "query": "S\u00e3o Paulo timezone moment \u65e5\u672c\u8a9e \u691c\u7d22 \ud83d\ude00",
+      "why": "unicode"
+    },
+    {
+      "query": "what does error code 0x80070005 mean",
+      "why": "hex error code"
+    },
+    {
+      "query": "kubectl get pods -n kube-system -l k8s-app=kube-dns",
+      "why": "cli"
+    },
+    {
+      "query": "ipv6 ::1 localhost loopback explained",
+      "why": "loopback is exempt by default"
+    },
+    {
+      "query": "mqtt://broker.example.com:1883 subscribe",
+      "why": "public host"
+    },
+    {
+      "query": "s3://my-bucket/path/to/object access denied",
+      "why": "non-network scheme"
+    },
+    {
+      "query": "forgot-password: https://example.com/reset-flow-2 redirect",
+      "why": "url value next to password name"
+    },
+    {
+      "query": "https://github.com/facebook/react/blob/9e3b772b8cabbd8cadc7522ebe3dde3279e79d9e/packages/react/src/React.js#L42 permalink",
+      "why": "commit hash inside a URL path"
+    },
+    {
+      "query": "https://www.notion.so/Project-Planning-Roadmap-1429989fe8ac4effbc8f57f56486db54 notion page",
+      "why": "slug ending in a page id"
+    },
+    {
+      "query": "useBase64EncodeStringUtilityFunctionForNode18 naming",
+      "why": "long identifier with digits"
+    },
+    {
+      "query": "getUserById1234ForTheAdminDashboardViewComponent typescript",
+      "why": "camelCase identifier with digits"
+    },
+    {
+      "query": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7vbqajDhAcF9xK2mQd5ZtYpLw8Nn3RgHsVuJ0iXoEeBkTfM1yCzPaS4lDrWqGhUj6OnI7vA9bYtKxEcLpZmQwRf3N me@laptop",
+      "why": "ssh public key blob"
+    },
+    {
+      "query": "ssh-keygen -lf key.pub 256 SHA256:nThbg6kXUpJWGl7E1IGOCspRomTxdCARLviKw6E5SY8 me@host (ED25519)",
+      "why": "public key fingerprint"
+    },
+    {
+      "query": "python threading.local vs contextvars",
+      "why": ".local suffix in code, no host context"
+    },
+    {
+      "query": "threading.local() thread safety in asyncio",
+      "why": ".local call"
+    },
+    {
+      "query": "docker run -e POSTGRES_PASSWORD=mysecretpassword postgres",
+      "why": "word password, no digits"
+    },
+    {
+      "query": "ftp://anonymous:anonymous@ftp.example.com directory listing",
+      "why": "anonymous ftp"
+    },
+    {
+      "query": "aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY docs example",
+      "why": "documented AWS example secret"
+    },
+    {
+      "query": "MIME type text/x-shellscript charset=utf-8 boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW",
+      "why": "multipart boundary"
+    }
+  ]
+}

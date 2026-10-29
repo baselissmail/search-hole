@@ -1,0 +1,11 @@
+# .searchhole.yaml (project) — golden fixture
+version: 1
+profiles:
+  coding:
+    match: { keywords: [react] }
+    engines: [searxng]
+rules:
+  - { match: stackoverflow.com, action: raise, weight: 2 }
+  - { match: w3schools.com, action: allow, profile: [coding, docs] }
+  - { match: example.net, action: quarantine }
+  - { match: example.com, action: block, colour: red }

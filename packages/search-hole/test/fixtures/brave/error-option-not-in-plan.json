@@ -1,0 +1,11 @@
+{
+  "type": "ErrorResponse",
+  "error": {
+    "id": "b9c0d0a8-9a62-4a3d-8c2f-5ee1c0a0b1b2",
+    "status": 403,
+    "code": "OPTION_NOT_IN_PLAN",
+    "detail": "Option Not in Plan: goggles require a plan that includes them.",
+    "meta": { "component": "plan_checker" }
+  },
+  "time": 1788100000
+}

@@ -1,0 +1,13 @@
+{
+  "type": "search",
+  "query": { "original": "python asyncio taskgroup", "more_results_available": false },
+  "web": {
+    "type": "search",
+    "mutated_by_goggles": true,
+    "results": [
+      { "title": "Coroutines and tasks — Python 3.15 documentation", "url": "https://docs.python.org/3/library/asyncio-task.html", "description": "Task groups combine a task creation API with a convenient and reliable way to wait for all tasks in the group to finish.", "page_age": "2026-09-14T11:00:00", "age": "1 month ago" },
+      { "title": "asyncio.TaskGroup - Real Python", "url": "https://realpython.com/python-asyncio-taskgroup/", "description": "Structured concurrency with TaskGroup.", "age": "3 months ago" },
+      { "title": "PEP 654 – Exception Groups and except*", "url": "https://peps.python.org/pep-0654/", "description": "This PEP introduces language extensions that allow programs to raise and handle multiple unrelated exceptions simultaneously.", "page_age": "2021-02-22T00:00:00" }
+    ]
+  }
+}

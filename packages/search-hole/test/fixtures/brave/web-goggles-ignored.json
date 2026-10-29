@@ -1,0 +1,12 @@
+{
+  "type": "search",
+  "query": { "original": "python asyncio taskgroup", "more_results_available": false },
+  "web": {
+    "type": "search",
+    "mutated_by_goggles": false,
+    "results": [
+      { "title": "asyncio TaskGroup tutorial | spam-site.example", "url": "https://spam-site.example/asyncio-taskgroup", "description": "Learn asyncio TaskGroup in 5 minutes.", "age": "2 days ago" },
+      { "title": "Coroutines and tasks — Python 3.15 documentation", "url": "https://docs.python.org/3/library/asyncio-task.html", "description": "Task groups combine a task creation API.", "page_age": "2026-09-14T11:00:00" }
+    ]
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "query": "react compiler",
+  "follow_up_questions": null,
+  "answer": null,
+  "images": [],
+  "results": [
+    {
+      "url": "https://react.dev/learn/react-compiler",
+      "title": "React Compiler – React",
+      "content": "React Compiler is a new build-time tool that automatically optimizes your React app. It works with plain JavaScript and understands the Rules of React.",
+      "score": 0.93214,
+      "raw_content": null,
+      "published_date": "Tue, 07 Oct 2025 16:21:03 GMT"
+    },
+    {
+      "url": "https://react.dev/blog/2025/10/07/react-compiler-1",
+      "title": "Introducing React Compiler 1.0 – React",
+      "content": "We are releasing React Compiler 1.0, a stable release ready for production.",
+      "score": 0.91107,
+      "raw_content": null,
+      "published_date": "2025-10-07T00:00:00Z"
+    },
+    {
+      "url": "https://github.com/facebook/react/tree/main/compiler",
+      "title": "react/compiler at main · facebook/react",
+      "content": "The React Compiler is a build-time only tool that automatically memoizes your React components.",
+      "score": 0.84031,
+      "raw_content": null
+    },
+    {
+      "url": "https://www.npmjs.com/package/babel-plugin-react-compiler",
+      "title": "babel-plugin-react-compiler - npm",
+      "content": "Babel plugin for the React Compiler.",
+      "score": 0.71882,
+      "raw_content": null,
+      "published_date": "2026-08-19T20:41:12"
+    },
+    {
+      "url": "https://stackoverflow.com/questions/78901234/react-compiler-is-it-worth-it",
+      "title": "React Compiler: is it worth it? - Stack Overflow",
+      "content": "I enabled the compiler and my bundle grew. Does the compiler replace useMemo and useCallback entirely?",
+      "score": 0.60012,
+      "raw_content": null,
+      "published_date": "not a date"
+    },
+    {
+      "url": "javascript:alert(1)",
+      "title": "Bad scheme result",
+      "content": "This one must be dropped by the adapter.",
+      "score": 0.5,
+      "raw_content": null
+    }
+  ],
+  "response_time": 1.37,
+  "request_id": "123e4567-e89b-12d3-a456-426614174111"
+}

@@ -1,0 +1,330 @@
+{
+  "_doc": "True positives for ADR-0015 point 4. Templates are expanded by hygiene.test.ts with a seeded PRNG so no literal credential-shaped string lives in the repo. Placeholders: {b62:N} A-Za-z0-9, {b64u:N} base64url, {b64:N} base64 (+/), {hex:N} lowercase hex, {upper:N} A-Z0-9, {num:N} digits.",
+  "cases": [
+    {
+      "id": "openai-legacy",
+      "class": "api_key",
+      "template": "my key is sk-{b62:48} and I get a 401"
+    },
+    {
+      "id": "openai-proj",
+      "class": "api_key",
+      "template": "sk-proj-{b64u:80} invalid_api_key"
+    },
+    {
+      "id": "anthropic",
+      "class": "api_key",
+      "template": "ANTHROPIC key sk-ant-api03-{b64u:90} authentication_error"
+    },
+    {
+      "id": "github-classic",
+      "class": "api_key",
+      "template": "curl -H \"Authorization: token ghp_{b62:36}\" https://api.github.com/user"
+    },
+    {
+      "id": "github-oauth",
+      "class": "api_key",
+      "template": "gho_{b62:36}"
+    },
+    {
+      "id": "github-server",
+      "class": "api_key",
+      "template": "token ghs_{b62:36} expired"
+    },
+    {
+      "id": "github-fine-grained",
+      "class": "api_key",
+      "template": "github_pat_{b62:22}_{b62:59}"
+    },
+    {
+      "id": "slack-bot",
+      "class": "api_key",
+      "template": "SLACK_BOT xoxb-{num:12}-{num:13}-{b62:24}"
+    },
+    {
+      "id": "slack-user",
+      "class": "api_key",
+      "template": "xoxp-{num:12}-{num:12}-{num:13}-{hex:32}"
+    },
+    {
+      "id": "slack-app",
+      "class": "api_key",
+      "template": "xapp-1-A{upper:10}-{num:13}-{hex:60}"
+    },
+    {
+      "id": "aws-akia",
+      "class": "api_key",
+      "template": "aws configure AKIA{upper:16} denied"
+    },
+    {
+      "id": "aws-asia",
+      "class": "api_key",
+      "template": "ASIA{upper:16} session token expired"
+    },
+    {
+      "id": "google-api-key",
+      "class": "api_key",
+      "template": "maps key AIza{b64u:35} referer error"
+    },
+    {
+      "id": "gitlab-pat",
+      "class": "api_key",
+      "template": "glpat-{b64u:20}"
+    },
+    {
+      "id": "npm-token",
+      "class": "api_key",
+      "template": "//registry.npmjs.org/:_authToken npm_{b62:36}"
+    },
+    {
+      "id": "stripe-live",
+      "class": "api_key",
+      "template": "stripe sk_live_{b62:24} webhook"
+    },
+    {
+      "id": "stripe-restricted",
+      "class": "api_key",
+      "template": "rk_test_{b62:24}"
+    },
+    {
+      "id": "sendgrid",
+      "class": "api_key",
+      "template": "SG.{b64u:22}.{b64u:43} 401"
+    },
+    {
+      "id": "huggingface",
+      "class": "api_key",
+      "template": "huggingface-cli login hf_{b62:34}"
+    },
+    {
+      "id": "tavily",
+      "class": "api_key",
+      "template": "tavily tvly-{b62:32} quota"
+    },
+    {
+      "id": "tavily-dev",
+      "class": "api_key",
+      "template": "tvly-dev-{b62:32}"
+    },
+    {
+      "id": "brave",
+      "class": "api_key",
+      "template": "X-Subscription-Token BSA{b62:28}"
+    },
+    {
+      "id": "bearer",
+      "class": "api_key",
+      "template": "Authorization: Bearer {b64u:40} returns 403"
+    },
+    {
+      "id": "basic-header",
+      "class": "api_key",
+      "template": "Authorization: Basic {b64:28}"
+    },
+    {
+      "id": "jwt",
+      "class": "jwt",
+      "template": "decode eyJ{b64u:20}.eyJ{b64u:60}.{b64u:43}"
+    },
+    {
+      "id": "jwt-only",
+      "class": "jwt",
+      "template": "eyJ{b64u:30}.eyJ{b64u:40}.{b64u:20}"
+    },
+    {
+      "id": "pem-rsa",
+      "class": "private_key",
+      "template": "-----BEGIN RSA PRIVATE KEY-----\n{b64:64}\n{b64:64}\n{b64:40}\n-----END RSA PRIVATE KEY-----\nwhy does openssl reject this"
+    },
+    {
+      "id": "pem-pkcs8",
+      "class": "private_key",
+      "template": "-----BEGIN PRIVATE KEY----- {b64:64} {b64:64} -----END PRIVATE KEY-----"
+    },
+    {
+      "id": "pem-openssh",
+      "class": "private_key",
+      "template": "-----BEGIN OPENSSH PRIVATE KEY-----\n{b64:70}\n-----END OPENSSH PRIVATE KEY-----"
+    },
+    {
+      "id": "pem-truncated",
+      "class": "private_key",
+      "template": "-----BEGIN EC PRIVATE KEY-----\n{b64:64}"
+    },
+    {
+      "id": "conn-postgres",
+      "class": "connection_string",
+      "template": "postgres://app:{b62:16}@db.example.com:5432/app ssl error"
+    },
+    {
+      "id": "conn-mongodb-srv",
+      "class": "connection_string",
+      "template": "mongodb+srv://svc:{b62:20}@cluster0.abc12.mongodb.net/test"
+    },
+    {
+      "id": "conn-redis-empty-user",
+      "class": "connection_string",
+      "template": "redis://:{b62:20}@cache.example.com:6379 NOAUTH"
+    },
+    {
+      "id": "conn-https-basic",
+      "class": "connection_string",
+      "template": "git clone https://deploy:{b62:20}@git.example.com/org/repo.git"
+    },
+    {
+      "id": "conn-amqp",
+      "class": "connection_string",
+      "template": "amqps://worker:{b62:14}@mq.example.org/vhost"
+    },
+    {
+      "id": "assign-env-password",
+      "class": "secret_assignment",
+      "template": "DB_PASSWORD={b62:20} not accepted"
+    },
+    {
+      "id": "assign-json-api-key",
+      "class": "secret_assignment",
+      "template": "{ \"api_key\": \"{b62:24}\" } 401"
+    },
+    {
+      "id": "assign-client-secret",
+      "class": "secret_assignment",
+      "template": "client_secret: {b62:30}"
+    },
+    {
+      "id": "assign-query-token",
+      "class": "secret_assignment",
+      "template": "GET /v1/items?access_token={b62:30}"
+    },
+    {
+      "id": "entropy-b62-40",
+      "class": "high_entropy",
+      "template": "what is this string {b62:40}"
+    },
+    {
+      "id": "entropy-b64-with-padding",
+      "class": "high_entropy",
+      "template": "decode {b64:43}="
+    },
+    {
+      "id": "entropy-b64u-43",
+      "class": "high_entropy",
+      "template": "{b64u:43}"
+    },
+    {
+      "id": "entropy-hex-48",
+      "class": "high_entropy",
+      "template": "{hex:48}"
+    },
+    {
+      "id": "host-single-label-http",
+      "class": "internal_host",
+      "template": "curl http://jenkins/job/build/lastBuild"
+    },
+    {
+      "id": "host-single-label-https",
+      "class": "internal_host",
+      "template": "https://confluence/display/ENG ssl certificate"
+    },
+    {
+      "id": "host-single-label-ldap",
+      "class": "internal_host",
+      "template": "ldap://dc01 bind failed"
+    },
+    {
+      "id": "host-internal",
+      "class": "internal_host",
+      "template": "ssh buildbox.internal permission denied"
+    },
+    {
+      "id": "host-corp",
+      "class": "internal_host",
+      "template": "db01.corp connection timed out"
+    },
+    {
+      "id": "host-local",
+      "class": "internal_host",
+      "template": "printer.local:631 cups"
+    },
+    {
+      "id": "host-lan",
+      "class": "internal_host",
+      "template": "nas.lan smb mount"
+    },
+    {
+      "id": "host-intranet",
+      "class": "internal_host",
+      "template": "https://wiki.intranet/pages"
+    },
+    {
+      "id": "host-home-arpa",
+      "class": "internal_host",
+      "template": "router.home.arpa dns"
+    },
+    {
+      "id": "host-uppercase",
+      "class": "internal_host",
+      "template": "JIRA.CORP login redirect"
+    },
+    {
+      "id": "host-email",
+      "class": "internal_host",
+      "template": "mail from me@mail.corp bounced"
+    },
+    {
+      "id": "ip-10",
+      "class": "private_ip",
+      "template": "ssh admin@10.1.2.3"
+    },
+    {
+      "id": "ip-10-port",
+      "class": "private_ip",
+      "template": "10.255.255.254:8080 connection refused"
+    },
+    {
+      "id": "ip-172-16",
+      "class": "private_ip",
+      "template": "route to 172.16.0.5 missing"
+    },
+    {
+      "id": "ip-172-31",
+      "class": "private_ip",
+      "template": "172.31.255.1 unreachable"
+    },
+    {
+      "id": "ip-192-168",
+      "class": "private_ip",
+      "template": "router 192.168.1.10 admin page"
+    },
+    {
+      "id": "ip-cidr",
+      "class": "private_ip",
+      "template": "allow 192.168.0.0/24 in ufw"
+    },
+    {
+      "id": "ip-link-local",
+      "class": "private_ip",
+      "template": "curl 169.254.169.254/latest/meta-data"
+    },
+    {
+      "id": "ip6-link-local",
+      "class": "private_ip",
+      "template": "ping fe80::1ff:fe23:4567:890a"
+    },
+    {
+      "id": "ip6-ula",
+      "class": "private_ip",
+      "template": "fd12:3456:789a::1 not routable"
+    },
+    {
+      "id": "aws-secret-bare",
+      "class": "api_key",
+      "template": "secret {b62:12}/{b62:12}+{b62:14} rejected"
+    },
+    {
+      "id": "aws-secret-assignment",
+      "class": "api_key",
+      "template": "aws_secret_access_key = {b64:40}"
+    }
+  ]
+}

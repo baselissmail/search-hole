@@ -1,0 +1,44 @@
+{
+  "description": "Deep search over three engines: www/AMP/mobile/AMP-cache variants, tracking params, a v= pair, a tie, a pin that is stale, blocks (rule and list), an audit list, stale results and an exa-only result that needs the coverage guarantee.",
+  "now": "2026-10-30T00:00:00Z",
+  "depth": "deep",
+  "limit": 6,
+  "freshness": { "maxAgeDays": 365 },
+  "engineOrder": ["searxng", "brave", "exa"],
+  "typedLists": { "react.dev": ["official"] },
+  "rules": [
+    { "id": "r_pin_react", "match": "react.dev", "action": "pin", "tier": "T3", "order": 0 },
+    { "id": "r_block_pinterest", "match": "pinterest.com", "action": "block", "tier": "T3" },
+    { "id": "l_farm", "match": "content-farm.example", "action": "block", "tier": "T4", "listId": "ai-content-farms" },
+    { "id": "r_raise_github", "match": "github.com", "action": "raise", "weight": 3, "tier": "T3" },
+    { "id": "r_lower_medium", "match": "medium.com", "action": "lower", "weight": 2, "tier": "T3" },
+    { "id": "r_lower_quora", "match": "quora.com", "action": "lower", "weight": 5, "tier": "T3" },
+    { "id": "a_w3s", "match": "w3schools.com", "action": "block", "tier": "T4", "listId": "audit-list", "audit": true }
+  ],
+  "raw": [
+    { "engine": "searxng", "rank": 1, "url": "https://react.dev/learn/react-compiler", "title": "React Compiler – React", "snippet": "The React Compiler is a build-time tool.", "dates": [{ "value": "2025-10-07", "kind": "published", "method": "engine:searxng.publishedDate", "confidence": "medium", "tzAssumed": false }], "via": ["duckduckgo", "brave"] },
+    { "engine": "searxng", "rank": 2, "url": "https://www.pinterest.com/pin/123", "title": "React pins", "snippet": "Pins.", "dates": [] },
+    { "engine": "searxng", "rank": 3, "url": "https://github.com/facebook/react/releases?utm_source=searx", "title": "Releases · facebook/react", "snippet": "React releases.", "dates": [] },
+    { "engine": "searxng", "rank": 4, "url": "https://amp.example-news.com/2026/03/react-compiler-stable/", "title": "React Compiler is stable", "snippet": "AMP page.", "dates": [{ "value": "2026-03-02", "kind": "published", "method": "engine:searxng.publishedDate", "confidence": "medium", "tzAssumed": false }] },
+    { "engine": "searxng", "rank": 5, "url": "https://medium.com/@dev/react-compiler-deep-dive", "title": "A deep dive", "snippet": "Old post.", "dates": [{ "value": "2024-02-01", "kind": "published", "method": "engine:searxng.publishedDate", "confidence": "medium", "tzAssumed": false }] },
+    { "engine": "searxng", "rank": 6, "url": "https://www.w3schools.com/react/react_compiler.asp", "title": "React Compiler", "snippet": "Tutorial.", "dates": [] },
+    { "engine": "searxng", "rank": 7, "url": "https://content-farm.example/react-compiler", "title": "10 React Compiler tips", "snippet": "Spam.", "dates": [] },
+    { "engine": "searxng", "rank": 8, "url": "https://dev.to/someone/react-compiler-notes", "title": "Notes on the React Compiler", "snippet": "My notes.", "dates": [{ "value": "2026-08-01", "kind": "published", "method": "engine:searxng.publishedDate", "confidence": "medium", "tzAssumed": false }] },
+    { "engine": "searxng", "rank": 9, "url": "https://www.youtube.com/watch?v=AAA&utm_source=x", "title": "React Compiler talk", "snippet": "Video.", "dates": [] },
+    { "engine": "searxng", "rank": 10, "url": "https://www-example--news-com.cdn.ampproject.org/c/s/www.example-news.com/2026/03/react-compiler-stable/", "title": "React Compiler is stable", "snippet": "AMP cache.", "dates": [] },
+
+    { "engine": "brave", "rank": 1, "url": "https://www.example-news.com/2026/03/react-compiler-stable", "title": "React Compiler is stable: what changes for your app", "snippet": "The React team marked the compiler stable in March 2026.", "dates": [{ "value": "2026-03-02T09:00:00Z", "kind": "published", "method": "engine:brave.page_age", "confidence": "medium", "tzAssumed": true }] },
+    { "engine": "brave", "rank": 2, "url": "http://react.dev/learn/react-compiler#installation", "title": "React Compiler", "snippet": "The React Compiler is a build-time tool that automatically optimizes your React app.", "dates": [] },
+    { "engine": "brave", "rank": 3, "url": "https://old.reddit.com/r/reactjs/comments/xyz/compiler/?ref=share", "title": "Is the React Compiler worth it?", "snippet": "Thread.", "dates": [{ "value": "2026-06-01", "kind": "published", "method": "engine:brave.page_age", "confidence": "medium", "tzAssumed": true }] },
+    { "engine": "brave", "rank": 4, "url": "https://github.com/facebook/react/releases", "title": "Releases", "snippet": "React releases on GitHub, with notes for every version.", "dates": [] },
+    { "engine": "brave", "rank": 5, "url": "https://pinterest.com/pin/123", "title": "React pins", "snippet": "Pins.", "dates": [] },
+    { "engine": "brave", "rank": 6, "url": "https://blog.example.dev/old-post", "title": "React performance in 2019", "snippet": "Old.", "dates": [{ "value": "2019-05-05", "kind": "published", "method": "engine:brave.page_age", "confidence": "medium", "tzAssumed": true }] },
+    { "engine": "brave", "rank": 7, "url": "https://stackoverflow.com/questions/1/react-compiler", "title": "How to enable the React Compiler?", "snippet": "Question.", "dates": [{ "value": "2026-09-01", "kind": "modified", "method": "http:last-modified", "confidence": "low", "tzAssumed": false }] },
+    { "engine": "brave", "rank": 8, "url": "https://news.ycombinator.com/item?id=4242", "title": "React Compiler 1.0", "snippet": "Discussion.", "dates": [{ "value": "2026-07-01", "kind": "published", "method": "engine:brave.page_age", "confidence": "medium", "tzAssumed": true }] },
+    { "engine": "brave", "rank": 9, "url": "https://m.youtube.com/watch?v=AAA", "title": "React Compiler talk", "snippet": "Video.", "dates": [] },
+    { "engine": "brave", "rank": 10, "url": "https://www.youtube.com/watch?v=BBB", "title": "Another talk", "snippet": "Video.", "dates": [] },
+
+    { "engine": "exa", "rank": 1, "url": "https://www.quora.com/What-is-React-Compiler", "title": "What is React Compiler?", "snippet": "Answers.", "dates": [{ "value": "2026-05-01", "kind": "published", "method": "engine:exa.publishedDate", "confidence": "medium", "tzAssumed": false }] },
+    { "engine": "exa", "rank": 2, "url": "https://pinterest.com/pin/999", "title": "More pins", "snippet": "Pins.", "dates": [] }
+  ]
+}

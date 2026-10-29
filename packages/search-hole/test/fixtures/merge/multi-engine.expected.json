@@ -1,0 +1,113 @@
+{
+  "note": "Hand-computed with k = 20. Scores rounded to 6 decimals. See src/core/merge/golden.test.ts for the derivation.",
+  "results": [
+    {
+      "url": "https://react.dev/learn/react-compiler",
+      "canonicalKey": "//react.dev/learn/react-compiler",
+      "urls": ["https://react.dev/learn/react-compiler", "http://react.dev/learn/react-compiler"],
+      "engines": ["searxng", "brave"],
+      "positions": { "searxng": 1, "brave": 2 },
+      "fused": 0.093074,
+      "adjusted": 0.093074,
+      "title": "React Compiler – React",
+      "snippet": "The React Compiler is a build-time tool that automatically optimizes your React app.",
+      "effectiveDate": "2025-10-07",
+      "sourceType": "official",
+      "flags": ["pinned", "stale"]
+    },
+    {
+      "url": "https://github.com/facebook/react/releases",
+      "canonicalKey": "//github.com/facebook/react/releases",
+      "urls": ["https://github.com/facebook/react/releases", "https://github.com/facebook/react/releases?utm_source=searx"],
+      "engines": ["searxng", "brave"],
+      "positions": { "searxng": 3, "brave": 4 },
+      "fused": 0.085145,
+      "adjusted": 0.12346,
+      "title": "Releases · facebook/react",
+      "snippet": "React releases on GitHub, with notes for every version.",
+      "sourceType": "repo",
+      "flags": ["raised", "date_unknown"]
+    },
+    {
+      "url": "https://www.example-news.com/2026/03/react-compiler-stable",
+      "canonicalKey": "//example-news.com/2026/03/react-compiler-stable",
+      "urls": [
+        "https://www.example-news.com/2026/03/react-compiler-stable",
+        "https://amp.example-news.com/2026/03/react-compiler-stable/",
+        "https://www-example--news-com.cdn.ampproject.org/c/s/www.example-news.com/2026/03/react-compiler-stable/"
+      ],
+      "engines": ["searxng", "brave"],
+      "positions": { "searxng": 4, "brave": 1 },
+      "fused": 0.089286,
+      "adjusted": 0.089286,
+      "title": "React Compiler is stable: what changes for your app",
+      "snippet": "The React team marked the compiler stable in March 2026.",
+      "effectiveDate": "2026-03-02",
+      "sourceType": "unknown",
+      "flags": []
+    },
+    {
+      "url": "https://www.youtube.com/watch?v=AAA&utm_source=x",
+      "canonicalKey": "//youtube.com/watch?v=AAA",
+      "urls": ["https://www.youtube.com/watch?v=AAA&utm_source=x", "https://m.youtube.com/watch?v=AAA"],
+      "engines": ["searxng", "brave"],
+      "positions": { "searxng": 9, "brave": 9 },
+      "fused": 0.068966,
+      "adjusted": 0.068966,
+      "title": "React Compiler talk",
+      "snippet": "Video.",
+      "sourceType": "unknown",
+      "flags": ["date_unknown"]
+    },
+    {
+      "url": "https://old.reddit.com/r/reactjs/comments/xyz/compiler/?ref=share",
+      "canonicalKey": "//old.reddit.com/r/reactjs/comments/xyz/compiler",
+      "urls": ["https://old.reddit.com/r/reactjs/comments/xyz/compiler/?ref=share"],
+      "engines": ["brave"],
+      "positions": { "brave": 3 },
+      "fused": 0.043478,
+      "adjusted": 0.043478,
+      "title": "Is the React Compiler worth it?",
+      "snippet": "Thread.",
+      "effectiveDate": "2026-06-01",
+      "sourceType": "forum",
+      "flags": []
+    },
+    {
+      "url": "https://www.quora.com/What-is-React-Compiler",
+      "canonicalKey": "//quora.com/What-is-React-Compiler",
+      "urls": ["https://www.quora.com/What-is-React-Compiler"],
+      "engines": ["exa"],
+      "positions": { "exa": 1 },
+      "fused": 0.047619,
+      "adjusted": 0.027211,
+      "title": "What is React Compiler?",
+      "snippet": "Answers.",
+      "effectiveDate": "2026-05-01",
+      "sourceType": "forum",
+      "flags": ["coverage", "lowered"],
+      "keptReason": "coverage"
+    }
+  ],
+  "overflow": [
+    { "url": "https://www.w3schools.com/react/react_compiler.asp", "adjusted": 0.038462, "flags": ["date_unknown", "would_hide"] },
+    { "url": "https://stackoverflow.com/questions/1/react-compiler", "adjusted": 0.037037, "flags": ["date_unknown"] },
+    { "url": "https://dev.to/someone/react-compiler-notes", "adjusted": 0.035714, "flags": [] },
+    { "url": "https://news.ycombinator.com/item?id=4242", "adjusted": 0.035714, "flags": [] },
+    { "url": "https://www.youtube.com/watch?v=BBB", "adjusted": 0.033333, "flags": ["date_unknown"] }
+  ],
+  "hidden": [
+    { "url": "https://www.pinterest.com/pin/123", "hiddenReason": "rule", "positions": { "searxng": 2 }, "ruleId": "r_block_pinterest" },
+    { "url": "https://pinterest.com/pin/999", "hiddenReason": "rule", "positions": { "exa": 2 }, "ruleId": "r_block_pinterest" },
+    { "url": "https://medium.com/@dev/react-compiler-deep-dive", "hiddenReason": "stale", "positions": { "searxng": 5 }, "flags": ["lowered", "stale"] },
+    { "url": "https://pinterest.com/pin/123", "hiddenReason": "rule", "positions": { "brave": 5 }, "ruleId": "r_block_pinterest" },
+    { "url": "https://blog.example.dev/old-post", "hiddenReason": "stale", "positions": { "brave": 6 }, "flags": ["stale"] },
+    { "url": "https://content-farm.example/react-compiler", "hiddenReason": "list", "positions": { "searxng": 7 }, "ruleId": "l_farm" }
+  ],
+  "warnings": [],
+  "hiddenSummary": {
+    "count": 6,
+    "byReason": { "rule": 3, "stale": 2, "list": 1 },
+    "topDomains": ["pinterest.com", "content-farm.example", "example.dev", "medium.com"]
+  }
+}

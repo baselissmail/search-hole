@@ -1,0 +1,158 @@
+{
+  "type": "search",
+  "query": {
+    "original": "react compiler",
+    "show_strict_warning": false,
+    "is_navigational": false,
+    "is_news_breaking": false,
+    "spellcheck_off": false,
+    "country": "us",
+    "bad_results": false,
+    "should_fallback": false,
+    "postal_code": "",
+    "city": "",
+    "header_country": "",
+    "more_results_available": true,
+    "state": ""
+  },
+  "mixed": {
+    "type": "mixed",
+    "main": [
+      { "type": "web", "index": 0, "all": false },
+      { "type": "web", "index": 1, "all": false },
+      { "type": "web", "index": 2, "all": false }
+    ],
+    "top": [],
+    "side": []
+  },
+  "web": {
+    "type": "search",
+    "family_friendly": true,
+    "results": [
+      {
+        "title": "React Compiler – React",
+        "url": "https://react.dev/learn/react-compiler",
+        "is_source_local": false,
+        "is_source_both": false,
+        "description": "React Compiler is a new build-time tool that automatically optimizes your React app. It works with plain JavaScript, and understands the Rules of React, so you don't need to rewrite any code to use it.",
+        "page_age": "2025-10-07T16:21:03",
+        "profile": { "name": "React", "url": "https://react.dev/learn/react-compiler", "long_name": "react.dev", "img": "https://imgs.search.brave.com/x/react.png" },
+        "language": "en",
+        "family_friendly": true,
+        "type": "search_result",
+        "subtype": "generic",
+        "is_live": false,
+        "meta_url": { "scheme": "https", "netloc": "react.dev", "hostname": "react.dev", "favicon": "https://imgs.search.brave.com/x/f.png", "path": "› learn › react-compiler" },
+        "age": "October 7, 2025",
+        "extra_snippets": [
+          "Learn what React Compiler does and how it automatically optimizes your React application by handling memoization for you."
+        ]
+      },
+      {
+        "title": "facebook/react: compiler README",
+        "url": "https://github.com/facebook/react/tree/main/compiler",
+        "is_source_local": false,
+        "is_source_both": false,
+        "description": "The React Compiler is a build-time only tool that automatically memoizes your React components. It&#x27;s used in production at Meta &amp; others.",
+        "page_age": "2026-03-02T09:14:55",
+        "profile": { "name": "GitHub", "url": "https://github.com/facebook/react/tree/main/compiler", "long_name": "github.com", "img": "https://imgs.search.brave.com/x/gh.png" },
+        "language": "en",
+        "family_friendly": true,
+        "type": "search_result",
+        "subtype": "software",
+        "is_live": false,
+        "meta_url": { "scheme": "https", "netloc": "github.com", "hostname": "github.com", "favicon": "https://imgs.search.brave.com/x/f2.png", "path": "› facebook › react › tree › main › compiler" },
+        "age": "5 months ago"
+      },
+      {
+        "title": "Introducing React Compiler 1.0",
+        "url": "https://react.dev/blog/2025/10/07/react-compiler-1",
+        "is_source_local": false,
+        "is_source_both": false,
+        "description": "We are releasing React Compiler 1.0, a stable release ready for production.",
+        "page_age": "2025-10-07T00:00:00",
+        "article": { "author": [{ "type": "person", "name": "The React Team" }], "date": "2025-10-07T00:00:00Z", "publisher": { "type": "organization", "name": "React" } },
+        "language": "en",
+        "family_friendly": true,
+        "type": "search_result",
+        "subtype": "article",
+        "is_live": false,
+        "meta_url": { "scheme": "https", "netloc": "react.dev", "hostname": "react.dev", "favicon": "", "path": "› blog › 2025 › 10 › 07" },
+        "age": "October 7, 2025"
+      },
+      {
+        "title": "How the React Compiler works - a deep dive",
+        "url": "https://www.example-blog.dev/posts/react-compiler-internals?utm_source=newsletter",
+        "is_source_local": false,
+        "is_source_both": false,
+        "description": "A walk through the HIR, the reactive scopes and the memoization codegen.",
+        "language": "en",
+        "family_friendly": true,
+        "type": "search_result",
+        "subtype": "article",
+        "is_live": false,
+        "meta_url": { "scheme": "https", "netloc": "example-blog.dev", "hostname": "www.example-blog.dev", "favicon": "", "path": "› posts › react-compiler-internals" },
+        "age": "2 months ago"
+      },
+      {
+        "title": "react-compiler - npm",
+        "url": "https://www.npmjs.com/package/babel-plugin-react-compiler",
+        "is_source_local": false,
+        "is_source_both": false,
+        "description": "babel-plugin-react-compiler. Babel plugin for the React Compiler.",
+        "page_age": "2026-08-19T20:41:12",
+        "language": "en",
+        "family_friendly": true,
+        "type": "search_result",
+        "subtype": "software",
+        "is_live": false,
+        "meta_url": { "scheme": "https", "netloc": "npmjs.com", "hostname": "www.npmjs.com", "favicon": "", "path": "› package › babel-plugin-react-compiler" },
+        "age": "2 months ago"
+      },
+      {
+        "title": "React Compiler: is it worth it? - Stack Overflow",
+        "url": "https://stackoverflow.com/questions/78901234/react-compiler-is-it-worth-it",
+        "is_source_local": false,
+        "is_source_both": false,
+        "description": "I enabled the compiler and my bundle grew. Does the compiler replace useMemo and useCallback entirely?",
+        "page_age": "2024-09-02T07:30:00",
+        "language": "en",
+        "family_friendly": true,
+        "type": "search_result",
+        "subtype": "qa",
+        "is_live": false,
+        "meta_url": { "scheme": "https", "netloc": "stackoverflow.com", "hostname": "stackoverflow.com", "favicon": "", "path": "› questions › 78901234" },
+        "age": "September 2, 2024"
+      },
+      {
+        "title": "React Compiler playground",
+        "url": "https://playground.react.dev/",
+        "is_source_local": false,
+        "is_source_both": false,
+        "description": "Try React Compiler in your browser and inspect the compiled output.",
+        "language": "en",
+        "family_friendly": true,
+        "type": "search_result",
+        "subtype": "generic",
+        "is_live": false,
+        "meta_url": { "scheme": "https", "netloc": "react.dev", "hostname": "playground.react.dev", "favicon": "", "path": "" },
+        "age": "1 week ago"
+      },
+      {
+        "title": "Meta's React Compiler explained (video)",
+        "url": "https://www.youtube.com/watch?v=lGEMwh32soc",
+        "is_source_local": false,
+        "is_source_both": false,
+        "description": "A short video on how the compiler removes the need for manual memoization.",
+        "page_age": "2025-05-21T13:05:00",
+        "language": "en",
+        "family_friendly": true,
+        "type": "search_result",
+        "subtype": "video",
+        "is_live": false,
+        "meta_url": { "scheme": "https", "netloc": "youtube.com", "hostname": "www.youtube.com", "favicon": "", "path": "› watch" },
+        "age": "May 21, 2025"
+      }
+    ]
+  }
+}

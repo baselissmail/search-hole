@@ -1,0 +1,36 @@
+# ~/.searchhole/rules.yaml (global) — golden fixture for the loader
+$schema: https://search-hole.dev/schema/rules-v1.json
+version: 1
+defaults:
+  engines: [searxng, brave]
+  depth: standard
+profiles:
+  coding:
+    match: { keywords: [docs, api, error, npm, pip, typescript, react] }
+    prefer: { lists: [official-docs] }
+    freshness: { maxAgeDays: 730, requireDate: false }
+  prices-news:
+    match: { regex: "(?i)\\bprices?\\b" }
+    freshness: { maxAgeDays: 30 }
+  "2024":
+    default: block
+rules:
+  - { match: pinterest.com, action: block }
+  - { match: "*.medium.com", action: lower, weight: 3 }
+  - { match: "=example.com", action: allow }
+  - { match: "github.com/orgname/", action: raise, weight: 2 }
+  - { match: "|https://*.example.*/amp/^", action: block }
+  - { match: "/-tutorial-.*\\.xyz$/", action: block }
+  - { match: developer.mozilla.org, action: pin, profile: coding }
+  - { match: w3schools.com, action: block, important: true, note: "never" }
+  - { match: example.org, action: block, until: 2026-12-31 }
+  - match: pinterest.com
+    action: block
+subscriptions:
+  - { name: seo-spam, url: "https://lists.example/seo-spam.txt", format: ublacklist, update: 7d }
+  - name: official-docs
+    url: https://lists.example/official-docs.txt
+    format: domains
+    kind: official
+    mode: audit
+    sha256: 0123456789ABCDEF0123456789abcdef0123456789abcdef0123456789abcdef

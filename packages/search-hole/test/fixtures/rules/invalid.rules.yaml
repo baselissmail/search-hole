@@ -1,0 +1,11 @@
+version: 1
+rules:
+  - { match: ok.example, action: block }
+  - { match: "/(?=x)y/", action: block }
+  - { match: fine.example, action: raise, weight: 11 }
+  - match: "*a*b*c"
+    action: block
+  - { action: block }
+profiles:
+  bad:
+    match: { regex: ["(a)\\1"] }

@@ -1,0 +1,10 @@
+{
+  "type": "search",
+  "query": { "original": "reakt compiler", "altered": "react compiler", "spellcheck_off": false, "more_results_available": true },
+  "web": {
+    "type": "search",
+    "results": [
+      { "title": "React Compiler – React", "url": "https://react.dev/learn/react-compiler", "description": "React Compiler is a new build-time tool.", "page_age": "2025-10-07T16:21:03" }
+    ]
+  }
+}

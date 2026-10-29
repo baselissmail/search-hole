@@ -1,0 +1,11 @@
+{
+  "type": "ErrorResponse",
+  "error": {
+    "id": "0d0b0c11-3f2d-4c59-8df6-0e2d1b8a7c10",
+    "status": 429,
+    "code": "QUOTA_LIMITED",
+    "detail": "Request quota limit exceeded for plan.",
+    "meta": { "plan": "Base", "rate_limit": 1, "rate_current": 0, "quota_limit": 1000, "quota_current": 1000, "component": "quota_limiter" }
+  },
+  "time": 1788100000
+}

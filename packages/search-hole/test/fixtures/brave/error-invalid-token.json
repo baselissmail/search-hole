@@ -1,0 +1,11 @@
+{
+  "type": "ErrorResponse",
+  "error": {
+    "id": "f1c4a2de-6b0e-4e0a-a1d3-77f0f6f5a1aa",
+    "status": 422,
+    "code": "SUBSCRIPTION_TOKEN_INVALID",
+    "detail": "The provided subscription token is invalid.",
+    "meta": { "component": "authentication" }
+  },
+  "time": 1788100000
+}

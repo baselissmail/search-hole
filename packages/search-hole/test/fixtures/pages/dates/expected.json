@@ -1,0 +1,148 @@
+{
+  "fetchedAt": "2026-10-30T12:00:00.000Z",
+  "cases": {
+    "jsonld-article.html": {
+      "url": "https://example.com/blog/shipping",
+      "dates": [
+        { "value": "2024-03-05T08:30:00.000Z", "kind": "published", "method": "jsonld:datePublished", "confidence": "high", "tzAssumed": false },
+        { "value": "2025-01-10T16:00:00.000Z", "kind": "modified", "method": "jsonld:dateModified", "confidence": "high", "tzAssumed": false }
+      ]
+    },
+    "jsonld-graph.html": {
+      "url": "https://blog.example/post/",
+      "dates": [
+        { "value": "2022-11-02T08:00:00.000Z", "kind": "published", "method": "jsonld:datePublished", "confidence": "high", "tzAssumed": false },
+        { "value": "2023-02-03T08:00:00.000Z", "kind": "modified", "method": "jsonld:dateModified", "confidence": "high", "tzAssumed": false },
+        { "value": "2022-11-01T00:00:00.000Z", "kind": "published", "method": "jsonld:datePublished", "confidence": "high", "tzAssumed": false },
+        { "value": "2023-02-01T00:00:00.000Z", "kind": "modified", "method": "jsonld:dateModified", "confidence": "high", "tzAssumed": false }
+      ]
+    },
+    "jsonld-mainentity.html": {
+      "url": "https://news.example/world/story",
+      "dates": [
+        { "value": "2023-06-15T12:00:00.000Z", "kind": "published", "method": "jsonld:datePublished", "confidence": "high", "tzAssumed": false },
+        { "value": "2023-06-16T07:45:00.000Z", "kind": "modified", "method": "jsonld:dateModified", "confidence": "high", "tzAssumed": false }
+      ]
+    },
+    "jsonld-wrapped.html": {
+      "url": "https://forum.example/t/pin-a-dependency/42",
+      "dates": [
+        { "value": "2024-08-21T01:22:05.000Z", "kind": "published", "method": "jsonld:datePublished", "confidence": "high", "tzAssumed": false }
+      ]
+    },
+    "opengraph.html": {
+      "url": "https://news.example/story",
+      "dates": [
+        { "value": "2021-09-14T10:00:00.000Z", "kind": "published", "method": "og:article:published_time", "confidence": "high", "tzAssumed": false },
+        { "value": "2022-01-02T03:04:05.000Z", "kind": "modified", "method": "og:article:modified_time", "confidence": "high", "tzAssumed": false },
+        { "value": "2022-01-03T00:00:00.000Z", "kind": "modified", "method": "og:updated_time", "confidence": "high", "tzAssumed": false }
+      ]
+    },
+    "itemprop.html": {
+      "url": "https://blog.example/itemprop",
+      "dates": [
+        { "value": "2020-12-24T00:00:00.000Z", "kind": "modified", "method": "itemprop:dateModified", "confidence": "medium", "tzAssumed": true },
+        { "value": "2020-12-01T10:00:00.000Z", "kind": "published", "method": "itemprop:datePublished", "confidence": "medium", "tzAssumed": false },
+        { "value": "2020-12-22T00:00:00.000Z", "kind": "modified", "method": "itemprop:dateModified", "confidence": "medium", "tzAssumed": true }
+      ]
+    },
+    "meta-names.html": {
+      "url": "https://docs.example/page",
+      "dates": [
+        { "value": "2018-05-01T00:00:00.000Z", "kind": "published", "method": "meta:dc.date", "confidence": "medium", "tzAssumed": true },
+        { "value": "2018-05-02T00:00:00.000Z", "kind": "published", "method": "meta:dcterms.created", "confidence": "medium", "tzAssumed": false },
+        { "value": "2019-07-08T09:10:11.000Z", "kind": "modified", "method": "meta:dcterms.modified", "confidence": "medium", "tzAssumed": false },
+        { "value": "2018-05-03T14:00:00.000Z", "kind": "published", "method": "meta:sailthru.date", "confidence": "medium", "tzAssumed": true },
+        { "value": "2018-05-04T15:00:00.000Z", "kind": "published", "method": "meta:parsely-pub-date", "confidence": "medium", "tzAssumed": false },
+        { "value": "2018-05-05T16:00:00.000Z", "kind": "published", "method": "meta:article.published", "confidence": "medium", "tzAssumed": false },
+        { "value": "2018-05-06T00:00:00.000Z", "kind": "published", "method": "meta:date", "confidence": "medium", "tzAssumed": true },
+        { "value": "2019-07-09T00:00:00.000Z", "kind": "modified", "method": "meta:last-modified", "confidence": "medium", "tzAssumed": false }
+      ]
+    },
+    "time-article.html": {
+      "url": "https://project.example/releases/latest",
+      "dates": [
+        { "value": "2024-02-29T08:00:00.000Z", "kind": "published", "method": "time:datetime", "confidence": "medium", "tzAssumed": true }
+      ]
+    },
+    "time-header.html": {
+      "url": "https://blog.example/header-time",
+      "dates": [
+        { "value": "2019-11-20T12:15:00.000Z", "kind": "published", "method": "time:datetime", "confidence": "medium", "tzAssumed": false }
+      ]
+    },
+    "url-day.html": {
+      "url": "https://news.example/2023/04/12/big-story",
+      "dates": [
+        { "value": "2023-04-12T00:00:00.000Z", "kind": "published", "method": "url-path", "confidence": "medium", "tzAssumed": true }
+      ]
+    },
+    "url-month.html": {
+      "url": "https://blog.example/archive/2021/07/",
+      "dates": [
+        { "value": "2021-07-01T00:00:00.000Z", "kind": "published", "method": "url-path", "confidence": "low", "tzAssumed": true }
+      ]
+    },
+    "last-modified.html": {
+      "url": "https://static.example/about.html",
+      "httpLastModified": "Tue, 15 Nov 2022 08:12:31 GMT",
+      "dates": [
+        { "value": "2022-11-15T08:12:31.000Z", "kind": "modified", "method": "http:last-modified", "confidence": "low", "tzAssumed": false }
+      ]
+    },
+    "last-modified-now.html": {
+      "url": "https://dynamic.example/home",
+      "httpLastModified": "Fri, 30 Oct 2026 11:58:00 GMT",
+      "dates": []
+    },
+    "conflict.html": {
+      "url": "https://docs.example/2019/05/01/guide",
+      "dates": [
+        { "value": "2021-03-03T00:00:00.000Z", "kind": "published", "method": "jsonld:datePublished", "confidence": "high", "tzAssumed": false },
+        { "value": "2021-01-01T00:00:00.000Z", "kind": "modified", "method": "jsonld:dateModified", "confidence": "high", "tzAssumed": false },
+        { "value": "2022-02-02T00:00:00.000Z", "kind": "published", "method": "og:article:published_time", "confidence": "high", "tzAssumed": false },
+        { "value": "2020-01-01T00:00:00.000Z", "kind": "published", "method": "meta:date", "confidence": "medium", "tzAssumed": true },
+        { "value": "2023-04-04T00:00:00.000Z", "kind": "published", "method": "time:datetime", "confidence": "medium", "tzAssumed": true },
+        { "value": "2019-05-01T00:00:00.000Z", "kind": "published", "method": "url-path", "confidence": "medium", "tzAssumed": true }
+      ]
+    },
+    "bogus.html": {
+      "url": "https://spam.example/post",
+      "dates": [
+        { "value": "2023-04-12T08:00:00.000Z", "kind": "published", "method": "jsonld:datePublished", "confidence": "high", "tzAssumed": false }
+      ]
+    },
+    "tz-assumed.html": {
+      "url": "https://example.org/tz",
+      "dates": [
+        { "value": "2023-04-12T10:00:00.000Z", "kind": "published", "method": "og:article:published_time", "confidence": "high", "tzAssumed": true },
+        { "value": "2023-05-01T00:00:00.000Z", "kind": "modified", "method": "og:article:modified_time", "confidence": "high", "tzAssumed": true }
+      ]
+    },
+    "rfc2822.html": {
+      "url": "https://example.org/rfc",
+      "dates": [
+        { "value": "2023-04-12T08:00:00.000Z", "kind": "published", "method": "meta:date", "confidence": "medium", "tzAssumed": false },
+        { "value": "2023-04-13T18:30:00.000Z", "kind": "modified", "method": "meta:last-modified", "confidence": "medium", "tzAssumed": false }
+      ]
+    },
+    "cjk.html": {
+      "url": "https://example.jp/news/item",
+      "dates": [
+        { "value": "2023-04-12T00:00:00.000Z", "kind": "published", "method": "meta:date", "confidence": "medium", "tzAssumed": true },
+        { "value": "2024-01-05T00:00:00.000Z", "kind": "modified", "method": "itemprop:dateModified", "confidence": "medium", "tzAssumed": true }
+      ]
+    },
+    "no-dates.html": {
+      "url": "https://example.com/about",
+      "dates": []
+    },
+    "entities-and-case.html": {
+      "url": "https://legacy.example/page",
+      "dates": [
+        { "value": "2016-07-07T07:07:07.000Z", "kind": "published", "method": "og:article:published_time", "confidence": "high", "tzAssumed": false },
+        { "value": "2016-07-06T00:00:00.000Z", "kind": "published", "method": "itemprop:datePublished", "confidence": "medium", "tzAssumed": true }
+      ]
+    }
+  }
+}
