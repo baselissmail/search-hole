@@ -260,6 +260,14 @@ export interface App {
     add(input: AddRuleInput, ctx?: RequestCtx): Promise<RuleListing>
     remove(idOrMatch: string, opts?: { scope?: 'session' | 'project' | 'global' }): Promise<RuleListing[]>
     explain(url: string, opts?: { profile?: string }): Promise<{ decision: string; lines: string[] }>
+    /** Approve a project's .searchhole.yaml by content hash (ADR-0008). */
+    trust(projectDir: string): Promise<{ path: string; sha256: string }>
+  }
+  keys: {
+    /** Store a key in search-hole's own store (OS keychain etc., ADR-0007). Never logged. */
+    set(engine: EngineId, value: string): Promise<{ backend: string }>
+    status(): Promise<Array<{ engine: EngineId; present: boolean; source: string }>>
+    remove(engine: EngineId): Promise<void>
   }
   suggestions: {
     list(): Promise<Array<{ id: number; input: SuggestRuleInput; createdAt: string; status: string }>>
