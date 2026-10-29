@@ -23,7 +23,7 @@ Checklist per MASTER_PLAN.md §11. Decisions taken without asking Basel are note
   - first run → ADR-0017;
   - hosting → personal GitHub, not pushed;
   - names/domain → prepared for Basel.
-- [ ] ARCHITECTURE.md drafted
+- [x] ARCHITECTURE.md drafted
 
 ## Decisions log
 
