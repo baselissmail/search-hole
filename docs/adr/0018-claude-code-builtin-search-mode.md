@@ -1,4 +1,4 @@
-# ADR-0018: Claude Code default: filter the built-in search (no engine needed)
+# ADR-0018: Claude Code search modes: `auto` (default), `builtin`, `engines`
 
 - **Status:** Accepted (2026-10-30). Supersedes the Claude Code parts of ADR-0014 point 2 (WebSearch steering) and ADR-0017 points 1–2 (first run).
 - **Related:** [0014](0014-claude-code-hook-integration.md), [0017](0017-first-run-and-default-engines.md), [0009](0009-engine-adapter-interface.md), [spikes §6](../research/spikes-2026-10-30.md)
@@ -13,9 +13,23 @@ Basel asked why a user would need SearXNG or Tavily at all. The earlier design a
 
 ## Decision
 
-**search-hole has two modes per host. In Claude Code the default is `builtin`.**
+**Claude Code has three modes. The default is `auto`.** The comparison in [spikes §7](../research/spikes-2026-10-30.md) showed the built-in search is noisier for developer queries (mirrors, scraped copies, SEO farms; official docs sometimes missing, no snippets or dates), while SearXNG gives better raw material but degrades under agent volume. Neither alone is best.
 
-| | `builtin` (Claude Code default) | `engines` (other hosts' default; opt-in in Claude Code) |
+- **`auto` (default):**
+  - **With at least one healthy engine:** our `search` is primary, and WebSearch is denied and steered to it (ADR-0014 point 2) for the full pipeline: ranking, freshness, snippets, dates, fusion.
+  - **Otherwise, or whenever every engine fails:** WebSearch is **allowed but filtered** (`builtin` behaviour below), so the fallback is never unfiltered while the gateway runs.
+  - **Zero setup:** it starts in builtin behaviour and upgrades itself the moment `doctor` adds SearXNG or a key.
+- **`builtin`:** always filter Claude's own WebSearch and never steer.
+- **`engines`:** always steer to our `search`, falling back to filtered built-in only when every engine fails.
+
+**Recommended setup** (which `doctor` suggests):
+- SearXNG via Docker (free, private, best developer results);
+- **plus** a free Tavily key (no card) as a second engine, so SearXNG's upstream rate limits don't degrade results;
+- `standard` depth fuses both.
+
+The table compares the two behaviours `auto` switches between:
+
+| | builtin behaviour (zero setup; `auto` without a healthy engine) | engines behaviour (`auto` with a healthy engine; the only mode on other hosts) |
 |---|---|---|
 | Who searches | Claude's own WebSearch | engines the user chose (SearXNG, Tavily, Brave, …) |
 | Setup | **none** (works at install) | Docker or a key (ADR-0017) |
@@ -40,10 +54,10 @@ Basel asked why a user would need SearXNG or Tavily at all. The earlier design a
      - log everything.
    - **PreToolUse(WebFetch):** deny blocked domains (real block, with the rule in the reason).
    - **PostToolUse(WebFetch):** log the opened source for the receipt.
-2. **`engines` mode in Claude Code** is chosen by the user (`/search-hole:engine searxng`, or `settings.yaml` `hosts.claude-code.mode: engines`). It restores the ADR-0014 point 2 behaviour: deny WebSearch while an engine is healthy, and steer to our `search`. Our `search` and `fetch` MCP tools stay available in both modes, for when the user asks for a specific engine or for `deep`.
+2. **Engines behaviour** (in `auto` with a healthy engine, or in `engines` mode): the ADR-0014 point 2 rules apply, so WebSearch is denied while an engine is healthy and the model is steered to `search`. When steering isn't possible (an engine fails, or the deny-loop breaker trips), WebSearch runs **with the builtin filters**. The mode is set with `/search-hole:mode auto|builtin|engines` or `settings.yaml` `hosts.claude-code.mode`. Our `search` and `fetch` tools stay available in every mode.
 3. **Fail-safe:** if the gateway isn't connected, `mcp_tool` hooks fail open and WebSearch runs unfiltered. The Stop line says "search-hole wasn't running for this search" when it can tell.
 4. **Other hosts are unchanged.** Claude Desktop, claude.ai, ChatGPT, VS Code and Zed offer no way to filter their built-in search, so search-hole there *is* the search tool and needs an engine (ADR-0017). Cursor and Codex hooks get the same spike in P7. If they support output rewriting, they get `builtin` mode too.
-5. **First run in Claude Code is now zero-config:** install the plugin and it works. `doctor` mentions engines only as an upgrade ("want snippets, dates, engine choice or `deep`? add SearXNG or a free Tavily key").
+5. **First run in Claude Code is zero-config:** install the plugin and filtering, the log and receipts work at once. `doctor` then offers the upgrade ("better developer results, snippets, dates and freshness: start SearXNG (Docker) and/or add a free Tavily key"), and `auto` switches over by itself.
 
 ## Alternatives considered
 
