@@ -10,10 +10,12 @@ Checklist per MASTER_PLAN.md §11. Decisions taken without asking Basel are note
   - GitHub `baselissmail/search-hole`: free. No `search-hole` or `searchhole` user/org exists.
   - Domains: `searchhole.com` is **taken** (Namecheap, registered 2025-04-03; a live, unrelated site "Search Hole — research-backed guidance for everyday decisions"). Unregistered: `searchhole.dev`, `searchhole.app`, `searchhole.io`, `searchhole.org`, `search-hole.com`, `search-hole.dev`, `search-hole.app`, `search-hole.io`, `search-hole.org`.
 - [x] Reference repos cloned to `research/refs/` (git-ignored). Commits pinned in `docs/research/_refs-table.md`.
-- [ ] Research notes in `docs/research/` (one per repo, plus platform-fact checks)
-- [ ] `docs/research/SYNTHESIS.md`
-- [ ] ADRs in `docs/adr/`
-- [ ] ARCHITECTURE.md drafted (after Basel answers the §13 questions)
+- [x] Research notes in `docs/research/`: 32 notes (one per reference repo, including smart-doctor) plus 3 platform-fact checks. 25 are adversarially verified; the other 10 had their load-bearing claims spot-checked (see SYNTHESIS §1).
+- [x] `docs/research/SYNTHESIS.md`
+- [x] ADRs 0001–0014 in `docs/adr/` (index: `docs/adr/README.md`)
+- [ ] ARCHITECTURE.md drafted. Deliberately not started: Basel asked to stop after SYNTHESIS + ADRs and review first.
+- [ ] Basel answers the §13 questions (SYNTHESIS §10)
+- [ ] Early spikes before P1 coding (SYNTHESIS §8): `mcp_tool` hook substitution, `node:sqlite` in Desktop's Node
 
 ## Decisions log
 
@@ -22,6 +24,14 @@ Checklist per MASTER_PLAN.md §11. Decisions taken without asking Basel are note
 | 2026-10-29 | Repo initialised on `main`, local only, no remote | — |
 | 2026-10-29 | Added `modelcontextprotocol/typescript-sdk`, `modelcontextprotocol/mcpb` and the spec repo to the reference set, to check the protocol facts against source | `docs/research/_refs-table.md` |
 | 2026-10-29 | Sparse checkouts for litellm (router, spend tracking, hooks), Infisical (`frontend/`) and supabase (studio + ui packages) | `docs/research/_refs-table.md` |
+| 2026-10-30 | Architecture decisions 0001–0014 (builder's call per §14; summary in SYNTHESIS §5) | `docs/adr/` |
+| 2026-10-30 | Added ADR-0014 (Claude Code hook integration) beyond the §10 list, because hooks span session, tool surface and runtime | `docs/adr/0014-claude-code-hook-integration.md` |
+
+## Dev environment to update before P1
+
+- Node 24.14.1 → **26 LTS** (24.14 prints the `node:sqlite` ExperimentalWarning)
+- pnpm 10.33.2 → **12.x**
+- Claude Code 2.1.97 → **≥ 2.1.295** (needed for `plugin eval`, `validate --strict`, `onFailure` and `mcp_tool` hooks)
 
 ## Waiting on Basel
 
