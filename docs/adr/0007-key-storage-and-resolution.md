@@ -8,7 +8,7 @@
 Keys reach the gateway in different ways per host. The CLI and dashboard can't read host-injected values. And §4 wants no native dependencies. Verified facts ([platform-facts-claude-code-runtime.md](../research/platform-facts-claude-code-runtime.md) §B; [platform-facts-engines-lists-versions.md](../research/platform-facts-engines-lists-versions.md) key answer 14; [mcpb.md](../research/mcpb.md)):
 
 - **Claude Code `userConfig` with `sensitive: true`** is stored in the **macOS Keychain**, but on Linux and Windows in **`~/.claude/.credentials.json`** (a file). Hooks get `CLAUDE_PLUGIN_OPTION_<KEY>`. `${user_config.KEY}` is substituted into the MCP server's `env`.
-- **MCPB `user_config` with `sensitive: true`** is stored in the OS keychain by Desktop. An **unset optional value arrives as the literal string `${user_config.brave_api_key}`**. A **required** value that is missing stops Desktop from launching the server at all.
+- **MCPB `user_config` with `sensitive: true`** is stored in the OS keychain by Desktop (per Anthropic's docs). An **unset optional value arrives as the literal string `${user_config.brave_api_key}`**. A **required** value that is missing stops Desktop from launching the server at all. These last two come from reading the mcpb source ([mcpb.md](../research/mcpb.md), not second-pass verified), so tests cover them.
 - **Claude Code can strip credentials from subprocess environments.** `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` removes credential-looking variables from hook and MCP environments. `CLAUDE_CODE_MCP_ALLOWLIST_ENV=1` passes only a baseline plus the configured `env`.
 - **The MCP Inspector passes only `HOME, LOGNAME, PATH, SHELL, TERM, USER`** plus the configured `env` to the servers it spawns.
 - **OS stores without native modules:**
@@ -21,15 +21,18 @@ Keys reach the gateway in different ways per host. The CLI and dashboard can't r
 ## Decision
 
 1. **Resolution order, evaluated per engine call** (cached for 60 s, not frozen at import, so "paste a key in `doctor`" works without restarting the host):
-   1. **Host-injected:** `SEARCHHOLE_<ENGINE>_API_KEY`, set by our own host configs from `userConfig` or `user_config`. A value matching `/^\$\{[^}]+\}$/` counts as **unset**.
+   1. **Host-injected:** `SEARCHHOLE_<ENGINE>_API_KEY`, set by our own host configs from `userConfig` or `user_config`. An empty or whitespace-only value, or one matching `/^\$\{[^}]+\}$/`, counts as **unset**. The same applies at every level below.
    2. **Process env, conventional names:** `BRAVE_SEARCH_API_KEY` (also `BRAVE_API_KEY`), `TAVILY_API_KEY`, `EXA_API_KEY`, `KAGI_API_KEY`, `MOJEEK_API_KEY`, `MARGINALIA_API_KEY`. Each also accepts a `*_FILE` variant pointing at a file that holds the key (Docker or secret managers). Setting both a name and its `*_FILE` is an error.
    3. **search-hole's own store** (point 2).
 
    The winning source is recorded per engine (`host-env | env | env-file | keychain | dpapi | file`) and written to `engine_health.key_source`, together with `key_present`. The dashboard and `doctor` can then show "Brave: set (via Claude Code plugin config)" for a key they can't read.
 2. **Own store: OS facilities via OS CLI tools.** There are no native modules and no secrets in argv.
-   - **macOS:** `security add-generic-password` / `find-generic-password -w`, run through `security -i` with commands on stdin. The service is `search-hole`, the account `<engine>`.
+   - **macOS:** `security add-generic-password` / `find-generic-password -w`, run through `security -i` with commands on stdin. The service is `search-hole`, the account `<engine>`. The key is trimmed, and **keys containing whitespace, `"` or `\` are rejected**, since `security -i` parses the line.
    - **Linux:** `secret-tool store` / `lookup`, with the secret on stdin. It is used only after a write-and-read-back probe succeeds.
-   - **Windows:** a DPAPI-protected file (`~/.searchhole/secrets/<engine>.dpapi`, written via `powershell -NoProfile -Command` with `ConvertFrom-SecureString`, user scope), read back with `ConvertTo-SecureString`.
+   - **Windows:** a DPAPI-protected file (`<data>/secrets/<engine>.dpapi`, user scope).
+     - It is written by `powershell -NoProfile -NonInteractive -Command "$k=[Console]::In.ReadLine(); ConvertTo-SecureString -String $k -AsPlainText -Force | ConvertFrom-SecureString | Set-Content -LiteralPath $env:SEARCHHOLE_DPAPI_OUT"`.
+     - **The key arrives on stdin as data, never in the script text**, so it never lands in argv or in the ScriptBlock event log.
+     - It is read back the same way, with `ConvertTo-SecureString`.
    - **No OS store** (headless Linux, a locked keychain): `searchhole keys set` **refuses** and explains the env-var and `*_FILE` options. It does not invent a weaker store. `--insecure-file` is an explicit opt-in that writes a plaintext `0600` file, and `doctor` warns about it permanently.
 3. **Writers and readers:**
    - Only the CLI writes keys (`searchhole keys set <engine>`, which reads from the TTY with echo off or from stdin, never from argv), plus the dashboard's "set key" form, which hands the key to the same code path.
@@ -62,11 +65,12 @@ Keys reach the gateway in different ways per host. The CLI and dashboard can't r
 
 - PRIVACY.md and the docs must say exactly where keys live per host and OS. That includes "Claude Code on Linux and Windows stores plugin secrets in `~/.claude/.credentials.json`, not a keychain".
 - The threat model states: at-rest protection against casual exposure and accidental commits, **not** against malware running as the same user.
-- Windows key handling spawns PowerShell (about 200–400 ms), so it is cached per process for 60 s and never sits on the hot path.
+- Windows key handling spawns PowerShell (estimated at 300–800 ms; measured in CI), so it is cached per process for 60 s and never sits on the hot path.
 
 ## Validate early (P1)
 
 - macOS keychain round-trip via `security -i`, checking no secret appears in `ps` output.
 - Linux with and without a Secret Service (container test).
 - Windows DPAPI round-trip in CI (`windows-latest`), plus measured PowerShell startup cost.
-- The MCPB placeholder string is treated as unset; host env takes precedence over keychain; a forced env value shows as locked.
+- The MCPB placeholder string and empty values are treated as unset; host env takes precedence over keychain; a forced env value shows as locked.
+- **P1/P3:** with `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1`, and separately with `CLAUDE_CODE_MCP_ALLOWLIST_ENV=1`, check whether `SEARCHHOLE_BRAVE_API_KEY` from the plugin's `.mcp.json` `env` reaches the gateway (an open question in the evidence). If it is scrubbed, `doctor` must say so and point to `searchhole keys set`. The plugin's whole key path depends on this.

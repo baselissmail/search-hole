@@ -49,7 +49,11 @@ SDK v2 facts ([mcp-typescript-sdk.md](../research/mcp-typescript-sdk.md), verifi
    - cache hints are set on `tools/list`, `resources/list`, `resources/read` and `server/discover` (Claude Code 2.1.302 fixed failures when they were missing);
    - `resultType` is always present (the SDK handles it, and tests assert it);
    - nothing deprecated is used: no Roots, Sampling or Logging (the `logging/setLevel` capability isn't declared); logs go to stderr via pino.
-6. **Escape hatch:** `SEARCHHOLE_MCP_PROTOCOL=auto|legacy|modern` (default `auto`). This passes `legacy: 'reject'` when set to `modern`, and forces 2025 behaviour when set to `legacy`, for diagnosing host bugs. `doctor` prints each connected host's era from the `sessions` table.
+6. **Escape hatch:** `SEARCHHOLE_MCP_PROTOCOL=auto|legacy|modern` (default `auto`), for diagnosing host bugs.
+   - `modern` passes `legacy: 'reject'`.
+   - `legacy` makes the **factory refuse `era === 'modern'`** (it throws), so the `server/discover` probe fails and dual-era clients fall back to `initialize`. The transport stays `serveStdio`, so this is not a hand-wired transport.
+   - A conformance case checks that client (c) with `legacy` set ends up on 2025-11-25.
+   - `doctor` prints each connected host's era from the `sessions` table.
 7. **Era-specific behaviour we deliberately accept:**
    - MRTR "ask first" works natively on 2026 clients that declare elicitation, through the elicitation shim on legacy ones, and as text everywhere else (ADR-0012).
    - Codex speaks **2025-06-18**, so we rely on no 2025-11-25-only feature (URL elicitation, icons) for core behaviour.

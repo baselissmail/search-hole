@@ -44,25 +44,38 @@ Receipts and freshness rules need each source's real publish and update dates wi
 
 | # | Source | Kind | Confidence |
 |---|---|---|---|
-| 1 | Engine fields: Tavily `published_date`; Kagi `time`; Brave `article.date`; Brave `page_age`; Exa `publishedDate`; Mojeek `date`; SearXNG `publishedDate` | published, except Mojeek: modified | Tavily, Kagi, Brave `article.date`: high. Brave `page_age`, SearXNG: medium. Exa: medium, marked estimated. Mojeek: medium |
+| 1 | Engine fields: Tavily `published_date` (requested with `include_published_date: true`); Kagi `time`; Brave `article.date`; Brave `page_age`; Exa `publishedDate`; Mojeek `date` (requested with `date=1`); SearXNG `publishedDate` | published, except Mojeek: modified | All **medium** until the P1 corpus measures them (the evidence doesn't characterise Tavily's or Kagi's semantics). Exa is marked estimated. **Mojeek: low**, the same as HTTP `Last-Modified`, which it effectively is |
 | 2 | JSON-LD (walking `@graph`; Article / NewsArticle / BlogPosting / TechArticle / WebPage / ScholarlyArticle): `datePublished` / `dateModified` | published / modified | high |
 | 3 | OpenGraph `article:published_time` / `article:modified_time`, `og:updated_time` | published / modified | high |
 | 4 | `itemprop="datePublished"` / `"dateModified"`; `<meta name>` in `date`, `dc.date`, `dcterms.created`, `dcterms.modified`, `last-modified`, `article.published`, `sailthru.date`, `parsely-pub-date` | published / modified | medium |
 | 5 | `<time datetime>` inside `<article>`/header (first one) | published | medium |
 | 6 | URL path date (`/2023/04/12/`, `/2023-04-12-`) | published | medium (day), low (month only) |
 | 7 | HTTP `Last-Modified` | modified | **low**, and **ignored if within 5 minutes of fetch time** (a dynamic page sending "now") |
+| — | *(Tavily, Kagi and Brave `article.date` move to high only if the P1 corpus shows ≥ 95% precision)* | | |
 | 8 | Brave `page_fetched` / an engine crawl time | crawled | (never used for freshness) |
 | 9 | Sitemap `<lastmod>` | modified | P6+, **opt-in** (extra request) |
 | 10 | Wayback CDX first capture | existed_by | **opt-in, off by default** (a third-party network call) |
 | 11 | `htmldate` sidecar | — | later, optional |
 
-4. **Effective date for freshness** (used by ADR-0010): the most recent date of kind `published`/`modified` with confidence high or medium. If only low-confidence dates exist, the effective date is unknown and the result is flagged `date_uncertain`.
+4. **Effective date for freshness** (used by ADR-0010):
+   - the high- or medium-confidence **published** date by default; if none exists, the modified date;
+   - a profile can choose `freshnessBasis: published | modified | newest`;
+   - if only low-confidence dates exist, the effective date is unknown and the result is flagged **`date_unknown`** (the same code as ADR-0010), with `dateConfidence: low` recorded separately.
+
+   This deliberately avoids metascraper's modified-first default.
 5. **Parsing rules:**
    - strict ISO 8601 and RFC 2822 first, then a short list of explicit formats;
    - **no natural-language parsing in v1**, so no "2 days ago": Brave's human-readable `age` is never parsed when `page_age` exists;
    - a date without a timezone is taken as UTC and marked `tzAssumed`;
    - dates in the future (more than 1 day ahead) or before 1995-01-01 are rejected.
 6. **Search results carry only engine dates** (step 1). Steps 2–7 run on pages the model actually opens with `fetch`. The receipt says "date from search engine" vs "date from page", so users know which sources were really checked.
+
+7. **Readable text and PDF extraction for `fetch`** (same parser decision, no `jsdom`, no native modules):
+   - HTML goes through **`@mozilla/readability` over `linkedom`** (pure-JS DOM), with a fallback to htmlparser2 text extraction when Readability returns nothing.
+   - PDFs go through a **lazily loaded pdf.js-based extractor (`unpdf`)**, capped at 20 MB and 200 pages.
+   - Both load as lazy chunks, outside the 300 ms startup path (ADR-0002).
+   - Versions and bundle sizes are measured in a P1 spike before pinning. These are candidates, not verified picks.
+   - **WebFetch parity gate** (ADR-0014): PDFs ≤ 20 MB extract, pages over 8k tokens continue via `cursor`, and a 50-page fixture corpus is ≥ 95% as readable as the built-in WebFetch's output, judged by an eval. Only after this does the PreToolUse hook steer `WebFetch` too.
 
 ## Alternatives considered
 

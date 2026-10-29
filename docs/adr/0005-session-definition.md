@@ -27,12 +27,16 @@ Two separate concepts:
 
 Resolved **per request** by a precedence chain. The first available source wins, and the source is recorded as `sessions.key_source`.
 
-1. **Hook-reported key** (Claude Code): the latest `session_id` reported to *this gateway process* by a search-hole hook (ADR-0014). Every hook call carries `session_id`, so after `/clear` the next hook re-keys the process.
+1. **Hook-reported key** (Claude Code): the `session_id` that search-hole's `SessionStart` or `UserPromptSubmit` hook reported to *this gateway process*. Re-keying happens only between turns, so a forged model call can't re-key (ADR-0014 point 1). After `/clear`, the next SessionStart or prompt re-keys the process.
 2. **Host `_meta` key:** `openai/session`, `vscode.conversationId`, `agent-session-id`. The adapter table lives in `gateway/host-keys.ts`, so adding a host is one line.
 3. **Spawn env:** `CLAUDE_CODE_SESSION_ID` (Claude Code before the first hook fires).
 4. **Fallback label:** `(gateway pid, host profile)` plus an **idle gap of 30 minutes**. Activity after a longer gap starts a new session. This is a grouping label, never a security or trust decision, and the UI marks it "approximate".
 
-The `sessions` table holds `id`, `host_profile`, `host_key`, `key_source`, `client_name`, `client_version`, `protocol_era`, `project_dir`, `gateway_id`, `started_at` and `last_seen_at`. `clientInfo` is a display label only, never a key: it is optional and self-reported, and Desktop and claude.ai both send `claude-ai` 0.1.0.
+The `sessions` table holds `id`, `host_profile`, `host_key`, `key_source`, `client_name`, `client_version`, `protocol_era`, `project_dir`, `gateway_id`, `open_receipt_id`, `turn_open`, `started_at` and `last_seen_at`. It is a mutable table (ADR-0003).
+
+`clientInfo` is a display label only, never a key, because it is optional and self-reported. Values seen so far are all reports to verify in P2:
+- Desktop local stdio reportedly sends `claude-ai` 0.1.0 (MCPJam probe);
+- claude.ai connectors reportedly send `Anthropic/ClaudeAI` 1.0.0 [report].
 
 **Project directory** (for `.searchhole.yaml` lookup), first available:
 1. Claude Code `CLAUDE_PROJECT_DIR` env
@@ -43,7 +47,10 @@ The `sessions` table holds `id`, `host_profile`, `host_key`, `key_source`, `clie
 
 Roots is deprecated and not used.
 
-**Session-scope rules** (ADR-0008) attach to the session id. When a session's key changes (for example `/clear`), its session rules don't carry over. That matches the user's mental model of a fresh conversation.
+**Session-scope rules** (ADR-0008) attach to the session id.
+- A re-key from the same project (`resume`, `compact`) carries them over.
+- `SessionStart(source=clear)` drops them, which matches the user's mental model of a fresh conversation.
+- **On sessions with a fallback key (source 4), session-scope rules are refused** with an explanation ("this host doesn't identify chats; use a global rule with `until:`"), because one process may serve many chats.
 
 ### Receipt: "which searches belong together?"
 
@@ -51,15 +58,13 @@ A **receipt** is a server-minted handle naming a set of searches and fetches.
 
 - **Format:** `rcpt_` followed by 22 base64url characters (128-bit random). It is unguessable because on a local server it is the only bearer for reading receipt contents.
 - **Returned on every `search`,** in text and `structuredContent`. `search` and `fetch` accept an optional `receiptId` to join an existing receipt explicitly.
-- **Default grouping, when no `receiptId` is passed:** the session's *open* receipt. A receipt closes at:
-  - a Claude Code `Stop` hook for that session (one receipt per turn);
-  - 10 minutes of inactivity in the session;
-  - an explicit `receipt` call with `close: true`.
-
-  The next search opens a new receipt.
-- **`receipt` with no `receiptIds`** returns the session's most recent receipt (open or closed). With a list, it returns those receipts.
-- **Unknown or expired ids** produce a tool error: "receipt rcpt_… expired; omit receiptId to start a new one". The search still runs.
-- **Retention:** receipts live as long as their searches (90 days by default, ADR-0006). Because the id survives in the chat transcript, reopening an old conversation can show its receipt again (SEP-2567 "resumption").
+- **Default grouping, when no `receiptId` is passed,** depends on the key source:
+  - **Hook-keyed (Claude Code):** the turn's receipt. `UserPromptSubmit` opens it and `Stop` closes it (ADR-0014). There is no idle timeout. `sessions.open_receipt_id` is updated inside each search's `BEGIN IMMEDIATE`.
+  - **Host-`_meta`-keyed (ChatGPT, VS Code, Goose):** the session's open receipt, closed after 10 minutes of inactivity.
+  - **Fallback key:** **no auto-join.** Each search without a `receiptId` opens its own receipt. The tool description and server instructions tell the model to pass the previous `receiptId` to group related work.
+- **`receipt` with no `receiptIds`** returns the session's most recent receipt on hook- or `_meta`-keyed sessions. On fallback sessions it returns a tool error asking for `receiptIds`, because guessing could show another chat's receipt. With a list, it returns those receipts.
+- **Unknown or expired ids on `search`/`fetch`** are **not** errors. The search runs under a new receipt and returns a `receipt_expired` warning (ADR-0012). The `receipt` tool itself errors on unknown ids.
+- **Retention:** receipts live as long as their searches (90 days by default, ADR-0015). Because the id survives in the chat transcript, reopening an old conversation can show its receipt again (SEP-2567 "resumption").
 
 ## Alternatives considered
 
@@ -70,7 +75,7 @@ A **receipt** is a server-minted handle naming a set of searches and fetches.
 
 ## Consequences
 
-- Claude Code receipts are exact per turn. ChatGPT, VS Code and Goose sessions are exact. Desktop, claude.ai, Cursor, Codex and Zed sessions are approximate. The dashboard says so, and the receipt itself (an explicit handle) is exact everywhere.
+- Claude Code receipts are exact per turn. ChatGPT, VS Code and Goose sessions are exact. Desktop, claude.ai, Cursor, Codex and Zed sessions are approximate, and the dashboard says so. On those hosts a receipt is exact **only when the model passes `receiptId`**. Otherwise each search is its own receipt, which is never wrong, only less grouped.
 - The Stop-hook line shows "searches in this turn" because the turn's receipt closes at Stop.
 - A loop guard (a per-session search cap with a clear tool error, as in litellm) can use the session id, with "approximate" sessions treated conservatively.
 

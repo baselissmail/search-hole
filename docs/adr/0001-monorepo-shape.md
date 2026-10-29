@@ -40,7 +40,7 @@ docs/                          ARCHITECTURE.md, adr/, research/, guides/, securi
 Rules:
 
 1. **Layer graph, checked in CI.** A dependency-cruiser config or a ~40-line script fails the build on violations:
-   - `core` and `lists` import nothing outside themselves and `shared/types`, and no I/O module.
+   - `core` and `lists` import nothing outside themselves, `shared/types`, and an **allowlist of pure, I/O-free packages**: zod, yaml, re2js, htmlparser2, tldts. Nothing else, and no I/O module.
    - `engines` imports only `core` and `shared`.
    - `store`, `fetch`, `gateway`, `ui-server` and `cli` sit at the edge.
 2. **Dependency injection by plain factories** (`createPipeline({engines, store, clock, fetcher})`), never a DI framework (§12.2).

@@ -29,7 +29,8 @@
 
 ### 2. Merge duplicates
 
-- Keep every engine's raw rank (`positions[engine]`) and the union of engines.
+- **Visibility is decided first, per original URL** (ADR-0008 "What a rule matches against"). Hidden URLs are recorded individually and **never join a dedupe group**. Only kept URLs merge.
+- Keep every engine's raw rank. `positions[engine]` = the **minimum** raw rank that engine gave any member of the group, so each engine contributes at most one term to the fusion sum (no self-agreement bonus). Keep the union of engines.
 - Keep the longest title and the longest snippet.
 - Dates: keep the **earliest** known *published* date and the **latest** known *modified* date, each with its source (ADR-0011).
 
@@ -50,11 +51,11 @@ fused(d) = Σ_engines  w_e / (k + rank_e(d))        k = 20, w_e = 1.0 by default
 
 | Result | Score | Lands at about |
 |---|---|---|
-| rank 10, `raise 1` (×1.15) | .0383 | rank 6 (a nudge) |
+| rank 10, `raise 1` (×1.15) | .0383 | position 7, just below rank 6 (.0385) (a nudge) |
 | rank 10, `raise 3` (×1.45) | .0483 | rank 1 (a promotion) |
 | rank 20, `raise 3` | .0363 | rank 7–8 |
 | rank 1, `lower 3` (÷1.45) | .0328 | rank 10–11 |
-| any, `raise 10` (×2.5) | | above every unweighted organic result |
+| raw rank ≤ 32, single engine, `raise 10` (×2.5) | ≥ .0481 | above every unweighted single-engine result. Not guaranteed against multi-engine agreement: rank 7 × 2.5 = .0926 < rank 1 on two engines = .0952 |
 
 These values go into the docs and the golden tests. They can be tuned later through the dashboard's "test a query" sandbox, with a new ADR if the defaults change.
 
@@ -67,13 +68,14 @@ These values go into the docs and the golden tests. They can be tuned later thro
 
 ### 6. Freshness (§5 step 7), after rules
 
-- **Effective date** = the most recent *high- or medium-confidence* published or modified date (ADR-0011).
+- **Effective date** (ADR-0011): by default, the high- or medium-confidence **published** date. If there is none, the modified date. A profile can set `freshnessBasis: published | modified | newest` (default `published`). A result whose modified date is much newer gets an `updated` flag.
 - If the effective date is older than the profile's `maxAgeDays`: **hidden** with reason `stale`. Pinned results are exempt: they are kept and flagged `stale`, because a pin is explicit trust.
 - If the date is unknown or low-confidence: kept and flagged `date_unknown`, unless the profile sets `requireDate: true`, in which case it is hidden with reason `date_required`.
 
 ### 7. Depth-specific rules
 
-- **`deep` coverage guarantee:** at least one result from each engine that responded makes the top N, swapped in for the lowest-ranked slot. It is recorded as `kept_reason: coverage`.
+- **`deep` coverage guarantee:** at least one result from each engine that responded makes the top N. It is swapped into the lowest-ranked slot that holds **neither a pin nor an earlier coverage result**. If no such slot exists, the swap is skipped with a `coverage_skipped` warning. A swapped-in result is recorded as `kept_reason: coverage`.
+- **Registrable domains** (for `single_source`, top domains and source typing) come from the Public Suffix List via `tldts`. It is pure JS with a bundled list that is refreshed each release.
 - **Gap flags for `deep`:**
   - `no_official_source`: no `official`/`docs` source type in the top N;
   - `single_source`: all kept results come from one registrable domain;
@@ -96,6 +98,8 @@ Return `limit`: default 10, max 20. Hidden results never consume output slots, w
 ## Consequences
 
 - Every output position can be explained from stored data: raw ranks, engines, the effective weight rule, pin and freshness. The dashboard's "replay with today's rules" (mitmproxy's dry-run replay) re-runs steps 3–7 on stored raw results with no network.
+  - **Limit 1:** replay can't restore results an engine removed because of a pushed-down block (ADR-0009 point 8). Those searches carry `pushed_rule_ids`, and the replay view says so.
+  - **Limit 2:** replay can't restore payloads that expired under engine terms (ADR-0009 point 9).
 - Golden tests cover a fixed multi-engine fixture covering: duplicates, AMP and `www` variants, tracking parameters, ties, pins, blocks and freshness. Expected orderings are checked in.
 
 ## Validate early (P1)

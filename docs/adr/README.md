@@ -19,4 +19,7 @@ Status values: **Proposed**, **Accepted**, **Superseded by ADR-NNNN**. To change
 | [0011](0011-date-extraction-chain.md) | Our own extractor: engine dates, then page metadata, then HTTP headers; typed dates with method and confidence | Accepted |
 | [0012](0012-mcp-tool-surface-and-output-limits.md) | Four model tools plus host-scoped internal tools; compact text plus object-root `structuredContent`; budgets in CI | Accepted |
 | [0013](0013-dual-protocol-support.md) | Serve 2026-07-28 and 2025-era clients from one binary with the SDK v2 defaults | Accepted |
-| [0014](0014-claude-code-hook-integration.md) | Claude Code hooks are `mcp_tool` hooks answered by the gateway; a node preflight hook covers the "no node" case | Accepted |
+| [0014](0014-claude-code-hook-integration.md) | Claude Code hooks are `mcp_tool` hooks answered by the gateway; turn bracketing; fail-open health predicate; Bash/Edit guard on rule changes; a Node preflight hook covers the "no node" case | Accepted |
+| [0015](0015-settings-data-locations-retention.md) | `settings.yaml` (separate from rules); XDG and AppData roots; per-table retention defaults; query hygiene; user-managed SearXNG container | Accepted |
+
+The ADRs were revised on 2026-10-30 after a three-lens adversarial review (facts, consistency, red team; 90 findings). Where an ADR writes `~/.searchhole/`, read it as the root that ADR-0015 resolves.

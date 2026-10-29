@@ -28,7 +28,7 @@ The reference projects agree on the pragma set and on "one connection per proces
 3. **Connection setup** (one connection per process, opened lazily on the first real request, never at spawn; see ADR-0006 on probe processes):
    ```sql
    PRAGMA journal_mode = WAL;          PRAGMA synchronous = NORMAL;
-   PRAGMA busy_timeout = 5000;         PRAGMA foreign_keys = ON;
+   PRAGMA busy_timeout = 100;          PRAGMA foreign_keys = ON;   -- 5000 for migrations and CLI commands
    PRAGMA journal_size_limit = 33554432;   -- 32 MiB
    PRAGMA cache_size = -8000;          -- ~8 MB, not 64 MB per gateway
    ```
@@ -36,16 +36,24 @@ The reference projects agree on the pragma set and on "one connection per proces
    - Maintenance is owned by the background-job lease holder (ADR-0006): periodic `incremental_vacuum(N)`, `wal_checkpoint(PASSIVE)` and `PRAGMA optimize`. Clean shutdown runs `wal_checkpoint(TRUNCATE)` when this process is the last one connected.
 4. **Write discipline:**
    - Each search is written in one `BEGIN IMMEDIATE` transaction: the search row, its result rows and their decisions. Writes are never interleaved with engine I/O.
-   - On `SQLITE_BUSY` after `busy_timeout`, the search result is still returned to the model and the log row is dropped with a counted warning (`engine_health`/`doctor`). Logging never blocks or fails a search (§5.1).
+   - **`node:sqlite` is synchronous, so a long busy wait would freeze the gateway's stdio loop.** The search path therefore uses `busy_timeout = 100 ms`.
+   - On `SQLITE_BUSY`, the write goes to an **in-memory retry queue** flushed on a jittered timer, and is dropped with a counted warning after 10 s. Spend-cap reservations follow ADR-0009 point 6.
+   - The search result is always returned. **Logging never blocks or fails a search** (§5.1).
+   - Migrations and CLI commands use 5000 ms.
 5. **Schema conventions:**
    - **Two table families in one file:**
-     - mutable config/state: `rules_session`, `lists`, `list_artifacts`, `suggestions`, `engine_health`, `engine_usage`, `jobs`, `gateways`, `installs`, `meta`
-     - append-only events: `sessions`, `receipts`, `searches`, `results`, `fetches`
+     - **mutable config/state:** `rules_session`, `rules_lastgood` (persisted compiled user rules keyed by file hash, ADR-0008), `project_trust(path, content_sha256, trusted_at)`, `lists`, `suggestions`, `engine_health`, `engine_usage`, `jobs`, `gateways`, `installs`, `sessions`, `receipts`, `daily_stats`, `meta`;
+     - **append-only, retention-pruned events:** `searches`, `results`, `result_payloads`, `fetches`.
+   - **List artifacts** are checksummed files under `<data>/lists/`, not DB blobs (ADR-0006).
+   - **The plan's `rules` table is replaced** by `rules.yaml` (global), `.searchhole.yaml` (project) and `rules_session`. A rule's provenance is a `source: suggestion:<id>` field on the YAML rule.
+   - Retention per table is in ADR-0015.
    - **Bulky or term-restricted content in child tables**, for example `result_payloads(result_id … ON DELETE CASCADE)` holding title and snippet. Retention per engine terms can then delete content and keep decisions, ranks and counts (agentgateway's `request_log_payloads` pattern).
    - **Enumerations are `TEXT` codes validated by zod, not `CHECK (x IN …)`**, so a new decision code or engine needs no table rebuild. `CHECK (json_valid(x))` is fine.
    - **Keyset indexes:** `searches(created_at, id)`, `results(search_id)`, `results(rule_id, created_at)` for "what did this rule hide". Daily rollup tables (`daily_stats(day, engine, …)` upserted on write) keep Overview queries cheap at 100k+ rows.
-   - **`rowid` is the live-tail cursor** (ADR-0004), so `searches` stays a rowid table.
-6. **Files:** the data dir is `0700` and the DB, WAL and SHM files are `0600`. The process umask is set before opening.
+   - **`rowid` is the live-tail cursor** (ADR-0004).
+     - `searches.id` is declared **`INTEGER PRIMARY KEY AUTOINCREMENT`**: still a rowid table, but ids are never reused after deletes.
+     - Every bulk delete, in any process, bumps **`meta.data_epoch`**, so tailers can send `reset`.
+6. **Files:** the data dir (ADR-0015) is `0700` and the DB, WAL and SHM files are `0600`. The process umask is set before opening.
 
 ## Alternatives considered
 

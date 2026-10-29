@@ -28,18 +28,28 @@ The research confirms the shape and closes gaps:
 | Scope | Where | Who can write | Notes |
 |---|---|---|---|
 | session | DB table `rules_session` (with TTL) | slash commands / dashboard / approved suggestions with `scope: session` | Dies with the session key (ADR-0005) |
-| project | `.searchhole.yaml` in the project dir | the user, by editing; applies **only after `searchhole trust`** approves its content hash (re-prompt on any change) | May contain only `rules` and `profiles`. It may select configured engines **by id**, but never endpoints, keys, `subscriptions` or retention |
+| project | `.searchhole.yaml` in the project dir | the user, by editing; or the CLI and dashboard (`searchhole rules add --project`, "scope: project" in the UI). Applies **only after `searchhole trust`** approves its content hash, with a re-prompt on any change. When search-hole itself writes an *already trusted* file, it records the new hash as trusted. | May contain only `rules` and `profiles`. It may select configured engines **by id**, but never endpoints, keys, `subscriptions`, retention or query hygiene. **`important: true` is a load error here**, so a repo can't outrank the user's session decisions. The model can't suggest project scope (ADR-0012) |
 | global | `~/.searchhole/rules.yaml` | CLI / dashboard / user edits (atomic write, comments preserved, ADR-0006) | Everything, including `subscriptions` |
 | lists | subscribed and bundled lists, compiled to versioned artifacts | list refresh job | Permissive parsing |
 
-Both files share one schema (`version: 1`, JSON Schema published for editors via `$schema`). Profiles with the same name in project and global: **the project profile shadows the global one entirely** (no deep merge, which avoids surprises). Settings precedence for a search: **explicit tool argument > project profile > global profile > `defaults`**. A test enforces it, because one-search-mcp silently overwrote the model's argument with env defaults.
+Both files share one schema (`version: 1`, JSON Schema published for editors via `$schema`). Settings such as engine URLs, caps and query hygiene live in `settings.yaml` (ADR-0015), never in rule files.
+
+**Profiles:**
+- **Same name in project and global:** the project profile *replaces* the global one. Fields it omits fall through to project `defaults`, then global `defaults`.
+- **Matching** (when no `profile` argument is given): project profiles first, then global, each in file order, first match wins. `keywords` are case-insensitive whole words. `regex` is re2js.
+- **Per-search precedence:** explicit tool argument > matched profile > `defaults`. **Exception (Principle 3):** a model argument may only *tighten* freshness (`effective maxAgeDays = min(arg, profile)`), and can't loosen it. A test enforces this, because one-search-mcp silently overwrote the model's argument with env defaults.
+
+**Strict loading, with resilience across versions:**
+- A user file that fails to parse or validate keeps the **last good compiled user rules, persisted in the DB** (keyed by file content hash), so an older or restarted gateway is never left without rules.
+- Within `version: 1`, an **unknown rule field is a warning and is ignored**. An **unknown `action` makes only that rule a counted no-op** ("needs search-hole ≥ x"), never a file-level failure.
+- Changes that alter meaning bump `version:`. An older binary then uses the persisted copy and shows "update required".
 
 ### Rule syntax
 
 ```yaml
 rules:
   - { match: pinterest.com, action: block }                 # host and all subdomains (label boundary)
-  - { match: "*.medium.com", action: lower, weight: 3 }     # subdomains only, not medium.com itself
+  - { match: "*.medium.com", action: lower, weight: 3 }     # same as medium.com: host + subdomains (uBlacklist meaning)
   - { match: "=example.com", action: allow }                # exact host only
   - { match: "github.com/orgname/", action: raise, weight: 2 }   # host + path prefix
   - { match: "|https://*.example.*/amp/^", action: block }   # URL pattern: *, ^, |  (Goggles/ABP style)
@@ -49,11 +59,17 @@ rules:
   - { match: example.org, action: block, until: 2026-12-31 }
 ```
 
-- **Domain matching:** the host is lowercased, IDNA-normalised (punycode ASCII) and has its trailing dot stripped. A rule matches the host itself or any `.`-boundary suffix, so `pinterest.com` never matches `notpinterest.com`. Spoof fixtures go into the property tests.
+- **Domain matching:** the host is lowercased, IDNA-normalised (punycode ASCII) and has its trailing dot stripped. A rule matches the host itself or any `.`-boundary suffix, so `pinterest.com` never matches `notpinterest.com`. `*.d` is accepted as a synonym for `d`, matching uBlacklist and WebExtension match patterns. Subdomains-only needs a URL pattern (`|https://*.d/`). Spoof fixtures go into the property tests.
+- **What a rule matches against:**
+  - Domain rules match the **original result host**.
+  - URL patterns and regex match the **original result URL with lossless normalisation only**: scheme and host lowercased, IDNA, trailing dot and default port removed, fragment dropped. Scheme, `www.`, path and query are kept.
+  - **The ADR-0010 dedupe key is never used for matching.**
+  - Visibility is decided **per original URL, before merging**, and hidden URLs never join a dedupe group (ADR-0010).
+  - Golden tests: this ADR's `/amp/` example, a uBlacklist `^https?://www\.` regex, and a hosts-file `www.` entry.
 - **URL patterns** compile to RE2 with Goggles' `^` definition: end of URL, or any character other than a letter, digit, `_`, `.`, `%` or `-`. A pattern allows at most 2 `*` and 2 `^`, and at most 500 characters.
 - **Regex rules** compile with **re2js only**. Lookarounds and backreferences are rejected. The cap is 1,000 characters.
 - **Fields:** `match`, `action`, `weight` (1–10, for raise/lower; default 1), `profile` (one name or a list), `important`, `until`/`ttl`, `note`, and an optional `id`.
-- **Rule ids:** the stable id is `r_` plus 10 hex characters of the SHA-256 of the normalised `(scope, match, action, weight, profile)`. Hand-edited YAML therefore needs no ids. Every logged decision stores the rule id *and* a snapshot of the rule text, so explanations survive deleting the rule.
+- **Rule ids:** the stable id is `r_` plus 10 hex characters of the SHA-256 of the normalised `(scope, match, action, weight, sorted profiles, important)`. An exact-duplicate tuple gets `-2`, `-3`, … in file order, and the loader warns about it. Hand-edited YAML therefore needs no ids. Every logged decision stores the rule id *and* a snapshot of the rule text, so explanations survive deleting the rule.
 - **Title/snippet matching** is out of v1. The result type keeps `props` (title, snippet, site) so it can be added later without a format change.
 
 ### Precedence: three passes per result
@@ -62,13 +78,15 @@ rules:
 
 | Tier | Contents |
 |---|---|
-| T0 important | user rules with `important: true`, walked session → project → global |
+| T0s, T0g important | user rules with `important: true`: session, then global (project files can't use `important`). Each is its own sub-tier |
 | T1 session | |
 | T2 project | |
 | T3 global | |
-| T4 lists | all subscribed and bundled lists |
+| T4 lists | `mode: enforce` lists (audit lists are evaluated separately; see Lists) |
 
-1. **Visibility** (actions `allow`, `block`, `pin`). Walk T0 → T4. **The first tier with any matching visibility rule decides.** Inside a user tier: `allow` → keep; otherwise `block` → hide; otherwise `pin` → keep. Inside T4, ABP semantics are kept so imported lists behave as their authors intended: `$important` block > `allow` (`@@`) > block. `$badfilter` cancels the identical normalised rule across all lists at artifact build time. If no tier matches, the result is kept, unless the active profile sets `default: block` (allowlist mode, needed to import a generic Goggles `$discard`).
+**In every pass, a rule whose `profile` doesn't include the active profile is skipped.** In the session tier, "file order" means `(created_at, id)`.
+
+1. **Visibility** (actions `allow`, `block`, `pin`). Walk T0s → T0g → T1 → T2 → T3 → T4. **The first tier with any matching visibility rule decides.** Inside a user tier: `allow` → keep; otherwise `block` → hide; otherwise `pin` → keep. Inside T4, ABP semantics are kept so imported lists behave as their authors intended: `$important` block > `allow` (`@@`) > block. `$badfilter` cancels the identical normalised rule across all lists at artifact build time. If no tier matches, the result is kept, unless the active profile sets `default: block` (allowlist mode, needed to import a generic Goggles `$discard`).
    - Consequence: **any user allow, pin or block beats every list rule, including a list's `$important`**, because user tiers come first. `important: true` lifts a user rule above scope order.
    - `raise`, `lower` and `normal` never change visibility, which avoids uBlacklist's "a user `lower` un-blocks a list block" surprise.
 2. **Pin.** A kept result is pinned if any **user** tier (T0–T3) has a matching `pin` for the active profile. Pin order is by tier (session first), then rule order in the file. Pins reorder results the engines returned; they never inject results.
@@ -79,7 +97,11 @@ rules:
    4. a domain suffix with more labels, then fewer
    5. file order, as a tie-break
 
-   `normal` explicitly neutralises lower tiers. Profile `prefer: {lists: [official-docs]}` acts as a T4 `raise 3` for list members (the weight is configurable). The multiplier maths is in ADR-0010.
+   - `normal` explicitly neutralises lower tiers.
+   - **A user-tier weight rule replaces list weights for that result**, so it is the user's number that counts.
+   - **Inside T4, ties are resolved commutatively** (Goggles semantics), so list order never matters: any raise beats any lower, the largest raise wins among raises, and the weakest lower wins among lowers.
+   - **Profile `prefer: {lists: [official-docs]}` is a separate profile multiplier** (default ×1.45, the same as `raise 3`). It applies to list members *after* the tier decision and stacks with it. It never replaces a user rule.
+   - The multiplier maths is in ADR-0010.
 
 Every result records **one** winning reason per pass (`decision`, `reason_code`, `rule_id`, `tier`, `list_id`). `--explain`, the dashboard and `searchhole explain <url>` show *all* matches, so "why" and "what else matched" are both answered (Pi-hole: row reason plus `/api/search`).
 
@@ -88,6 +110,10 @@ Every result records **one** winning reason per pass (`decision`, `reason_code`,
 - **Subscription fields:** `subscriptions: [{name, url, format: auto|ublacklist|abp|adguard|hosts|domains|goggles|searchhole, kind: block|allow|official|content-farm|clone, update: 7d, mode: enforce|audit|disabled, sha256?}]`. These live in global `rules.yaml` only. URLs must be HTTPS.
 - **List role defines meaning** (AdGuard Home's idea). A plain domain list with `kind: official` annotates source type and feeds `prefer`; it never hides anything. `kind: allow` turns its entries into list-tier exceptions.
 - **`mode: audit`** records "would hide" without hiding (context-forge's permissive mode). The dashboard shows "would remove 312 results/week", so a user can trial a list before enforcing it. New subscriptions default to `enforce`, and audit is one click.
+  - **T4 is resolved twice.** The *enforced* decision uses only `enforce` lists. The *audit* decision adds the audit lists and is recorded only where it differs (`would_hide`, `would_show`).
+  - Audit lists never feed pushdown or `prefer`.
+  - Property: adding an audit-mode list never changes the visible output.
+- **`$badfilter`:** each list's `$badfilter` lines compile into a separate **cancel set** inside that list's own artifact. At load time, the union of cancel sets from enabled enforce lists filters matches. No artifact ever edits another list's artifact (ADR-0006).
 - **Strict vs permissive compile:**
   - User files are **strict**: a bad rule fails the load with file, line and reason, and the last good compiled rules stay in force.
   - Lists are **permissive**: bad or unsupported lines become counted, reported no-ops, never silent passes or crashes. Examples are cosmetic filters, `$client`/`$dnstype`/`$denyallow`, and non-linear regex.
@@ -99,7 +125,7 @@ Every result records **one** winning reason per pass (`decision`, `reason_code`,
 | ABP/AdGuard | `\|\|d^` → domain; `@@` → allow; `$important` → list-important; `$badfilter` → cancel |
 | hosts | exact host |
 | plain domains | domain suffix |
-| uBlacklist | match patterns → domain or URL pattern; `/re/` → regex; `@` → allow; `@N` → `raise N` (clamped 1–10, with an "approximate" warning) |
+| uBlacklist | `*://*.d/*` and `*://*.d/<path>` → domain `d` (host + subdomains), with an optional path prefix; a non-wildcard subdomain → exact host; other match patterns → URL pattern; `/re/` → regex; `@` → allow; `@N` → `raise N` (clamped 1–10, with an "approximate" warning). Golden fixture: imported `*://*.pinterest.com/*` blocks both `pinterest.com` and `www.pinterest.com` |
 | Goggles | resolved **per goggle with its own semantics** (discard final, max boost, weakest downrank) into one effective action per (result, goggle); `discard` → block, `boost=N` → raise N, `downrank=N` → lower N |
 
 - **Compiled matcher (artifact):**

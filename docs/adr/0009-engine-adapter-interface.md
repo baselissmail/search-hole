@@ -40,7 +40,8 @@ interface EngineAdapter {
     dates: 'none' | 'published' | 'modified' | 'estimated' | 'mixed'
     maxPerCall: number; paging: boolean
     requiresKey: boolean; endpoint: 'fixed' | 'user'   // SearXNG: user-supplied URL
-    officialApi: boolean
+    officialApi: boolean; billed: boolean
+    attribution: string | null                  // e.g. "Results from Marginalia Search (CC-BY-NC-SA 4.0)", rendered in receipts
   }
   retention: { log: 'full' | 'metadata' | 'decisions-only', payloadTtlHours: number | null }   // enforced by the store
   defaults: { timeoutMs: number; concurrency: number; retry: RetryPolicy; suspend: SuspendPolicy; overFetch: number }
@@ -73,6 +74,7 @@ type ParseOutcome =
 | `ErrorClass` | Suspend | Retry | User-facing fix |
 |---|---|---|---|
 | `offline` (no route, DNS fail for all) | **no** (fail fast, don't poison health) | no | "You appear to be offline" |
+| `unreachable` (ECONNREFUSED/ECONNRESET/EHOSTUNREACH to a configured origin while others resolve) | 30 s, no backoff growth | other engine now | "SearXNG isn't running → `searchhole searxng up` or `doctor`" |
 | `timeout` | 5 s × backoff | other engine now | — |
 | `rate_limited` (429) | `Retry-After` / reset headers, else 180 s | other engine now | "Brave rate-limited; resumes 14:05" |
 | `quota` (402, quota body) | until reset or 24 h | other engine | "Monthly quota used" |
@@ -85,9 +87,15 @@ type ParseOutcome =
    - Backoff is `base × 2^(consecutive−1)`, capped at 1 h, and resets on the first success.
    - A **lone** engine is suspended only for explicit signals (429 with reset, auth, quota, json_disabled). Error rate alone never suspends the last engine standing.
    - The rate-limit header parser follows agentgateway's: `Retry-After` in seconds or as a date, `retry-after-ms`, `x-ratelimit-reset*`.
-4. **Health is shared:**
-   - `engine_health(engine, sub_engine, state, reason_class, until, consecutive_failures, ewma_success, p50/p95_ms, last_error_redacted, key_present, key_source, updated_at)` lives in SQLite. Every gateway and the dashboard see one truth.
-   - SearXNG upstream problems (`unresponsive_engines`, the `Suspended:` prefix, `Server-Timing`) become `sub_engine` rows.
+4. **Health is shared, with three states:**
+   - **`healthy`:** a successful call (`ok` or `empty`) or explicit probe within the last 10 minutes, and not suspended or capped.
+   - **`unhealthy`:** suspended, capped, inactive, or the last attempt failed.
+   - **`unknown`:** no attempt yet, or none recent.
+
+   The PreToolUse hook relies on this distinction (ADR-0014).
+   - **Storage:** `engine_health(engine, key_fp, sub_engine, state, reason_class, until, consecutive_failures, ewma_success, p50/p95_ms, last_success_at, last_error_redacted, key_present, key_source, updated_at)` lives in SQLite. Every gateway and the dashboard see one truth.
+   - **`key_fp`** is the first 8 bytes of HMAC-SHA256(install secret in `meta`, key), so gateways holding *different* keys for one engine (ADR-0007 resolves keys per process) don't poison each other. `auth`, `quota` and `spend_cap` states are per `key_fp`. Key-independent classes (`timeout`, `server`, `unreachable`, `captcha`, IP-based `rate_limited`) are shared across fingerprints. The key and its prefix are never stored.
+   - **SearXNG upstream problems** (`unresponsive_engines`, the `Suspended:` prefix, `Server-Timing`) become `sub_engine` rows.
 5. **Fallback walk:**
    - the plan's engine list, then the configured fallback chain;
    - an `attemptedEngines` set shared across hops, with `maxFallbacks` = 2;
@@ -101,24 +109,39 @@ type ParseOutcome =
    - all user-configurable.
 
    Hitting a cap makes the engine inactive (`spend_cap`) with a receipt warning. Caps are the guard against a looping agent.
+   - Usage is keyed by `(engine, key_fp, period)`.
+   - **`engine_usage`'s schema never takes a writer-breaking change**, so even read-only processes (ADR-0006) can reserve.
+   - **If the reservation can't be written** (BUSY after the short logging timeout, or any DB error), billed engines get only an **in-memory hard allowance of 20 calls per process per day**, after which they fail closed with `spend_cap`. Free engines proceed. The receipt warns "spend cap not shared (DB unavailable)".
+   - Reservations are not refunded on `timeout`, since the call may have been billed. They are refunded only when the connection failed before the request was sent.
 7. **Over-fetch:** request `overFetch × wanted`, at most `maxPerCall`: ×2 at standard, ×3 at deep. Brave `count=20` is one billed call.
-8. **Pushdown:** `compilePushdown` gets **resolved** rules (after precedence, ADR-0008) and a size budget. It returns the parameters plus `pushed` and `skipped` rule ids. **Local filtering always runs anyway.** Goggles only re-rank, and SearXNG's `remove` doesn't report what it dropped.
+8. **Pushdown: blocks only, and only when safe.** Pushed rules remove results engine-side, so they are invisible to our log, our raw ranks and replay (ADR-0010). The point is to save quota on billed engines, not to filter.
+   - **Setting:** `pushdown: blocks | off` per engine (ADR-0015). The default is `blocks` for billed engines and `off` for SearXNG and other free engines.
+   - **Only `block` is pushed, never `raise`, `lower` or `pin`.** Ranks stay raw, and local multipliers are the only weighting, so nothing is applied twice.
+   - **Computed per request from the session's resolved tiers:**
+     - A block is pushed only if no keep rule (`allow`/`pin`) in any user tier or profile, and no `kind: allow` list, could match a URL in that block's host scope.
+     - Any keep rule whose host set isn't literal (regex, wildcard host) disables block pushdown for that request.
+     - **Audit-mode lists are never pushed.**
    - **Brave:**
-     - `block` → `$discard,site=`, `raise N` → `$boost=N,site=`, `lower N` → `$downrank=N,site=`, `pin` → `$boost=10` (pins are still applied locally);
-     - a user `allow` that overlaps a list block **omits** that discard;
-     - the cap is 2,000 instructions, user rules first, and the 418k-rule list is never pushed;
+     - `block` → `$discard,site=`, with a budget of 2,000 instructions, user rules first; the 418k-rule list is never pushed;
      - a generic `$discard` is never emitted outside allowlist mode;
      - large goggles go by POST;
      - `web.mutated_by_goggles` is checked and recorded.
-   - **Tavily / Exa / Mojeek:** domain include/exclude arrays within their caps.
-   - **SearXNG:** per request `engines=` (without `categories=`, so it doesn't union), `language` always explicit, `time_range`, `safesearch`, and `timeout_limit` (our client timeout is `timeout_limit + 1.5 s`). Engine names are validated against `/config` and skipped names are reported. Instance-level `hostnames.remove` is compiled **only** for the bundled container we manage, as anchored, case-insensitive, port-tolerant regexes in an external file. `plugins:` is never written, and the container restarts on change.
+   - **Tavily / Exa / Mojeek:** domain exclude arrays within their caps (Mojeek `fe` ≤ 25).
+   - **Recording:** each search stores `pushed_rule_ids`. The receipt and `--explain` say "N block rules applied upstream (their hits aren't observable)".
+   - **SearXNG:** no hostnames-plugin pushdown in v1. Per request we send `engines=` (without `categories=`, so it doesn't union), `language` always explicit, `time_range`, `safesearch`, and `timeout_limit` (our client timeout is `timeout_limit + 1.5 s`). Engine names are validated against `/config`, and skipped names are reported. Gateways never touch Docker (ADR-0015).
    - **Freshness pushdown only when the profile sets `requireDate: true`**, because engine date filters drop undated results, which conflicts with "flag, don't drop" (§5 step 7). Otherwise we over-fetch and filter locally.
-9. **Retention is enforced by the store, not by trust.** Each adapter's `retention` drives what is written:
-   - **SearXNG, Tavily, Mojeek (Business):** `full`.
-   - **Brave, Kagi, Exa:** `metadata`, with `payloadTtlHours: 24`. Titles and snippets are purged after 24 h. URL, domain, rank, decision, rule and date stay.
-   - **Mojeek (Startup):** 1 h.
-
-   This is a conservative reading of the transient-use terms, and the open legal questions are listed in [SYNTHESIS](../research/SYNTHESIS.md). The dashboard says "snippet expired (engine terms)".
+   - **`site:` and `-site:` from the query** (ADR-0012) become include/exclude parameters where supported, and are always enforced locally.
+   - **Query hygiene** (ADR-0015 point 4) runs before `buildRequest`.
+9. **Retention is enforced by the store, not by trust.** Each adapter's `retention` drives what is written. It follows the evidence's own recommendations ([platform-facts-engines-lists-versions.md](../research/platform-facts-engines-lists-versions.md) §3):
+   - **SearXNG, Tavily, Mojeek (Business), Marginalia:** `full`. Marginalia's CC-BY-NC-SA attribution is stored and rendered with its results.
+   - **Brave, Kagi, Exa:** `decisions-only`, the default:
+     - stored: a URL hash, the registrable domain, rank, decision, rule ids, engine dates and counts;
+     - **titles, snippets and full URLs live only in process memory**, for the current turn's receipt and the `search` response;
+     - the dashboard shows "details not stored (engine terms)".
+     - Whether storing the registrable domain is allowed is an open legal question ([SYNTHESIS §8](../research/SYNTHESIS.md)).
+   - **Mojeek (Startup):** `metadata` with a 1 h payload TTL.
+   - **Opt-in:** `engines.<id>.storageRights: true` (ADR-0015) switches an engine to `full` for users with a storage-rights plan.
+   - **Payloads are stored per engine** (`result_payloads(result_id, engine, title, snippet, url, expires_at)`), each row with its own engine's TTL. The merged "longest title and snippet" (ADR-0010) is picked at read time from rows that haven't expired.
 
 ### v1 adapters
 
@@ -127,6 +150,8 @@ type ParseOutcome =
 - **Not shipped:** DuckDuckGo and SerpApi (no official API or terms risk).
 - **Per-engine quirks are documented in each adapter's header and covered by fixtures:**
   - Brave: `X-Subscription-Token`, `text_decorations=false`, record `query.altered`;
+  - Tavily: always send `include_published_date: true`;
+  - Mojeek: always send `date=1`;
   - Marginalia: `api2.marginalia-search.com`, the `API-Key` header, 503 means quota;
   - SearXNG: rank by `score`, store `engines[]` per result.
 

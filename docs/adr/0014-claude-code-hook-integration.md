@@ -1,7 +1,7 @@
 # ADR-0014: Claude Code hook integration
 
-- **Status:** Accepted (2026-10-30)
-- **Related:** [0002](0002-runtime-and-packaging.md), [0005](0005-session-definition.md), [0012](0012-mcp-tool-surface-and-output-limits.md)
+- **Status:** Accepted (2026-10-30; revised the same day after adversarial review)
+- **Related:** [0002](0002-runtime-and-packaging.md), [0005](0005-session-definition.md), [0009](0009-engine-adapter-interface.md), [0012](0012-mcp-tool-surface-and-output-limits.md)
 
 ## Context
 
@@ -9,100 +9,152 @@
 - a **PreToolUse hook that fails open**: it denies `WebSearch` (and later `WebFetch`) *only while a healthy engine exists*, and otherwise allows the call with `additionalContext`;
 - a **Stop hook** that prints a one-line receipt as `systemMessage`, only for turns that searched.
 
-Verified hook facts ([platform-facts-claude-code-runtime.md](../research/platform-facts-claude-code-runtime.md) §D; re-checked in the live docs on 2026-10-30):
+Principle 3 adds: the model can never change rules itself. Verified hook facts ([platform-facts-claude-code-runtime.md](../research/platform-facts-claude-code-runtime.md) §D; re-checked in the live docs on 2026-10-30):
 
-- **`mcp_tool` hooks** (v2.1.118+): `{"type":"mcp_tool","server":"plugin:<plugin>:<server>","tool":"…","input":{…}}`. String inputs support `${path}` substitution from the hook's JSON input (the docs show `${tool_input.file_path}`; **whether top-level `${session_id}` works is undocumented**). The tool's text is parsed like command stdout. **If the server isn't connected, the hook gives a non-blocking error and execution continues**, so it fails open by design. On blocking events (PreToolUse, Stop), Claude Code waits for a connecting server up to `MCP_TIMEOUT`.
+- **`mcp_tool` hooks** (v2.1.118+): `{"type":"mcp_tool","server":"plugin:<plugin>:<server>","tool":"…","input":{…}}`.
+  - String inputs support `${path}` substitution from the hook's JSON input. The docs show `${tool_input.file_path}`; **top-level fields such as `${session_id}` are undocumented, so this is a spike**.
+  - The tool's text is parsed like command stdout.
+  - **If the server isn't connected, the hook gives a non-blocking error and execution continues** (fail-open by design).
+  - On blocking events, Claude Code waits for a connecting server up to `MCP_TIMEOUT`.
+  - `onFailure` is documented only for command and HTTP hooks.
 - **Command hooks:**
-  - **Exec form** (`command` + `args`, v2.1.139+) needs no shell quoting, which matters because Basel's path contains a space.
-  - **Shell-form failures block the tool on Windows without Git Bash**, unless `onFailure: "continue"` (v2.1.295+) is set.
-  - A missing `node` counts as a failure.
+  - Exec form (`command` + `args`, v2.1.139+) needs no shell, but on Windows it needs a real `.exe`.
+  - Shell form runs under `sh -c` (macOS, Linux), Git Bash, or **PowerShell when Git Bash is absent**. There, a failing hook **blocks the tool** unless `onFailure: "continue"` (v2.1.295+) is set.
 - **Output traps:**
-  - On **Stop**, `additionalContext` or `decision: "block"` **makes Claude keep working**, so the receipt line must use `systemMessage` only.
+  - On **Stop**, `additionalContext` or `decision: "block"` **makes Claude keep working**.
   - `suppressOutput` no longer has any effect.
-  - Strings are capped at 10,000 characters.
-- **`permissionDecision: "deny"`'s reason is shown to Claude**, which is how we steer it to our tool. `updatedInput` can't redirect to an MCP tool.
-- **Plugin tool naming:** `mcp__plugin_search-hole_search-hole__search`.
-- **A plugin can't ship permission deny rules.** Only `agent` and `subagentStatusLine` take effect from plugin settings.
-- **The MCP server keeps its spawn-time `CLAUDE_CODE_SESSION_ID` after `/clear`** (ADR-0005).
-- **Hook precedent:** nightshift runs all its hooks in bash plus a PowerShell polyglot, with no Node. It uses hooks as gates and records each plugin copy that answers ([nightshift.md](../research/nightshift.md)).
+  - Output strings are capped at 10,000 characters.
+- **Deny reasons and naming:** `permissionDecision: "deny"`'s reason is shown to Claude. Plugin tools are named `mcp__plugin_search-hole_search-hole__<tool>`. Subagents may not have every MCP tool.
+- **A plugin can't ship permission rules** (only `agent` and `subagentStatusLine` take effect from plugin settings).
+- **In Claude Code the model has Bash, Edit and Write.** It can run any CLI the user can, including ours, and edit our YAML files.
+- **Hook precedent:** nightshift dot-sources a sh/PowerShell polyglot `.ps1` launcher from shell-form hooks: `". \"${CLAUDE_PLUGIN_ROOT}/hooks/dispatch/claude-hardhat.ps1\""` ([nightshift.md](../research/nightshift.md), checked in the ref).
 
 ## Decision
 
-**The gateway answers the hooks itself through `mcp_tool` hooks.** The only command hook is the node preflight.
+**The gateway answers every hook through `mcp_tool` hooks.** The only shell code is the Node preflight.
 
-`hooks/hooks.json` (Claude Code plugin):
+`hooks/hooks.json` (shape; exact `${…}` substitutions confirmed by the spike):
 
 ```json
 {
   "hooks": {
-    "SessionStart": [
-      { "hooks": [
-        { "type": "command", "command": "\". \\\"${CLAUDE_PLUGIN_ROOT}/hooks/preflight\\\"\"",
-          "onFailure": "continue", "timeout": 5 },
-        { "type": "mcp_tool", "server": "plugin:search-hole:search-hole", "tool": "hook",
-          "input": { "event": "SessionStart", "sessionId": "${session_id}" } } ] } ],
-    "PreToolUse": [
-      { "matcher": "WebSearch|WebFetch",
-        "hooks": [ { "type": "mcp_tool", "server": "plugin:search-hole:search-hole", "tool": "hook",
-          "input": { "event": "PreToolUse", "sessionId": "${session_id}",
-                     "toolName": "${tool_name}", "query": "${tool_input.query}" } } ] } ],
-    "Stop": [
-      { "hooks": [ { "type": "mcp_tool", "server": "plugin:search-hole:search-hole", "tool": "hook",
-          "input": { "event": "Stop", "sessionId": "${session_id}" } } ] } ]
+    "SessionStart": [ { "hooks": [
+      { "type": "command", "command": ". \"${CLAUDE_PLUGIN_ROOT}/hooks/preflight.ps1\"", "onFailure": "continue", "timeout": 5 },
+      { "type": "mcp_tool", "server": "plugin:search-hole:search-hole", "tool": "hook",
+        "input": { "event": "SessionStart", "sessionId": "${session_id}", "source": "${source}" } } ] } ],
+    "UserPromptSubmit": [ { "hooks": [
+      { "type": "mcp_tool", "server": "plugin:search-hole:search-hole", "tool": "hook",
+        "input": { "event": "UserPromptSubmit", "sessionId": "${session_id}" } } ] } ],
+    "PreToolUse": [ { "matcher": "WebSearch|WebFetch|Bash|Edit|Write", "hooks": [
+      { "type": "mcp_tool", "server": "plugin:search-hole:search-hole", "tool": "hook",
+        "input": { "event": "PreToolUse", "sessionId": "${session_id}", "agentType": "${agent_type}",
+                   "toolName": "${tool_name}", "query": "${tool_input.query}",
+                   "command": "${tool_input.command}", "filePath": "${tool_input.file_path}" } } ] } ],
+    "Stop": [ { "hooks": [
+      { "type": "mcp_tool", "server": "plugin:search-hole:search-hole", "tool": "hook",
+        "input": { "event": "Stop", "sessionId": "${session_id}" } } ] } ]
   }
 }
 ```
 
-The preflight is the one **shell-form** hook, because exec form needs a real executable and Windows has no `sh` without Git Bash.
-- It is a POSIX-sh / PowerShell **polyglot**, dot-sourced, so it runs under `sh -c` on macOS and Linux, under Git Bash on Windows, and under PowerShell on Windows without Git Bash. This is nightshift's launcher technique (MIT, attributed).
-- `onFailure: "continue"` guarantees it never blocks.
-- The exact quoting is fixed and tested on all three OSes in P3; `claude plugin validate` warns on an unquoted `${CLAUDE_PLUGIN_ROOT}`.
-- The `mcp_tool` hooks have no shell or quoting concerns at all.
+### 1. Turn bracketing and session keys (forge-resistant)
 
-1. **PreToolUse.** The `hook` tool (registered only for the `claude-code` host profile, ADR-0012) returns:
-   - **Deny**, if this gateway has ≥ 1 healthy, non-capped engine *right now*. This comes from in-process state plus `engine_health`, with no heartbeat file and no race. The reason is short:
-     > `search-hole is active: use mcp__plugin_search-hole_search-hole__search (and __fetch for pages) instead of WebSearch. It applies the user's source rules.`
-   - **Allow plus `additionalContext`**, if no engine is healthy:
-     > `search-hole has no healthy engine (brave: key invalid). Built-in WebSearch allowed. Tell the user to run /search-hole:doctor.`
-   - **`WebFetch` is allowed** with an `additionalContext` nudge until our `fetch` matches it on PDFs and long pages (a P2/P3 gate). After that, it is denied under the same health rule.
-   - **If the gateway isn't connected,** the `mcp_tool` hook fails open by itself: WebSearch proceeds.
-   - **Escape hatch:** the plugin `userConfig.hook_mode: "steer" | "off"` (default `steer`), plus the env var `SEARCHHOLE_HOOKS=off`. With `off`, the hook always allows.
-2. **Stop.**
-   - The `hook` tool closes this session's open receipt (ADR-0005).
-   - If the receipt has ≥ 1 search, it returns only `{"systemMessage": "search-hole · 6 searches · 41 results · 9 hidden · sources: 3 official, 2 blogs · ⚠ 1 stale (2022)"}`. Otherwise it returns `{}`, which is silent.
-   - It **never** returns `additionalContext` or `decision`.
-   - Turned off with `userConfig.receipt_line: false`.
-3. **SessionStart:**
-   - The `mcp_tool` hook re-keys the gateway's session to the current `session_id`. This runs after `/clear` and compaction, but is skipped at first launch, when no MCP context exists yet; `CLAUDE_CODE_SESSION_ID` from the spawn env covers that case.
-   - The **preflight command hook** is the only shell code. It is the sh/PowerShell polyglot described above, with no Node and no network. It checks that `node` exists and is ≥ 22.13. If not, it prints `{"systemMessage": "search-hole needs Node.js 22.13+ … then run /mcp → reconnect search-hole"}`. If Node is fine, it prints nothing. It sets `onFailure: "continue"`, so it can never block.
-4. **Every hook call re-keys the session.** Each `hook` call carries `sessionId`, so the gateway's session label is always the current one (ADR-0005 precedence 1).
-5. **Strict mode is opt-in via `/search-hole:enforce`.**
-   - With explicit consent, it writes `"permissions": {"deny": ["WebSearch", "WebFetch"]}` to the user's `~/.claude/settings.json`, tagged with a marker so `/search-hole:unenforce` removes exactly those entries.
-   - It shows the diff before writing.
-   - It is reversible, and `uninstall --purge` reminds the user to run it.
-6. **Minimum Claude Code version:** 2.1.295. That covers `onFailure` (2.1.295), exec-form hooks (2.1.139), `CLAUDE_CODE_SESSION_ID` for MCP (2.1.154), the resume fix (2.1.163) and `mcp_tool` hooks (2.1.118). Plugin manifests have no minimum-version field, so the preflight hook also checks `claude --version` when cheap (it may skip this) and `doctor` reports it.
+- **`UserPromptSubmit` opens a turn.** It fires before any model tool call in that turn. **`Stop` closes it.** The gateway keeps `turnOpen` per session.
+- **Re-keying the session id happens only on `SessionStart`** with `source ∈ {startup, resume, clear, compact}` **or on `UserPromptSubmit`, and only while no turn is open.**
+  - Model-initiated tool calls happen *inside* a turn, so a forged `hook` call from the model (or injected content) can't re-key the session or open a turn.
+  - `PreToolUse` and `Stop` never re-key.
+  - `Stop` closes the turn only if `sessionId` equals the current key.
+  - A `search`/`fetch` arriving after a Stop and before the next UserPromptSubmit marks that Stop as suspect: the turn is reopened and the event logged.
+  - Every re-key and close is logged to the session's receipt history.
+- **Session-scope rules survive a re-key from the same `CLAUDE_PROJECT_DIR`.** They are dropped only on `SessionStart(source=clear)`, matching "a fresh conversation" (ADR-0005).
+
+### 2. PreToolUse on `WebSearch` / `WebFetch`: fail-open steering
+
+- **Deny `WebSearch` only if all of these hold:**
+  - At least one engine in the plan this session's `search` would use (active profile plus fallback chain) is **`healthy`**: a successful call or probe within the last 10 minutes, and not suspended or capped (health states are defined in ADR-0009).
+  - The **last search attempt in this process did not fail on every engine**.
+  - The engine state isn't merely `unknown`. On `unknown` (for example a fresh install), the gateway runs a **bounded probe** of ≤ 500 ms: SearXNG `GET /config` plus a JSON check; for keyed engines, the key is present and has not been rejected. If the probe fails, WebSearch is allowed.
+
+  The deny reason is short:
+  > `search-hole is active: use mcp__plugin_search-hole_search-hole__search (and __fetch for pages) instead of WebSearch; site: operators work. It applies the user's source rules.`
+- **Otherwise allow, with `additionalContext`:**
+  > `search-hole has no healthy engine (brave: key invalid). Built-in WebSearch allowed. Tell the user to run /search-hole:doctor.`
+- **Deny-loop breaker:**
+  - The gateway records `lastDeny[sessionId]`.
+  - If the next `PreToolUse(WebSearch)` for that session arrives with **no `search` call since the deny**, the caller evidently can't use our tool (a subagent without our MCP tool, a restricted tool list). The call is **allowed**, with `additionalContext` saying so.
+  - `agentType` is logged so evals can show which agents can't see the tool.
+- **`WebFetch` is allowed** (with an `additionalContext` nudge) until our `fetch` passes the parity gate defined in ADR-0011: PDFs, and long pages via `cursor`. After that, it follows the WebSearch rule.
+- **If the gateway is down,** the `mcp_tool` hook fails open by itself.
+
+### 3. PreToolUse on `Bash` / `Edit` / `Write`: guarding rule changes
+
+This guards against the model changing rules (Principle 3). **Deny**, with a reason pointing to `suggest_rule`, when:
+- a Bash `command` invokes search-hole's rule-changing verbs: the CLI path or the `searchhole`/`search-hole` command with `block|allow|pin|lower|raise|normal|rules|trust|keys|suggestions approve|enforce|unenforce|lists`;
+- an `Edit`/`Write` targets `rules.yaml`, `.searchhole.yaml`, or anything under the search-hole data root.
+
+All other Bash/Edit/Write calls get an immediate allow, with no output, and the check is a plain string match in-process.
+
+**This is defence in depth, not a guarantee.** A model with shell access can always obfuscate, so SECURITY.md says so honestly. The real boundaries are:
+- **No MCP tool changes rules.**
+- **Rule-changing slash commands are skills with `disable-model-invocation: true`.** They run the CLI through the skill's pre-execution command injection, so the user's own action runs it. The skill text never hands the model a command to run.
+- **`suggest_rule` returns an approval *instruction for the user*** ("type `/search-hole:approve 3`"), not a shell command (ADR-0012).
+- **Claude Code's permission prompts still apply** to Bash.
+
+### 4. Stop
+
+- Closes the turn's receipt.
+- If the turn had ≥ 1 search, it returns only `{"systemMessage": "search-hole · 6 searches · 41 results · 9 hidden · sources: 3 official, 2 blogs · ⚠ 1 stale (2022)"}`. Otherwise it returns `{}`.
+- It **never** returns `additionalContext` or `decision`.
+- Off with setting `hooks.receiptLine: false` (ADR-0015).
+
+### 5. SessionStart preflight
+
+- **The one shell-form hook:** `". \"${CLAUDE_PLUGIN_ROOT}/hooks/preflight.ps1\""`. That is one escape layer, with a `.ps1` extension so PowerShell can dot-source it.
+- **The file is a sh/PowerShell polyglot** (the sh body outside a `<# … #>` block, as in nightshift; MIT, attributed). It runs under `sh -c`, Git Bash and PowerShell.
+- **It needs no Node and no network.**
+- **What it checks and prints:**
+  - **Node missing or older than 22.13:** it prints `{"systemMessage":"search-hole needs Node.js 22.13+ … then run /mcp → reconnect search-hole"}`.
+  - **Node present and recent enough:** it prints nothing.
+- **It never blocks:** `onFailure: "continue"`, and a 5 s timeout.
+
+### 6. Modes
+
+`hooks.mode` (ADR-0015; also via plugin `userConfig` → `SEARCHHOLE_HOOK_MODE`):
+
+| Mode | Behaviour |
+|---|---|
+| `steer` (default) | As above |
+| `strict` | Deny WebSearch even when unhealthy, with an explanation. It disappears with the plugin |
+| `off` | Always allow (the Bash/Edit guard stays on unless `hooks.guard: false`) |
+
+**`/search-hole:enforce`** sets `strict`. As an explicit second step, with a warning that the rules **persist after uninstall**, it offers to write marker-tagged `permissions.deny` entries to `~/.claude/settings.json`. `/search-hole:unenforce` removes exactly those entries. `doctor` detects marker-tagged deny rules while the plugin is absent and says how to remove them.
+
+### 7. Minimum Claude Code version: **2.1.296**
+
+That covers `onFailure` (2.1.295), the 4,096-character `instructions` cap (2.1.296; ADR-0012), exec form (2.1.139), `CLAUDE_CODE_SESSION_ID` for MCP (2.1.154), the resume fix (2.1.163) and `mcp_tool` hooks (2.1.118). Manifests have no minimum-version field, so `doctor` checks and reports it.
 
 ## Alternatives considered
 
-- **Command hooks in Node that read a heartbeat file and the DB** (the plan's default). These are kept as the fallback if the P0/P2 spike shows `${session_id}` substitution or `mcp_tool` hooks don't work as needed. Downsides:
-  - one Node spawn per WebSearch attempt (≈ 50–100 ms);
-  - a heartbeat race ("healthy" as of the last write);
-  - no exact session correlation, because a command hook can't reach *this* gateway process;
-  - a Windows shell-failure risk.
-- **Bash-only hooks with a heartbeat file** (nightshift style). These need no Node, but they have the same correlation and race problems, and they need `stat` portability shims.
-- **Reading the transcript in the Stop hook** to find receipt ids. Rejected: the transcript is written asynchronously (ADR-0005).
-- **Hiding the `hook` tool from the model.** Not possible in Claude Code: no documented mechanism exists, and `visibility: ["app"]` is unverified on non-Apps hosts. It is mitigated instead: one line of description, read-only behaviour, and tool search defers its definition (only the name costs tokens).
+- **Node command hooks reading a heartbeat file and the DB** (the plan's default). This is the fallback if the spike shows `mcp_tool` substitution doesn't work. Downsides:
+  - one Node spawn per hooked tool call, which matters now that Bash is matched;
+  - a heartbeat race;
+  - no exact session correlation;
+  - Windows shell-failure risk.
+- **Bash-only hooks with state files** (nightshift style). These have the same correlation and race problems.
+- **Reading the transcript in Stop.** Rejected: it is written asynchronously (ADR-0005).
+- **Hiding `hook` from the model.** Not possible in Claude Code. It is mitigated by turn bracketing and the narrow, logged side effects in point 1.
 
 ## Consequences
 
-- The PreToolUse decision is exact and current. A dead or absent gateway means built-in search keeps working, which is §1's "my AI's built-in search keeps working until search-hole has a healthy engine".
-- The model sees a `hook` tool in Claude Code. Calling it can at worst produce a decision string or re-label its own session. This is documented in SECURITY.md.
-- Cursor and Codex hooks use their own event schemas (Cursor `preToolUse`, `stop`, …) and are designed in P7. Codex directory listing needs a hookless variant (and is blocked anyway for local stdio servers without partner approval).
+- PreToolUse is exact and current. A dead gateway, an unknown or failing engine, or an agent that can't see our tool all leave built-in search working (§1's promise).
+- Matching `Bash|Edit|Write` puts an in-process string check on every such call: a local MCP round-trip of a few ms. Plugin evals measure it.
+- Cursor and Codex hooks have their own event schemas and are designed in P7. Cursor also loads this Claude plugin, which is handled by host detection (ADR-0012).
 
-## Validate early (P0 spike, before P3 work)
+## Validate early (P0 spike, before P3)
 
-1. `${session_id}`, `${tool_name}` and `${tool_input.query}` substitution in `mcp_tool` hook `input`.
-2. PreToolUse deny via `mcp_tool` actually steers the model to our tool. Measure it in plugin evals against a no-plugin baseline.
+1. Substitution of `${session_id}`, `${source}`, `${agent_type}`, `${tool_name}` and `${tool_input.*}` in `mcp_tool` `input`, and that UserPromptSubmit fires before any tool call.
+2. A deny via `mcp_tool` steers the model to `search` (plugin evals vs a no-plugin baseline). The deny-loop breaker frees a subagent without our tool.
 3. The Stop `systemMessage` shows once per searching turn and never triggers continuation.
-4. The gateway being down means WebSearch proceeds (fail open) on macOS, Linux and Windows (with and without Git Bash).
-5. Behaviour when two plugin copies are installed (Cursor loading the Claude plugin): one receipt line, not two (ADR-0006 point 11).
+4. Fail-open on macOS, Linux and Windows (with and without Git Bash): the gateway is down, the engine unknown, or all engines failing.
+5. The preflight's literal hooks.json command runs through `sh -c`, Git Bash and `powershell -Command` with `node` removed from PATH, and prints the systemMessage.
+6. A forged `hook({event:"SessionStart"})` from the model mid-turn is rejected and logged.
