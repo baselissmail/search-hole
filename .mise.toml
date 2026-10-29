@@ -1,0 +1,4 @@
+# Project-local toolchain (ADR-0002: develop on Node 26 LTS; support >= 22.13)
+[tools]
+node = "26.13.0"
+pnpm = "12.16.1"

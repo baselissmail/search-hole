@@ -1,0 +1,45 @@
+{
+  "name": "search-hole",
+  "version": "0.0.0",
+  "description": "A local, open-source search gateway for AI assistants: choose the engines and sites your AI searches, see every search, get source receipts.",
+  "license": "Apache-2.0",
+  "author": "Basel Issmail <basel.issmail@gmail.com>",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "bin": {
+    "searchhole": "dist/searchhole.mjs",
+    "search-hole": "dist/searchhole.mjs"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "dev": "node --experimental-strip-types src/cli/main.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@mozilla/readability": "0.6.0",
+    "@types/node": "26.6.6",
+    "fast-check": "4.10.2",
+    "htmlparser2": "12.0.0",
+    "ipaddr.js": "2.5.0",
+    "linkedom": "0.18.14",
+    "pino": "10.4.0",
+    "re2js": "2.9.1",
+    "robots-parser": "3.0.1",
+    "tldts": "7.4.19",
+    "tsdown": "0.23.4",
+    "typescript": "7.0.2",
+    "undici": "8.12.3",
+    "vitest": "5.0.5",
+    "yaml": "2.9.1",
+    "zod": "4.6.7"
+  }
+}
