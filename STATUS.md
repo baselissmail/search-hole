@@ -53,3 +53,14 @@ Checklist per MASTER_PLAN.md §11. Decisions taken without asking Basel are note
 - Publish the two npm placeholders (`distribution/npm-reserve/README.md`). No domain is needed: search-hole is local, and docs can live on GitHub Pages as smart-doctor's do. Revisit only for a landing page or the v2/v3 hosted connector.
 - Optional: a free Tavily key (no card) for the live adapter check in P1. Not needed for Claude Code use (ADR-0018 built-in mode).
 - Say if you'd prefer MIT over Apache-2.0 (free to switch before outside contributions).
+
+## v0.1 test build (target: Basel can install it in Claude Code and use it)
+
+Scope, cut from P1–P3 for a first hands-on test (the rest follows in later releases):
+- [ ] P1 modules: rules engine + YAML, URL/merge/freshness/source types, SearXNG/Brave/Tavily adapters + health + fan-out + mock engine, SQLite store + migrations, safe fetcher + page dates + engine transport, paths/settings/keys/logging/query hygiene (wave 1, in progress)
+- [ ] Pipeline wiring + CLI: `search --explain`, `block|allow|pin|raise|lower|normal|unrule`, `rules`, `log`, `explain <url>`, `doctor`, `searxng up|down|status`, `keys set|status`, `mcp`
+- [ ] MCP gateway (SDK v2, both protocol eras): `search`, `fetch`, `receipt`, `suggest_rule`, plus the app-only `hook`; Claude Code `auto` / `builtin` / `engines` modes (ADR-0018)
+- [ ] Claude Code plugin: manifest, local marketplace, `.mcp.json`, `mcp_tool` hooks (UserPromptSubmit, PreToolUse WebSearch/WebFetch/Bash/Edit/Write, PostToolUse WebSearch/WebFetch, Stop), node preflight, skills (slash commands), research skill
+- [ ] End-to-end check with a real Claude Code session; install instructions in README
+
+Deferred past v0.1: dashboard (P4), MCP App panel and `.mcpb` (P5), list subscriptions and importers (P6), Cursor/Codex manifests (P7), release engineering (P8).
