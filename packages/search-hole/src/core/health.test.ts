@@ -36,6 +36,7 @@ describe('ERROR_POLICY (ADR-0009 point 3 table)', () => {
     expect(ALL_CLASSES.sort()).toEqual(
       [
         'auth',
+        'bad_request',
         'cancelled',
         'captcha',
         'forbidden',

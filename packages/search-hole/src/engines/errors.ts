@@ -19,9 +19,9 @@ const THIRTY_DAYS_S = 30 * 24 * 60 * 60
 
 /**
  * Maps an HTTP status (plus a short body snippet and the lower-cased response headers)
- * to an error class. Returns null for 2xx. Other 4xx statuses mean our request was wrong
- * and count as `malformed` (adapter needs an update). A redirect from an API endpoint is
- * unexpected and also `malformed`.
+ * to an error class. Returns null for 2xx. Other 4xx statuses mean the engine rejected our
+ * request and count as `bad_request`. A redirect from an API endpoint is unexpected and
+ * counts as `malformed`.
  */
 export function classifyHttp(
   status: number,
@@ -50,7 +50,9 @@ export function classifyHttp(
       break
   }
   if (status >= 500) return status === 503 && challenged ? 'captcha' : 'server'
-  return 'malformed'
+  // Other 4xx: the engine rejected our request (bad query, unsupported parameter). Not an
+  // engine outage and not proof the adapter is broken, so it gets its own class.
+  return 'bad_request'
 }
 
 // ── Retry-After and rate-limit reset headers ────────────────────────────

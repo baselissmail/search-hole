@@ -172,7 +172,7 @@ describe('tavily adapter: parseResponse', () => {
     expect(err(432, readFixture('tavily/error-plan-limit.json'))).toMatchObject({ errorClass: 'quota' })
     expect(err(433, '{}')).toMatchObject({ errorClass: 'quota' })
     expect(err(402, '{}')).toMatchObject({ errorClass: 'quota' })
-    expect(err(400, readFixture('tavily/error-bad-request.json'))).toMatchObject({ errorClass: 'malformed' })
+    expect(err(400, readFixture('tavily/error-bad-request.json'))).toMatchObject({ errorClass: 'bad_request' })
     expect(err(500, '')).toMatchObject({ errorClass: 'server' })
     const detail = err(400, readFixture('tavily/error-bad-request.json'))
     expect(detail.kind === 'error' && detail.detail).toContain('Query is too long')

@@ -17,6 +17,7 @@ export type ErrorCode =
   | 'store_unavailable'
   | 'schema_newer'
   | 'invalid_argument'
+  | 'config_locked'
   | 'internal'
 
 export class SearchHoleError extends Error {

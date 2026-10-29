@@ -155,6 +155,15 @@ export const ERROR_POLICY: Readonly<Record<ErrorClass, ErrorPolicy>> = {
     adapterBroken: true,
     fix: 'The adapter could not read the response. It may need an update; please report this.',
   },
+  bad_request: {
+    suspend: { kind: 'none' },
+    retrySame: false,
+    fallback: true,
+    explicit: 'never',
+    recordsAttempt: true,
+    adapterBroken: false,
+    fix: 'The engine rejected this request (for example an unsupported query). Try rephrasing; report it if it repeats.',
+  },
   cancelled: {
     suspend: { kind: 'none' },
     retrySame: false,

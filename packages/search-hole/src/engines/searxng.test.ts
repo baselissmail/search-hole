@@ -234,7 +234,7 @@ describe('searxng adapter: parseResponse errors and edge cases', () => {
   it('maps other statuses through the shared table', () => {
     expect(adapter.parseResponse(response(500, 'oops'), plan, ctx)).toMatchObject({ errorClass: 'server' })
     expect(adapter.parseResponse(response(302, ''), plan, ctx)).toMatchObject({ errorClass: 'malformed' })
-    expect(adapter.parseResponse(response(404, 'nope'), plan, ctx)).toMatchObject({ errorClass: 'malformed' })
+    expect(adapter.parseResponse(response(404, 'nope'), plan, ctx)).toMatchObject({ errorClass: 'bad_request' })
   })
 
   it('reports non-JSON and shapeless 200s as malformed, never throwing', () => {

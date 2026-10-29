@@ -12,6 +12,9 @@
 
 export type EngineId = 'searxng' | 'brave' | 'tavily' | 'exa' | 'mojeek' | 'kagi' | 'marginalia'
 
+/** Every EngineId, in default display order. */
+export const ENGINE_ID_LIST = ['searxng', 'brave', 'tavily', 'exa', 'mojeek', 'kagi', 'marginalia'] as const satisfies readonly EngineId[]
+
 export type Depth = 'quick' | 'standard' | 'deep'
 
 /** ADR-0009 error classes. Order is irrelevant; codes are persisted. */
@@ -27,6 +30,7 @@ export type ErrorClass =
   | 'captcha'
   | 'server'
   | 'malformed'
+  | 'bad_request'
   | 'cancelled'
 
 export type InactiveReason =
@@ -150,6 +154,8 @@ export interface EngineAdapter {
   buildRequest(plan: EnginePlan, ctx: AdapterCtx): HttpRequest
   /** Pure; never throws. */
   parseResponse(res: HttpResponse, plan: EnginePlan, ctx: AdapterCtx): ParseOutcome
+  /** Number of block rules this request pushes to the engine (ADR-0009 point 8). */
+  pushedRuleCount?(plan: EnginePlan): number
 }
 
 // ── Results, dates, decisions ────────────────────────────────────────────
@@ -217,6 +223,8 @@ export interface RuleRef {
   listId?: string
   /** Snapshot of the rule's source text, so explanations survive rule deletion. */
   text: string
+  /** Where the rule was defined, e.g. 'rules.yaml:12'. */
+  source?: string
 }
 
 /** Outcome of evaluating rules for one original URL (ADR-0008 three passes). */
@@ -256,6 +264,10 @@ export interface MergedResult {
   decision: RuleDecision
   flags: ResultFlag[]
   keptReason?: 'coverage'
+  /** Why it was hidden, for results in SearchOutcome.hidden (covers stale/date_required too). */
+  hiddenReason?: HiddenReason
+  /** Per-engine payloads, so the store can apply each engine's retention (ADR-0009 point 9). */
+  hits?: Array<Pick<RawResult, 'engine' | 'url' | 'title' | 'snippet' | 'rank'>>
 }
 
 // ── Rules (ADR-0008) ─────────────────────────────────────────────────────
@@ -280,6 +292,8 @@ export interface Rule {
   note?: string
   /** e.g. 'suggestion:42' (provenance). */
   source?: string
+  /** Original source line (e.g. ABP syntax) for explanations. */
+  text?: string
   /** List rules only. */
   listId?: string
   /** ABP `$important` inside the list tier. */
@@ -340,8 +354,23 @@ export type Warning =
   | { code: 'logging_unavailable'; detail: string }
   | { code: 'list_compiling'; listId: string }
 
+export interface FallbackHop {
+  from: EngineId
+  to: EngineId
+  errorClass: ErrorClass | InactiveReason
+}
+
 export interface SearchOutcome {
   receiptId: string
+  /** Resolved session key (ADR-0005), if any. */
+  sessionId?: string
+  /** Claude Code `claudecode/toolUseId` for transcript correlation (ADR-0012). */
+  toolUseId?: string
+  /** Rule ids pushed to engines; their hits are not observable (ADR-0009 point 8). */
+  pushedRuleIds?: string[]
+  fallbackTrail?: FallbackHop[]
+  /** Engine-side spelling correction (e.g. Brave query.altered). */
+  alteredQuery?: string
   query: string
   profile: string
   depth: Depth
