@@ -1,0 +1,33 @@
+| Ref dir | Upstream | Commit | Commit date |
+|---|---|---|---|
+| `adguardhome` | git@github-basel:AdguardTeam/AdGuardHome | `c0a81e99d2` | 2026-10-27 |
+| `agent-search` | git@github-basel:brcrusoe72/agent-search | `f65b7a3c84` | 2026-10-13 |
+| `agentgateway` | git@github-basel:agentgateway/agentgateway | `a94094d1dd` | 2026-10-28 |
+| `brave-search-skills` | git@github-basel:brave/brave-search-skills | `62793e0c49` | 2026-08-12 |
+| `docker-mcp-gateway` | git@github-basel:docker/mcp-gateway | `7e0f34277c` | 2026-10-26 |
+| `dokploy` | git@github-basel:Dokploy/dokploy | `96fb00478f` | 2026-10-28 |
+| `ext-apps` | git@github-basel:modelcontextprotocol/ext-apps | `07cda2513b` | 2026-10-27 |
+| `goggles-quickstart` | git@github-basel:brave/goggles-quickstart | `e83e5c23d2` | 2026-04-22 |
+| `infisical` | git@github-basel:Infisical/infisical | `b3f622d4ef` | 2026-10-28 |
+| `langfuse` | git@github-basel:langfuse/langfuse | `b1067f3a8c` | 2026-10-28 |
+| `litellm` | git@github-basel:BerriAI/litellm | `96fe78f96e` | 2026-10-28 |
+| `mcp-context-forge` | git@github-basel:IBM/mcp-context-forge | `1441ce8091` | 2026-10-28 |
+| `mcp-inspector` | git@github-basel:modelcontextprotocol/inspector | `e3217388c8` | 2026-10-28 |
+| `mcp-omnisearch` | git@github-basel:spences10/mcp-omnisearch | `736fcc0789` | 2026-10-27 |
+| `mcp-spec` | git@github-basel:modelcontextprotocol/modelcontextprotocol | `9850cae892` | 2026-10-28 |
+| `mcp-typescript-sdk` | git@github-basel:modelcontextprotocol/typescript-sdk | `39ae8e6192` | 2026-10-27 |
+| `mcpb` | git@github-basel:modelcontextprotocol/mcpb | `70fe3b34cd` | 2026-04-22 |
+| `mcpjam-inspector` | git@github-basel:MCPJam/inspector | `a1d7256fcc` | 2026-10-28 |
+| `mitmproxy` | git@github-basel:mitmproxy/mitmproxy | `df14a28624` | 2026-10-27 |
+| `nightshift` | git@github-basel:orwa-mahmoud/nightshift | `4b4abca125` | 2026-10-22 |
+| `one-search-mcp` | git@github-basel:yokingma/one-search-mcp | `16eb424608` | 2026-07-31 |
+| `pi-hole-ftl` | git@github-basel:pi-hole/FTL | `29c8b13f4b` | 2026-10-17 |
+| `pi-hole-web` | git@github-basel:pi-hole/web | `fb699c4e3f` | 2026-10-17 |
+| `pi-hole` | git@github-basel:pi-hole/pi-hole | `f503a65d3a` | 2026-10-17 |
+| `searxng` | git@github-basel:searxng/searxng | `c360868e5b` | 2026-10-28 |
+| `supabase` | git@github-basel:supabase/supabase | `9eaae4cd2c` | 2026-10-29 |
+| `toolhive` | git@github-basel:stacklok/toolhive | `20bc1a1df1` | 2026-10-28 |
+| `ublacklist` | git@github-basel:iorate/ublacklist | `e3df713adc` | 2026-10-23 |
+| `ublock` | git@github-basel:gorhill/uBlock | `aaefbdb76e` | 2026-10-28 |
+| `uptime-kuma` | git@github-basel:louislam/uptime-kuma | `2e8bf7da56` | 2026-10-28 |
+| `vane` | git@github-basel:ItzCrazyKns/Vane | `348feca3e3` | 2026-09-01 |
