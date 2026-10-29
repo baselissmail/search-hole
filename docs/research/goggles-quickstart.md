@@ -1,5 +1,5 @@
 # brave/goggles-quickstart
-> Ref: `research/refs/goggles-quickstart` @ e83e5c2 (2026-04-22) · License: **none**. There is no LICENSE file anywhere in the tree (`find` shows only README.md, CONTRIBUTING.md, getting-started.md, faq.md, `assets/`, `goggles/*.goggle`, `.github/renovate.json`), and no grant in README/CONTRIBUTING. Treat as all-rights-reserved: **link only**. This note describes the syntax in our own words; no goggle file or doc text is reproduced. All examples below use `example.com` and are ours.
+> Ref: `research/refs/goggles-quickstart` @ e83e5c2 (2026-04-22) · License: **none**. There is no LICENSE file anywhere in the tree (`find` shows only README.md, CONTRIBUTING.md, getting-started.md, faq.md, `assets/`, `goggles/*.goggle`, `.github/renovate.json`), and no license grant in README, CONTRIBUTING, getting-started or faq. `faq.md` and `getting-started.md` call goggles "open" / "open-source" and say each author picks a license, but none of the eight example goggles names one. Treat as all-rights-reserved: **link only**. This note describes the syntax in our own words; no goggle file or doc text is reproduced. All examples below use `example.com` and are ours.
 
 ## Purpose
 Brave's educational repo for **Goggles**, a small rule language that re-ranks Brave Search results: boost, downrank or discard by URL pattern and/or site. It has three docs and eight example goggles by "Goggles 101". `CONTRIBUTING.md` says the content is educational, not something Brave plans to maintain. Why it matters to search-hole:
@@ -60,7 +60,7 @@ n/a. The language is closed. The only "extension" Brave suggests is concatenatin
 - A *non-generic* `discard` is **final** and beats everything.
 - Otherwise **any boost beats any downrank**, on the stated principle that Goggles exist to *surface more* content.
 - Among boosts the **highest strength wins**. Among downranks the **weakest wins** (bare `$downrank` beats `$downrank=2`). The overall order is therefore: discard > boost=10 … > boost=1 > downrank=1 … > downrank=10.
-- Strengths **do not add up**. A site-wide `downrank=3` plus a path `boost=3` that both match one URL produces "boosted with strength 3".
+- Strengths **do not add up**, as far as the docs show: their one worked example (a site-wide `downrank=3` plus a path `boost=3` matching the same URL) ends as "boosted with strength 3". The docs do not define how a strength changes the score.
 - If nothing matches, the default applies: the result stays in place, or is excluded when a generic `$discard` is present.
 
 **Hard limits** for submitted (hosted) goggles (`getting-started.md` "Creating a Goggle"):
@@ -80,7 +80,8 @@ Inline-goggle limits are **not documented in this repo**. Assume the same caps o
 - Boost values cluster at 2, 3 and 4 (2,125, 3,688 and 2,008 occurrences).
 - Path or wildcard patterns are rare and appear mainly in `rust_programming` (`*rust*`, `-rs^`, `/coreutils^`) and `tech_blogs` (`/blog/`, `/engineering.`).
 - `no_pinterest`, `1k_short` and `copycats_removal` are plain `$discard,site=` blocklists.
-- **Takeaway:** in practice a goggle is a domain list with tiers, so a domain hash set covers about 99% of imported instructions. Only the few path patterns need the pattern engine.
+- Of the 9,063 non-comment, non-blank lines, 8,821 (about 97%) start with `$`, i.e. have no pattern; 242 have a pattern, and 4 are generic `$discard`.
+- **Takeaway:** in practice a goggle is a domain list with tiers, so a domain suffix set covers about 97% of imported instructions. The remaining ~3% (path or wildcard patterns, some combined with `site=`) need the pattern engine.
 
 ## Testing strategy
 There is no test code. Brave validates on submit and reports errors on the create page (`getting-started.md` "Creating a Goggle"). For tuning, the docs recommend a personal "test set" of queries, iterating with the explanation UI (`getting-started.md` "Fine-tuning a Goggle"). For us: the example goggles are **unlicensed, so we can't vendor them as test fixtures**. We need our own fixtures covering every syntax feature (substring, `*`, `^`, `|…|`, `site=` with a TLD, generic `$discard`, option order, bare pattern = boost, conflict cases).
@@ -107,14 +108,14 @@ There is no test code. Brave validates on submit and reports errors on the creat
 - [rule-format-precedence] **Import mapping:**
   - `discard` → `block`, `boost=N` → `raise N`, `downrank=N` → `lower N`
   - a bare instruction or bare `$boost` → `raise 1`
-  - the strength scale 1–10 **matches our weight range exactly**, so it is lossless
+  - the strength scale 1–10 **matches our weight range numerically**, so the mapping preserves order. It is not score-equivalent: the docs never define what a strength does to a result's score, and ours is the `1 + 0.15·N` multiplier, so treat it as an approximation
   - generic `$discard` has **no equivalent in the planned YAML**. Add a list/profile-level `default: block` (allowlist mode), or the importer must refuse or flag it.
 - [rule-format-precedence] **Precedence conflict:**
   - Goggles: discard final, then max-boost wins, then *weakest* downrank wins, no summing.
   - Our plan: `allow > block > pin > raise/lower` within a scope, and multiplicative weights (`1 + 0.15·N`).
   - Proposal: **resolve each imported goggle as a unit using its native semantics**, giving one effective action per (result, list), then combine across scopes and lists with our table.
   - Cover it with property tests: "boost beats downrank inside one goggle", "discard is final inside one goggle", "user allow beats a goggle discard".
-- [rule-format-precedence] Add a URL-pattern `match` type with Goggles/ABP-style syntax (`*`, `^`, leading/trailing `|`). Translate it to an RE2-safe regex (`^` becomes "a non-word separator or end of URL"). Enforce the same caps: ≤ 2 `*`, ≤ 2 `^`, ≤ 500 chars.
+- [rule-format-precedence] Add a URL-pattern `match` type with Goggles/ABP-style syntax (`*`, `^`, leading/trailing `|`). Translate it to an RE2-safe regex (`^` becomes "end of URL, or any character other than a letter, digit, `_`, `.`, `%` or `-`", per the quickstart's own definition; a plain "non-word" class would wrongly treat `.`, `%` and `-` as separators). Enforce the same caps: ≤ 2 `*`, ≤ 2 `^`, ≤ 500 chars.
 - [engine-adapter] **Brave push-down compiler** (works on *resolved* rules, never by naive concatenation):
   - `block` → `$discard,site=d`, `raise N` → `$boost=N,site=d`, `lower N` → `$downrank=N,site=d`
   - `pin` → `$boost=10,site=d`, and the pin is still applied locally (Brave has no pin)
@@ -132,7 +133,7 @@ There is no test code. Brave validates on submit and reports errors on the creat
   - hosted goggles have no version history, so our ETag/rollback guard (§6) matters
 - [security] **Privacy of push-down:**
   - Brave's README warns that a rarely used goggle URL can act as a user identifier
-  - an inline goggle compiled from personal rules is even more unique and is sent with every query
+  - an inline goggle compiled from personal rules is probably even more unique and is sent with every query (inferred; the README only discusses goggle URLs)
   - make push-down a per-engine setting, documented in PRIVACY.md, and consider pushing only blocks and common list rules
 - [ui-ux] Copy the explanation pattern in the dashboard and in-chat panel: a coloured marker per list (avatar colour), plus a popover listing the matched rules in normalized form with a one-line plain-English explanation and the list name.
 - [testing] We can't use the example goggles as fixtures (no license). Write our own golden fixtures per syntax feature and conflict case. Fuzz the parser (fast-check) for the caps and anchors.
@@ -152,3 +153,16 @@ There is no test code. Brave validates on submit and reports errors on the creat
 - Relying on Brave-side filtering alone. Goggles only re-rank the recall set; always filter locally too.
 - Supporting `$intitle/$indescription/$incontent`. They are documented only as future and commented out.
 - Emitting a generic `$discard` in compiled goggles unless the profile is explicitly allowlist-only.
+
+## Verification
+- Date: 2026-10-29. Checked against `research/refs/goggles-quickstart` @ e83e5c2. Claims checked: 52 (license and file inventory, metadata keys, grammar and `^` definition, precedence text, hard limits, ownership / transfer / recall FAQ, the screenshot, the example-goggle tallies recomputed over `goggles/*.goggle`, and every bullet under "Implications for search-hole").
+- Confirmed with no change: no LICENSE file in the tree; mandatory and optional metadata keys; limits (2 MB, 100,000 instructions, 500 chars, 2 `*`, 2 `^`); discard > boost > downrank with bare `$downrank` ahead of `$downrank=2`; generic `$discard` as allowlist mode; transfer rules; one-goggle-at-a-time FAQ; 9,242 lines, 9,033 `site=`, 7,829 `boost`, 1,219 `discard`, 4 `downrank`, boost=2/3/4 counts, 6 of 8 files with `avatar`, 0 with `license`; `,inurl` in the explanation screenshot.
+- Corrections made:
+  1. "About 99% of instructions are domain-only" was wrong: 8,821 of 9,063 instruction lines (about 97%) have no pattern, so about 3% need the pattern engine.
+  2. Import mapping said the strength scale is "lossless". Only the numeric range matches; what a strength does to a score is undefined in the docs, so the mapping is order-preserving, not score-equivalent (an input to the rule-format ADR).
+  3. Importer bullet translated `^` as "a non-word separator or end of URL". Per the quickstart, `^` is end of URL or any character other than letter, digit, `_`, `.`, `%`, `-`; "non-word" would treat `.`, `%` and `-` as separators.
+  4. License header: said no grant in README/CONTRIBUTING; added that `faq.md` / `getting-started.md` call goggles open-source and let authors pick a license, and that no example goggle names one (conclusion "link only" unchanged).
+  5. "Strengths do not add up" is supported only by one worked example; reworded.
+  6. Privacy bullet: the claim that an inline goggle is more unique than a goggle URL is our inference; marked as such.
+- No GPL/AGPL/EUPL code is in this note. The note quotes only a few short phrases from the docs and no goggle text.
+

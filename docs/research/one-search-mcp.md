@@ -1,5 +1,5 @@
 # yokingma/one-search-mcp
-> Ref: `research/refs/one-search-mcp` @ 16eb424 (2026-07-31) · License: **MIT** (`LICENSE`, "Copyright (c) 2025 zac_ma."). One root LICENSE file; `package.json` `"license": "MIT"`; no per-directory licenses. Short snippets with attribution are fine. Note that the runtime dependency `agent-browser` (npm) and Playwright have their own licenses (not checked here).
+> Ref: `research/refs/one-search-mcp` @ 16eb424 (2026-07-31) · License: **MIT** (`LICENSE`, "Copyright (c) 2025 zac_ma."). One root LICENSE file; `package.json` `"license": "MIT"`; no per-directory licenses. Short snippets with attribution are fine. Runtime dependencies keep their own licenses; per `package-lock.json`, `agent-browser` 0.8.5 and `playwright-core` 1.58.1 are Apache-2.0, and `duck-duck-scrape`, `@tavily/core` and `turndown` are MIT.
 
 ## Purpose
 A stdio MCP server (npm `one-search-mcp` 1.2.4) with **one search tool backed by exactly one provider chosen by env var**, plus three headless-browser tools for scrape, map and extract. The providers are SearXNG, DuckDuckGo (scraped via `duck-duck-scrape`), Bing API, Tavily, Google CSE, Zhipu, Exa, Bocha, You.com (`ydc`) and `local`, which drives a real Chromium against Bing/Google/Baidu/Sogou HTML (`src/interface.ts: SearchProvider`; `README.md` lines 172–192). The default is `local` (`src/index.ts` line 26). Why it matters to search-hole:
@@ -57,7 +57,7 @@ n/a. There are no rules, lists or domain filters. The search schema has no inclu
   - `assertUrlIsSafe(url, resolveHostname)` and `installUrlProtection(page, resolver)` take a fake DNS resolver and a fake `page.route` collector (`test/url-guard.test.ts`).
   - Provider tests stub `fetch` and assert the **exact request URL** (`test/searxng.test.ts`, for example `…/search?q=mcp&pageno=1&categories=general&format=json&safesearch=0&language=auto&engines=all&time_range=month`).
 - **Real-process integration**: `test/stdio-disconnect.integration.test.ts` spawns the server, closes stdin, and walks `ps -ax -o pid=,ppid=,command=` to assert **no orphaned browser descendants** after a 2 s grace period. It is skipped when no local browser is found.
-- **Metadata/security-floor tests** (`test/package-metadata.test.ts`) check that the versions match across `package.json`, the lockfile, `server.json` and `src/index.ts`, that `@modelcontextprotocol/sdk` is pinned to a patched minimum, that the `server.json` description is ≤ 100 chars, and that `prepublishOnly` runs the release checks.
+- **Metadata/security-floor tests** (`test/package-metadata.test.ts`) check that the versions match across `package.json`, `server.json` and `src/index.ts` (`PATTERNS.md` also lists `package-lock.json`, but the test does not check it), that `@modelcontextprotocol/sdk` is pinned to a patched minimum, that the `server.json` description is ≤ 100 chars, and that `prepublishOnly` runs the release checks.
 - Gaps: the SSRF redirect test drives the *mocked* route handler with the redirect URL directly (`test/url-guard.test.ts` lines 68–91), so it does not prove that Playwright really invokes the route on 3xx hops (see Implications).
 
 ## UX patterns worth copying
@@ -83,9 +83,9 @@ MIT. We may borrow code with attribution. The SSRF guard is short and well-shape
   | `one_map` | 104 | 4 (`url`) | 606 | 150 |
   | `one_scrape` | 253 | 7 (`url`) + 6-variant `actions` union | 2,677 | 670 |
   | `one_extract` | 134 | 1 (`urls`) | 428 | 110 |
-  | **Total** | 593 | | **≈ 4,540** | **≈ 1.1k (up to ~1.5k at chars/3)** |
+  | **Total** | 593 | | **≈ 4,540** (±5 %) | **≈ 1.1k (up to ~1.5k at chars/3)** |
 
-  - **60 % of the budget is the `one_scrape` action union.**
+  - **`one_scrape` alone is ~60 % of the `tools/list` JSON** (2,677 of ~4,540 chars). Its nested `actions` union is about 1.5k chars of that (~33 % of the total).
   - Lesson: the description text was never the problem; nested schemas are. Keep `search`/`fetch` inputs flat with enums, and measure the full `tools/list` JSON in CI, not just the description strings.
 - [mcp-tool-surface] The `one_search` description ("Search and retrieve content…") says nothing about when to use it versus the host's built-in search, or about depth. With ~100 chars it relies entirely on the tool name. Our descriptions plus server `instructions` must carry the "quick vs deep" and "read receipt warnings" guidance (§4 "Teaching the model").
 - [mcp-tool-surface] **There are no output limits anywhere.** Exa asks for `contents.text.maxCharacters: 10000` **per result** and maps it into `snippet` (`src/search/exa.ts` lines 12, 48–52, 67), so a default 10-result call can return ~100k chars. `one_scrape` concatenates markdown, raw HTML, HTML, links and a **base64 PNG data URI as text** (`src/index.ts` lines 199–225). This is the anti-pattern our §4 caps (`search` ≤ 2.5k tok, `fetch` ≤ 8k with a `cursor`) exist to prevent.
@@ -113,12 +113,12 @@ MIT. We may borrow code with attribution. The SSRF guard is short and well-shape
   5. `ALLOW_PRIVATE_NETWORK` is the opt-out.
 - [security] **Gaps that our design must close:**
   - **No connection pinning.** The guard resolves DNS itself, then Chromium resolves again, which leaves a DNS-rebinding window (inferred).
-  - **Redirect hops.** Per the Playwright docs, `page.route` handlers are called only for the first URL of a redirect chain (inferred from Playwright behaviour, not visible in the ref), so a public URL that 302s to `169.254.169.254` may bypass the route check. The ref's redirect test uses a mock that calls the handler directly.
+  - **Redirect hops.** The Playwright `page.route` docs (playwright.dev, checked 2026-10-29) say: "The handler will only be called for the first url if the response is a redirect." So a public URL that 302s to `169.254.169.254` may bypass the route check (the docs wording is the evidence; real-browser behaviour is not tested in the ref). The ref's redirect test uses a mock that calls the handler directly.
   - **Missing ranges:** `198.18/15`, `192.0.0/24`, the TEST-NETs, `224/4` multicast, `240/4` reserved, `255.255.255.255`, `64:ff9b::/96` NAT64 (which can embed private IPv4), `2002::/16` 6to4 and `ff00::/8`. IPv4-mapped IPv6 such as `::ffff:127.0.0.1` is matched against the IPv4 rules by Node's `BlockList` (inferred from Node docs).
-  - **No byte or time caps** on page content.
+  - **No byte cap** on page content. The only time limits are the navigation timeout (30 s default) and the fixed 2 s wait.
   - **`skipTlsVerification` is a model-controllable argument** (`src/schemas.ts` line 82).
 
-  Our §12.4 plan already fixes most of this: undici `connect.lookup` + `ipaddr.js` `range() === 'unicast'`, manual redirects re-validated per hop, and size and time caps. Add NAT64/6to4 unwrapping, and never let the model turn TLS off.
+  Our §12.4 plan already fixes most of this: undici `connect.lookup` + `ipaddr.js` `range() === 'unicast'`, manual redirects re-validated per hop, and size and time caps. NAT64/6to4 need no unwrapping if we simply reject them: ipaddr.js `main` (checked 2026-10-29) lists `64:ff9b::/96`, `2002::/16`, `198.18.0.0/15`, multicast and reserved ranges as special ranges, so `range() === 'unicast'` already refuses them (version-dependent, so pin the version and test it). Never let the model turn TLS off.
 - [security] The fetched page goes to the model with no "external content" marking and no injection flags. Turndown converts the **whole** HTML, ignoring the `onlyMainContent: true` it is passed (`process-extract.ts` line 20; `AgentBrowser.scrapeUrl` never reads it), so nav and footers are included too. Our `fetch` should use a readability-style extractor and wrap output as clearly untrusted (§12.4).
 - [security] Error messages pass raw upstream bodies to the model (You.com: `` `You.com Search API error ${resp.status}: ${body}` ``, `src/search/ydc.ts` line 86). Ours should truncate and redact them, and treat them as untrusted.
 - [dual-protocol] It uses `@modelcontextprotocol/sdk ^1.29.0` with `McpServer.registerTool` and imports **`zod/v3`** (`src/schemas.ts` line 1), connected via `server.connect(new StdioServerTransport())` (`src/index.ts` lines 303–304). That is the 2025-era path that, per §3, only speaks to 2025-era clients. There are no tool annotations (`readOnlyHint`/`openWorldHint` absent), no `outputSchema`, and no `structuredContent`. A competitor on SDK v1 is common, which confirms that hosts will keep sending `initialize` for a while. Our gateway must answer both.
@@ -146,3 +146,15 @@ MIT. We may borrow code with attribution. The SSRF guard is short and well-shape
 - SDK-wrapped engines that cannot be cancelled.
 - Dropping `publishedDate`/`score`/`engines` from SearXNG results.
 - An SSRF guard without connection pinning or per-hop redirect checks.
+
+## Verification
+- Date: 2026-10-29. Checked against `research/refs/one-search-mcp` @ 16eb424. Claims checked: 78 (license header and section, every Implications bullet, and the mechanism claims they rely on: tool sizes, provider dispatch, SearXNG/Tavily/Exa/You.com request shapes, SSRF guard ranges and flow, abort plumbing, test and CI structure, `PATTERNS.md` quotes).
+- License confirmed: one root `LICENSE` (MIT, "Copyright (c) 2025 zac_ma."), `package.json` `"license": "MIT"`, no per-directory license files. No GPL/AGPL/EUPL code is pasted. The one code excerpt (the `BlockList` lines) is MIT and attributed.
+- Tool-surface table re-measured: description lengths (102/104/253/134), parameter counts (5/4/7/1) and the `tools/list` sizes reproduce (606, 2,677 and 428 chars exactly; `one_search` within 4 %; total 4.5–4.6k chars, ≈ 1.1k tokens).
+- Corrections:
+  1. "60 % of the budget is the `one_scrape` action union" was wrong: `one_scrape` as a whole is ~60 %; the `actions` union alone is ~1.5k chars (~33 %). Fixed. The lesson (nested schemas, not descriptions) still holds.
+  2. The package-metadata test does not check `package-lock.json` (only `package.json`, `server.json` and `src/index.ts`; the lockfile is named in `PATTERNS.md` only). Fixed.
+  3. "No byte or time caps" was imprecise: there is a navigation timeout (30 s default) and fixed waits, but no byte cap. Fixed.
+  4. The Playwright redirect claim was marked "inferred"; the `page.route` docs on playwright.dev say "The handler will only be called for the first url if the response is a redirect". Updated with the quote.
+  5. Dependency licenses filled in from `package-lock.json` (`agent-browser`, `playwright-core` Apache-2.0).
+  6. "Add NAT64/6to4 unwrapping" in the SSRF recommendation was imprecise: with ipaddr.js `main` (checked 2026-10-29) those ranges are special ranges, so the planned `range() === 'unicast'` check already rejects them. Reworded (version-dependent, pin and test).

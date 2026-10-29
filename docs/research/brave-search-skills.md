@@ -1,5 +1,5 @@
 # brave/brave-search-skills
-> Ref: `research/refs/brave-search-skills` @ 62793e0 (2026-08-12) · License: **MIT** (`LICENSE`, "Copyright (c) 2026 Brave Software"). There are no per-directory licenses. `clawhub/bx-search/SKILL.md` frontmatter declares `license: MIT-0` for that one packaged skill. Short snippets (≤ 10 lines) may be quoted with attribution.
+> Ref: `research/refs/brave-search-skills` @ 62793e0 (2026-08-12) · License: **MIT** (`LICENSE`, "Copyright (c) 2026 Brave Software"). There are no per-directory licenses. `clawhub/bx-search/SKILL.md` frontmatter declares `license: MIT-0` for that one packaged skill (the repo `LICENSE` stays plain MIT). MIT allows reuse with the copyright and permission notice kept; the "≤ 10 lines" quoting limit is our own house rule, not a license term.
 
 ## Purpose
 Brave's official **Agent Skills** (agentskills.io format) that teach coding agents to call the Brave Search API with `curl`, or with Brave's `bx` CLI (a separate repo, `brave/brave-search-cli`, not in our refs). There is one skill per endpoint: web, news, images, videos, llm-context, answers, local-*, suggest and spellcheck. There is also an all-in-one `bx` skill and a ClawHub-packaged `bx-search`. It is distributed as a Claude Code plugin marketplace and via curl/tar for other agents.
@@ -18,12 +18,12 @@ docs/api-key-setup.md             per-agent key setup, ordered "most to least se
 .github/workflows/validate.yml    shell+jq lint of skills/marketplace/AGENTS.md
 .github/workflows/release-clawhub.yml  manual publish of clawhub/bx-search (version from frontmatter)
 ```
-There is no code. Every skill is a single `SKILL.md` of 74–322 lines, with **no `references/` subfiles, no scripts and no `allowed-tools`** (own `find`).
+There is no code. Every `skills/*` skill is a single `SKILL.md` of 74–322 lines (the ClawHub `bx-search` one is 374), with **no `references/` subfiles, no scripts and no `allowed-tools`** (own `find`).
 
 ## Key modules and data flow
 - Agent → skill text → `curl https://api.search.brave.com/res/v1/<endpoint>` with header `X-Subscription-Token: ${BRAVE_SEARCH_API_KEY}`, or → `bx <cmd>` (JSON on stdout, errors on stderr).
-- Endpoints: `/res/v1/web/search`, `/news/search`, `/images/search`, `/videos/search`, `/llm/context`, `/chat/completions`, `/local/place_search`, `/local/pois`, `/local/descriptions`, `/suggest/search`, `/spellcheck/search`, `/web/rich` (README "Available Skills" table).
-- **Both GET and POST** are accepted on web, news and llm-context. POST is recommended "for long queries or complex Goggles" (`skills/web-search/SKILL.md` "Endpoint"; `skills/news-search/SKILL.md`).
+- Endpoints: `/res/v1/web/search`, `/news/search`, `/images/search`, `/videos/search`, `/llm/context`, `/chat/completions`, `/local/place_search`, `/local/pois`, `/local/descriptions`, `/suggest/search`, `/spellcheck/search` (README "Available Skills" table) and `/web/rich` (`skills/web-search/SKILL.md` "Rich Callback Endpoint").
+- **Both GET and POST** are accepted on web, news and llm-context. POST is recommended "for long queries or complex Goggles" (`skills/web-search/SKILL.md` "Endpoint"; `skills/news-search/SKILL.md`). Only llm-context shows a POST example (JSON body, `Content-Type: application/json`, `{"q": ...}`); the web and news POST body format is not documented in this repo (unverified: assume the same JSON shape).
 - **Key resolution in `bx`:** `--api-key` flag > `BRAVE_SEARCH_API_KEY` env > config file at `~/Library/Application Support/brave-search/api_key` (macOS), `~/.config/brave-search/api_key` (Linux), `%APPDATA%\brave-search\api_key` (Windows). `bx config set-key` with no argument prompts, which keeps the key out of shell history (`clawhub/bx-search/SKILL.md` "Configuring the API Key").
 
 ## Data model and storage
@@ -40,7 +40,7 @@ Brave **response fields that matter to our adapter, merge and receipts** (from t
   - `grounding.generic[].{url,title,snippets[]}`
   - `sources[url].age` is a **4-slot array**: [full date, `YYYY-MM-DD`, relative age, ISO 8601 with `Z`], or `[]` when the date is unknown
   - `enable_source_metadata` adds `site_name`, `favicon`, `thumbnail`, `description`
-  - its `freshness` doc defines page age as "the most relevant date reported by the content, **such as its published or last modified date**", so `page_age` may be a modified date
+  - its `freshness` parameter doc defines the age used by the *filter* as "the most relevant date reported by the content, **such as its published or last modified date**". The web and news docs describe the `page_age` *field* as the publication date, so whether `page_age` can be a modified date is an inference (unverified)
 - **Errors:**
   - stderr shape `{"type":"ErrorResponse","error":{"code":"RATE_LIMITED","status":429,...}}` (`clawhub/bx-search/SKILL.md` "Exit Codes")
   - documented error texts: "Invalid API Key", "Rate Limited", "**Option Not in Plan**", the last meaning the endpoint needs a higher tier (`docs/api-key-setup.md` "Troubleshooting")
@@ -61,7 +61,7 @@ Brave **response fields that matter to our adapter, merge and receipts** (from t
   - Claude Code `~/.claude/settings.json` → `env.BRAVE_SEARCH_API_KEY`, or `.claude/settings.local.json` per project
   - Codex `~/.codex/config.toml` `[shell_environment_policy] set = {…}`
   - direnv `.envrc`, then a shell profile
-  - the stated rationale: "Coding agents can access environment variables — scoped configs limit exposure"
+  - the stated rationale (paraphrased from `docs/api-key-setup.md`): coding agents can read shell environment variables and profile files, so scoped agent-native config limits exposure. The order is given per agent ("listed from most to least secure"), not as one global ranking
 
 ## Extension points (plugins, hooks)
 - Skills are the only extension. `strict:false` in marketplace.json lets the plugin entry list skill paths without a `plugin.json`.
@@ -121,26 +121,26 @@ These are skill-writing patterns:
 
 ## Performance tricks
 - **Token budgeting server-side** (llm-context `maximum_number_of_*`) instead of returning raw pages. `bx` makes budgeted context the default command.
-- `Accept-Encoding: gzip` is supported on all endpoints.
+- `Accept-Encoding: gzip` is documented for web, llm-context, local-* and suggest; the news, images, videos, answers and spellcheck skills do not mention it.
 - POST bodies for long goggles avoid URL-length limits.
 - `context_threshold_mode=strict` trades recall for precision.
 - The suggest endpoint is documented at < 100 ms (`skills/suggest/SKILL.md` description).
 
 ## License and what it means for us
-MIT. We may borrow the skill structure, the CI checks and short snippets with attribution, and we may reuse API facts freely. The ClawHub skill is MIT-0 (no attribution needed). Nothing here is copyleft. Brave's *API terms* (storage rights, §5.2 of the plan) are separate and not covered by this repo.
+MIT. We may borrow the skill structure, the CI checks and short snippets with attribution, and we may reuse API facts freely. The ClawHub skill declares MIT-0 in its own frontmatter only, while the repo `LICENSE` is plain MIT; keep attribution to be safe. Nothing here is copyleft. Brave's *API terms* (storage rights, §5.2 of the plan) are separate and not covered by this repo.
 
 ## Implications for search-hole
 - [engine-adapter] **Brave adapter request rules:**
   - send `X-Subscription-Token`
   - validate `q` (≤ 400 chars, ≤ 50 words) before calling
   - **set `text_decorations=false`** so snippets carry no highlight markup (inferred: the default is `true`, "Include highlight markers")
-  - over-fetch with `count=20` (one billed call); `offset` is a *page index* 0–9, so the hard ceiling is 200 results
-  - use POST when the compiled inline goggle is large
+  - over-fetch with `count=20` (the web maximum). That this is one billed call is inferred from "$5/month free credits (~1,000 free queries)" (`clawhub/bx-search/SKILL.md:93`); the repo states no per-result charge. `offset` is documented only as "Page offset for pagination (0-9)"; reading it as a page index, with a 200-result ceiling, is an inference
+  - use POST when the compiled inline goggle is large (body format: see the POST caveat above)
   - record `query.altered` (spellcheck rewrite) in the search log so users see when Brave changed their query
 - [engine-adapter] **Use `web.mutated_by_goggles`** as push-down verification. If a goggle was sent and this flag is false, note it in the receipt and engine health. It also helps the "Goggles only re-rank the recall set" honesty.
 - [engine-adapter] **Error mapping for health and quota:**
   - parse `error.code`/`status`
-  - 401/403 → "key invalid" or "**option not in plan**" (a distinct, actionable status)
+  - 401/403 → "key invalid" or "**option not in plan**" (a distinct, actionable status). The repo documents "Option Not in Plan" only as an error text, and bx exit code 3 as "Auth/permission error (401/403) ... check API key or plan"; that the plan error arrives as 401/403 is inferred
   - 429 → suspend with backoff
   - 5xx → retry once, then fall back
   - this mirrors `bx` exit codes 3/4/5
@@ -149,12 +149,12 @@ MIT. We may borrow the skill structure, the CI checks and short snippets with at
   - caveat (inferred, undocumented): Brave's filter probably drops results with no known date
   - that conflicts with our "flag, don't drop unknown dates" (§5 step 7), so push freshness down **only when the profile has `requireDate: true`**, or over-fetch an unfiltered call
 - [date-extraction] **Brave date fields, in priority order:**
-  1. `page_age`: ISO, **no timezone**. Parse as UTC and label it "page date (published or modified)", medium–high confidence, because llm-context defines it as published *or last modified*.
+  1. `page_age`: ISO, **no timezone** (the docs never name the zone, so parsing as UTC is our assumption). Label it "page date (published; may be modified)", medium confidence: the web and news docs call it the publication date, and only the llm-context `freshness` doc mentions "published or last modified".
   2. `article.date` when present.
   3. llm-context `sources[url].age[3]` (ISO, `Z`).
   - Never parse `age` (human text) when `page_age` exists.
   - `page_fetched` / `fetched_content_timestamp` is a **crawl time, not a publish date**. Store it separately as "last seen alive by engine" (useful for the dead-link heuristic).
-- [rule-format-precedence] The `bx --include-site/--exclude-site` shortcuts are the right UX for 90% of users. Expose `allow-only`/`exclude` sugar in the CLI and slash commands that compiles to rules, keep goggles for power users, and make the two mutually exclusive per invocation to avoid surprises.
+- [rule-format-precedence] The `bx --include-site/--exclude-site` shortcuts look like the right UX for most users (our judgment; the repo has no usage data). Expose `allow-only`/`exclude` sugar in the CLI and slash commands that compiles to rules, keep goggles for power users, and make the two mutually exclusive per invocation to avoid surprises.
 - [lists-subscriptions] Several goggles per request may be accepted on news and llm-context (array/repeat). Web documents only a string, so the Brave compiler should **merge into one inline goggle** for portability.
 - [mcp-tool-surface] **Skill and instructions design for §9.1:**
   - a "USE FOR …" description under ~300 chars that names sibling capabilities (search vs fetch vs receipt)
@@ -165,7 +165,7 @@ MIT. We may borrow the skill structure, the CI checks and short snippets with at
 - [mcp-tool-surface] Brave's "Context Size Guidelines" (5/2048, 20/8192, 50/16384) is a useful sanity anchor for our output caps (`search` ≤ ~2.5k tokens at standard): our results are links plus snippets, not extracted page text, so they should be well under Brave's numbers.
 - [key-storage] Adopt the **same env var name `BRAVE_SEARCH_API_KEY`** so users who already followed Brave's setup (Claude Code `settings.json` env, Codex `shell_environment_policy`, direnv) work with zero config, and `doctor` can say "found in env". `bx` stores its key in a plaintext file per OS. Detect it at most with explicit user consent; don't silently read another tool's secret.
 - [distribution] marketplace.json with `"strict": false` plus an explicit `skills` list is a minimal working plugin manifest. ClawHub/OpenClaw metadata (`requires.bins`, `primaryEnv`, per-OS `install` downloads) is a template if we ship standalone binaries (runtime option b) to that ecosystem. Also ship an `AGENTS.md` index for agents that don't read plugin manifests.
-- [testing] Copy `validate.yml`'s checks into our CI (name == dir, frontmatter closed, every skill listed in the marketplace, description ≤ 1024). Add what Brave lacks: **plugin evals** (§9.1) that check the model actually routes to our tool.
+- [testing] Copy `validate.yml`'s checks into our CI (name == dir, frontmatter closed, every skill listed in the marketplace). Add `description ≤ 1024` ourselves: Brave's workflow does not check length. Add what Brave lacks: **plugin evals** (§9.1) that check the model actually routes to our tool.
 - [security] Echo Brave's key-hygiene guidance in our docs: prefer host-native secret config (`userConfig` with `sensitive: true`, MCPB keychain) over shell exports, and never accept keys as CLI flags (they show up in process listings, as `bx` warns).
 
 ## Borrow / avoid
@@ -182,3 +182,20 @@ MIT. We may borrow the skill structure, the CI checks and short snippets with at
 - Long multi-endpoint skills (300+ lines). Our skill should stay short; the gateway carries the mechanics.
 - Pushing freshness to Brave when unknown-date results should be flagged rather than dropped.
 - Parsing the human-readable `age` string when `page_age` is available.
+
+## Verification
+- Date: 2026-10-29. Checked against `research/refs/brave-search-skills` @ 62793e0. Claims checked: 58 (license files and per-skill frontmatter, marketplace and skill inventory, endpoint list, request parameter tables for web, news and llm-context, response and date fields, error and exit-code tables, key-resolution order, `validate.yml` checks, description-length measurement, and every bullet under "Implications for search-hole").
+- Confirmed with no change: MIT `LICENSE` (Brave Software, 2026), `marketplace.json` contents (v1.5.0, `strict: false`, 13 paths, `skills/search -> bx` symlink with `name: bx`), ClawHub `license: MIT-0` and `version: 1.4.0`, parameter ranges and defaults (web `count` 1-20, `offset` 0-9, `text_decorations` true; news `count` 1-50 and `safesearch` strict; llm-context token and URL limits), `goggles` type per endpoint (string, string-or-array, string/list), `web.mutated_by_goggles`, `query.altered`, `page_age` / `page_fetched` / four-slot llm-context `age`, freshness formats, exit codes 3/4/5, description lengths 118-458, frontmatter `name` + `description` only.
+- Corrections made:
+  1. "Accept-Encoding: gzip is supported on all endpoints": the repo documents it for six skills only (web, llm-context, local-*, suggest).
+  2. `page_age` as "published or last modified": the llm-context `freshness` doc says that about the filter's page age; web and news call the `page_age` field the publication date. Bullet and data-model line now mark the modified-date reading as an inference, and the UTC parsing as an assumption.
+  3. POST: only llm-context shows a body format (JSON); the web and news POST body format is undocumented in the repo, so the "use POST for large goggles" bullet now says to verify it (input to the Brave push-down design).
+  4. "One billed call", "offset is a page index" and "ceiling of 200 results" are inferences, not repo statements; labelled.
+  5. "Option Not in Plan" arriving as 401/403 is inferred (the repo gives only an error text and exit code 3 "check API key or plan").
+  6. Misquoted rationale in `docs/api-key-setup.md`; replaced with a paraphrase, and noted that the "most to least secure" order is per agent.
+  7. `validate.yml` does not check description length; the "≤ 1024" check is ours.
+  8. ClawHub file is 374 lines (the "74-322" range is for `skills/*`); `/web/rich` is cited from `skills/web-search/SKILL.md`, not the README table.
+  9. License section: the "≤ 10 lines" quoting limit is a house rule, not an MIT term; MIT-0 is declared in one frontmatter only, so keep attribution.
+  10. "Right UX for 90% of users" had no source; reworded as our judgment.
+- No GPL/AGPL/EUPL code is in this note. The one JSON excerpt is a condensed MIT excerpt of `marketplace.json`.
+

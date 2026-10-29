@@ -1,5 +1,5 @@
 # IBM/mcp-context-forge
-> Ref: `research/refs/mcp-context-forge` @ 1441ce8 (2026-10-28) · License: Apache-2.0 (`LICENSE`; `pyproject.toml` `license = "Apache-2.0"`; Rust workspace `Cargo.toml` `license = "Apache-2.0"`; all 521 SPDX headers under `mcpgateway/`, `plugins/`, `mcp-servers/` say Apache-2.0). No per-directory exceptions found. Note: the plugin *framework* itself now lives in the external PyPI package `cpex` (`pyproject.toml`: `cpex>=0.1.4`), which is **not** in the ref; only the gateway-side integration and the built-in plugins are.
+> Ref: `research/refs/mcp-context-forge` @ 1441ce8 (2026-10-28) · License: Apache-2.0 (`LICENSE`; `pyproject.toml` `license = "Apache-2.0"`; Rust workspace `Cargo.toml` `license = "Apache-2.0"`; all 519 files with an SPDX header under `mcpgateway/`, `plugins/`, `mcp-servers/` say Apache-2.0). No per-directory exceptions found. Note: the plugin *framework* itself now lives in the external PyPI package `cpex` (`pyproject.toml`: `cpex>=0.1.4`), which is **not** in the ref; only the gateway-side integration and the built-in plugins are.
 
 ## Purpose
 "ContextForge AI Gateway" (package `mcp-contextforge-gateway` v1.1.0, Python 3.12/3.13, FastAPI): an enterprise registry + proxy + federation layer for MCP, A2A and REST/gRPC tools, with RBAC/teams/SSO, a plugin/guardrail pipeline, an admin UI, structured logs, metrics rollups and OTEL. For search-hole it is the most complete open example of (a) a pre/post-invoke guardrail pipeline with explicit failure modes, (b) a dual-era MCP server that speaks both 2025-11-25 and the stateless 2026-07-28 revision, and (c) Alembic-based upgrades with multi-process migration locking. It is far heavier than anything we should build.
@@ -51,7 +51,7 @@ Log flow: Python logging → `services/log_storage_service.py: LogStorageService
   - Slow path: `advisory_lock(conn)` = Postgres `pg_try_advisory_lock(42424242424242)` with retries, else a `filelock.FileLock` at `tempfile.gettempdir()/mcpgateway_migration.lock` with 300 s timeout; then `command.upgrade(cfg, "head")` on the locked connection.
   - `MCPGATEWAY_SKIP_MIGRATIONS=true` → never migrate; fail fast with `_SchemaNotAtHeadError` if not at head (for init-container deployments).
   - Warns that SQLite + `GATEWAY_REPLICAS>1` gives no cross-container lock (tmp is per container).
-  - **No "DB is newer than this binary" handling**: grep for `newer`/`ahead` in `bootstrap_db.py` and `alembic/env.py` finds nothing; an old binary meeting a newer DB will hit Alembic's `Can't locate revision` (documented as a troubleshooting row in `alembic/README.md:158`). Rollback is manual: `alembic downgrade -1`, then deploy the old image (`MIGRATION.md`, "Rollback").
+  - **No "DB is newer than this binary" handling**: grep for `newer`/`ahead` in `bootstrap_db.py` and `alembic/env.py` finds nothing; an old binary meeting a newer DB will probably hit Alembic's `Can't locate revision` (inferred: `alembic_at_head` returns False when the DB head is unknown to the script directory, so it falls to `command.upgrade`; the `alembic/README.md:158` troubleshooting row documents that error for a deleted/renamed revision, not for a newer DB). Rollback is manual: `alembic downgrade -1`, then deploy the old image (`MIGRATION.md`, "Rollback").
 - Background-job ownership (`services/leader_election.py`): `filelock` backend = one primary per host, held for process lifetime and released by the OS on exit; `redis` backend = `SET NX EX` lease + Lua compare-and-renew + if-owner release, follower loop re-acquires on expiry.
 
 ## Config format
@@ -63,7 +63,7 @@ Log flow: Python logging → `services/log_storage_service.py: LogStorageService
 - Plugin manifests: `plugin-manifest.yaml` per plugin (`docs/docs/architecture/plugins.md:391`).
 
 ## Extension points (plugins, hooks)
-- **Modes** (legacy names → cpex, `mcpgateway/plugins/gateway_plugin_manager.py: _LEGACY_MODE_TO_PLUGIN_MODE`):
+- **Modes** (legacy names → cpex, `mcpgateway/plugins/gateway_plugin_manager.py: _LEGACY_MODE_TO_PLUGIN_MODE`; the semantics below are from `docs/docs/architecture/plugins.md:236-241`, and `resource_filter` confirms that in `TRANSFORM` mode a violation is logged but processing continues, since the cpex implementation is not in the ref):
   - `enforce` → `SEQUENTIAL`: violations *and* plugin errors block
   - `enforce_ignore_error` → `SEQUENTIAL` + `OnError.IGNORE`: violations block, technical errors pass
   - `permissive` → `TRANSFORM`: log violations and errors, continue
@@ -78,7 +78,7 @@ Log flow: Python logging → `services/log_storage_service.py: LogStorageService
 - Built-ins relevant to us:
   - `plugins/resource_filter/resource_filter.py: _canonical_host`: canonicalizes both sides of a domain block comparison (percent-decoding, lowercase, trailing dot, IPv6 brackets, `host:port`, legacy integer IPs `2130706433`→`127.0.0.1`, IPv4-mapped IPv6, IDNA punycode). Blocks on `host == b or host.endswith("." + b)` (L195).
   - `plugins/citation_validator`: checks link reachability and adds `citation_results {ok,status}`; hooks `resource_post_fetch`, `tool_post_invoke`; `block_on_all_fail`/`block_on_any_fail`.
-  - `plugins/robots_license_guard`, `deny_filter`, `regex_filter`, `safe_html_sanitizer`, `html_to_markdown`, `circuit_breaker`, `cached_tool_result`; cpex add-ons `cpex-url-reputation`, `cpex-output-length-guard`, `cpex-secrets-detection` (`pyproject.toml:20–28`).
+  - `plugins/robots_license_guard`, `deny_filter`, `regex_filter`, `safe_html_sanitizer`, `html_to_markdown`, `circuit_breaker`, `cached_tool_result`; cpex add-ons `cpex-url-reputation`, `cpex-output-length-guard`, `cpex-secrets-detection` (`pyproject.toml:288–295`; the `cpex` package source is not in the ref, so their behaviour is unverified).
 
 ## Rules / lists: parsing and compilation
 n/a: no list or subscription format. The closest thing is `resource_filter`'s `blocked_domains` array, canonicalized once in `__init__` into `_blocked_hosts` and checked by linear scan (L136–138, L195), which is fine for tens of entries and unusable for our ~418k-rule lists.
@@ -121,7 +121,7 @@ Apache-2.0: we may copy code with attribution and a NOTICE entry, and the patent
   - `get_capabilities` omits `logging` for modern callers (SEP-2577)
 
   Our `search` outputSchema must be an **object** schema so one schema works on both eras.
-- [dual-protocol] Validate `MCP-Protocol-Version` on HTTP only (`middleware/protocol_version.py`): a missing header means the latest version, an unsupported one gets 400 + JSON-RPC `-32022` with `data{supported[],requested}`. Context-forge also keeps `auto|legacy` kill-switches for inbound and outbound (`config.py:604–620: mcp_inbound_protocol_mode`, `mcp_client_connect_mode`). Ship a similar env escape hatch (`SEARCHHOLE_MCP_PROTOCOL=legacy`).
+- [dual-protocol] Validate `MCP-Protocol-Version` on HTTP only (`middleware/protocol_version.py`): a missing header is recorded in request state as the latest version (the handshake-era version in `legacy` mode), but era routing stays header-driven in the SDK, so a headerless request still takes the legacy `initialize` path (module doctest). An unsupported value gets HTTP 400 + JSON-RPC `-32022` with `data{supported[],requested}`. Context-forge also keeps `auto|legacy` kill-switches for inbound and outbound (`config.py:604–620: mcp_inbound_protocol_mode`, `mcp_client_connect_mode`). Ship a similar env escape hatch (`SEARCHHOLE_MCP_PROTOCOL=legacy`).
 - [dual-protocol] `server/discover` and list results set `ttlMs` (shortest upstream refresh interval) and `cacheScope="private"` (`_adapt_discover_with_ttl_cache_scope`, L3667). For us: `ttlMs` = time until the next rules/list change could alter the tool set (effectively static, so large), with `cacheScope: "private"`.
 - [upgrades-migrations] Copy the shape of `bootstrap_db.main`:
   1. fast "already at head?" probe with no lock
@@ -130,7 +130,7 @@ Apache-2.0: we may copy code with attribution and a NOTICE entry, and the patent
   Add what it lacks: an explicit "DB schema newer than me → read-only" branch. Its n-2 upgrade test suite (`tests/migration/`) is the model for our "two gateway versions sharing one DB" mock scenario.
 - [sqlite-driver] Pragma set to reuse: WAL, `busy_timeout` 5000 ms, `synchronous=NORMAL`, `foreign_keys=ON` (`db.py:423–431`). A 64 MB cache is overkill per gateway process; use the default or a few MB.
 - [other] Background jobs (list refresh): the passive `filelock` primary in `services/leader_election.py` is the simplest correct single-host owner, released by the OS on crash. For short-lived gateways prefer a DB lease row (see docker-mcp-gateway note), but the file lock is a good fallback.
-- [dashboard-process-model] Their live log view depends on a per-process in-memory buffer plus Redis to fan out across workers. That breaks across processes, which is evidence for our "tail SQLite rows → SSE" design over in-memory buffers (inferred). Reuse the SSE details: a single merged queue, keepalive comments every 15 s, drop-on-slow-subscriber.
+- [dashboard-process-model] Their live log view reads a per-process in-memory buffer (`log_storage_service.py` has no Redis or cross-worker path; `/admin/logs/stream`, `admin.py` ~15471). Redis Pub/Sub is used by `EventService` for the separate `/admin/events` stream of gateway/tool events. A per-process buffer is blind to other workers, which is evidence for our "tail SQLite rows → SSE" design over in-memory buffers (inferred). Reuse the SSE details: a single merged queue, keepalive comments every 15 s, drop-on-slow-subscriber.
 - [ui-ux] The correlation-trace view and log search filters are the right primitives for the dashboard's search log ("search → results → decisions → fetches").
 - [ui-ux] Hourly rollup tables with p50/p95/p99 plus raw-row retention give the dashboard fast "engine latency over 30 days" charts (`db.py:2721`).
 - [security] Port the `_canonical_host` normalization steps into our URL normalizer, applied to both list entries and result hosts (`plugins/resource_filter/resource_filter.py:43`).
@@ -154,5 +154,15 @@ Apache-2.0: we may copy code with attribution and a NOTICE entry, and the patent
 - Plugin timeouts of 30–120 s. Our whole gateway overhead budget is 50 ms p95.
 - In-memory log buffers as the source for the live dashboard: per-process, lost on restart.
 - Lock files in `/tmp` (not shared, cleaned by the OS) and relying on manual `alembic downgrade` for rollback.
-- Giant modules (`db.py` 7.1k lines, `admin.py` 16k+ lines) and an HTMX/Alpine admin UI with 1,000+-line JS modules.
+- Giant modules (`db.py` 7.2k lines, `admin.py` 20.9k lines) and an HTMX/Alpine admin UI with 1,000+-line JS modules.
 - A master-secret-in-env encryption scheme for API keys on a desktop tool.
+
+## Verification
+Date: 2026-10-29. Claims checked: 52 (LICENSE and `pyproject.toml`/Cargo license fields, SPDX header count, all 16 "Implications" bullets and the mechanisms behind them: plugin mode mapping, hook payload write policy, violation-code mapping, era adapters in `streamablehttp_transport.py`, protocol-version middleware, `ttlMs`/`cacheScope` derivation, bootstrap/migration lock and fast path, SQLite pragmas, retention defaults, leader election, SSE keepalive, `_canonical_host`, Argon2id envelope, cited line numbers and paths).
+Corrections:
+- Implication "dual-protocol" (`MCP-Protocol-Version`): "a missing header means the latest version" was incomplete. The middleware only records the latest version in request state; era routing stays header-driven in the SDK, so a headerless request still takes the legacy `initialize` path.
+- Implication "dashboard-process-model": the live log view does not use Redis. It reads a per-process in-memory buffer; Redis Pub/Sub belongs to `EventService` for the separate `/admin/events` gateway/tool event stream. The conclusion (prefer tailing SQLite) is unchanged.
+- "Newer DB than binary → `Can't locate revision`" is now marked inferred; the README row cited documents the deleted/renamed-revision cause.
+- Plugin mode semantics are from docs (cpex source is not in the ref); `resource_filter` confirms the permissive/TRANSFORM behaviour for violations.
+- cpex add-on citation fixed (`pyproject.toml:288-295`, not 20-28, which are uv pins); SPDX header count 521 -> 519 files; `admin.py` size 16k+ -> 20.9k lines.
+No GPL/AGPL/EUPL code present or pasted (Apache-2.0 throughout; the external `cpex` license remains unverified, as the note already says).

@@ -1,10 +1,10 @@
 # iorate/ublacklist
 
-> Ref: `research/refs/ublacklist` @ e3df713 (2026-10-23) · License: MIT (`LICENSE.txt`, "Copyright (c) 2018 iorate"). `third-party/is-mobile/LICENSE` is MIT (Julian Gruber). `builtin/` is an empty git submodule here (`.gitmodules` → `ublacklist/builtin`, branch `dist`; its license is not visible in the ref). **The rule parser and matcher are not in this repo.** They live in npm packages `@ublacklist/ruleset@2.0.1` and `@ublacklist/match-pattern@2.0.0` (`package.json`; `pnpm-lock.yaml:875-882, 1625-1635`), published from `github.com/ublacklist/packages`. That repo is MIT according to its root `LICENSE` (upstream, not in ref). Where this note describes package internals, it says "(upstream, not in ref)".
+> Ref: `research/refs/ublacklist` @ e3df713 (2026-10-23) · License: MIT (`LICENSE.txt`, "Copyright (c) 2018 iorate"). `third-party/is-mobile/LICENSE` is MIT (Julian Gruber). `builtin/` is an empty git submodule here (`.gitmodules` → `ublacklist/builtin`, branch `dist`; its license is not visible in the ref). **The rule parser and matcher are not in this repo.** They live in npm packages `@ublacklist/ruleset@2.0.1` and `@ublacklist/match-pattern@2.0.0` (`package.json`; `pnpm-lock.yaml:875-882, 1625-1635`), published from `github.com/ublacklist/packages`. That repo is MIT according to its root `LICENSE` ("Copyright (c) 2026 iorate"; fetched 2026-10-29), and `packages/ruleset/package.json` (v2.0.1) declares `"license": "MIT"`. Neither file is in the ref. Where this note describes package internals, it says "(upstream, not in ref)".
 
 ## Purpose
 uBlacklist is a browser extension (Chrome, Firefox, Edge, Safari) that hides or highlights sites in search engine result pages (SERPs) using user rules plus subscribed rulesets, synced across devices through Google Drive, Dropbox, OneDrive, WebDAV or browser sync. It matters to search-hole for four reasons:
-1. It is the **origin format for most of our seed lists**: about 8 of the 13 seed lists in Appendix B are uBlacklist rulesets.
+1. It is the **origin format for several of our seed lists** (unverified count: Appendix B does not record each list's format, so "about 8 of 13" is an estimate to re-check list by list).
 2. It has the cleanest **user-vs-subscription precedence** model in the reference set.
 3. Its **"block this site" dialog** computes a minimal, validated rule patch: the closest prior art for `suggest_rule` and `apply_rule`.
 4. It is MIT, so we can reuse code and depend on its MIT parser package.
@@ -88,7 +88,7 @@ The ruleset is a text file of one rule per line. Optional YAML frontmatter betwe
 
 ## Extension points (plugins, hooks)
 - **SERPINFO** (YAML, `@ublacklist/serpinfo`; e2e mock at `e2e/mocks/google-serpinfo.yml`): `name`, then `pages[]` with `matches` (URL match patterns), and `results[]` with `root`, `url` and `props` (CSS selectors or commands). Optional fields: `button`, `preserveSpace`, `extraSelector`, `delay`, `commonProps`. Users can add their own SERPINFO. Built-in SERPINFO is downloaded periodically from `ublacklist/builtin` (`background/serpinfo.ts:25-75`, alarm `update-all-remote-serpinfo`). This is a data-driven adapter layer for scraping result pages; search-hole's engine adapters return structured JSON, so it does not apply directly.
-- **Subscription links:** `https://ublacklist.github.io/rulesets/subscribe?url=…` redirects into the options page's "add subscription" dialog once the user grants permission (`shared/constants.ts:6-8`, `shared/enable-subscription-url.tsx`).
+- **Subscription links:** `https://ublacklist.github.io/rulesets/subscribe?url=…` is redirected by a `declarativeNetRequest` dynamic rule to `pages/options.html?url=…` (`background/serpinfo.ts:77-110`, `setupSubscriptionURL`), once the user has granted host permission for `ublacklist.github.io` (`shared/constants.ts:6-8`, `shared/enable-subscription-url.tsx`). The options page reads the `url`, `name` (also `addSubscriptionURL` / `addSubscriptionName`) and `type` query parameters and passes them to the `Options` component as an `addSubscription*` query (`options/index.tsx:49-60`); that this prefills the add-subscription dialog is inferred from the names.
 - **Host permissions per subscription origin:** `requestPermission` asks for `<scheme>//<host>/*` unless the origin is `raw.githubusercontent.com` or `cdn.statically.io` (`shared/permissions.ts`, `shared/constants.ts:1-4`).
 - **Agent skills** for writing rulesets and SERPINFO ship in `ublacklist/packages` (`README.md` "Authoring rulesets... with AI agents"; `AGENTS.md`).
 
@@ -96,7 +96,7 @@ The ruleset is a text file of one rule per line. Optional YAML frontmatter betwe
 **Parser (upstream, not in ref).**
 - `packages/ruleset/src/ruleset.grammar` and `frontmatter.grammar` are Lezer grammars compiled to an LR parser (`ruleset.grammar.ts`). Dependencies are `@lezer/common`, `@lezer/lr`, `@lezer/highlight`, `@lezer/yaml`, `js-yaml` and `zod` (`pnpm-lock.yaml:1627-1635`).
 - Rules with syntax errors, invalid string or regex literals, or failed map insertion are skipped silently. Errors surface only in the editor's linter (`options/shared/ruleset-lang.ts:20-50`).
-- `Ruleset.extend(text)` parses only the appended range and merges it into the existing map, so the "add rule" path in `validateRulesToAdd` costs nothing extra (interactive-ruleset.ts:99-111).
+- `Ruleset.extend(text)` parses only the appended range and merges it into that ruleset's own map (upstream `ruleset.ts`, fetched 2026-10-29). In the ref, `validateRulesToAdd` builds a throwaway `new Ruleset("")`, extends it with only the typed rules and evaluates them against the one result, so validation never re-parses the user's file (interactive-ruleset.ts:99-111).
 
 **Matching structure (upstream `packages/match-pattern/src/index.ts`, not in ref).**
 - `MatchPatternMap` is a **host-label trie walked from the TLD inward**.
@@ -136,12 +136,12 @@ So, within a tier: highlight with a higher N > highlight with a lower N > unbloc
 **Sync model** (`background/sync.ts`, `sync-sections.ts`, `sync-backends.ts`):
 - Five independent files: `uBlacklist.txt` (raw user rules), `general.json`, `appearance.json`, `subscriptions.json` (**metadata only**: `[{name,url,type,enabled}]`, each device re-downloads the content) and `serpinfo.json` (`sync-sections.ts:13-17`, 234-290).
 - Uploads are debounced 5 s after a change (`SYNC_DELAY`, sync.ts:19) plus a periodic alarm. Dirty flags select which sections upload (`beforeSync`).
-- `syncFile` (sync-backends.ts:119-193) is **last-writer-wins on file modified time** at the backend's precision (Google Drive ms; Dropbox, WebDAV and browser sync s). If local is older, download; if equal, no-op; if newer, upload with the local modified time.
+- `syncFile` (sync-backends.ts:119-193) is **last-writer-wins on file modified time** at the backend's precision (`modifiedTimePrecision`: Google Drive and browser sync `millisecond`; Dropbox, OneDrive and WebDAV `second`). If local is older, download; if equal, no-op; if newer, upload with the local modified time.
 - `force: "upload"` stamps `now`. The initial sync lets the user pick "Keep newest", "Use local" or "Use remote" (`_locales/en/messages.json: options_turnOnSyncDialog_initialSync*`).
 - After downloading, `afterDownloadAll` drops a section if local items changed during the sync (sync-sections.ts:98-105). Every incoming JSON is zod-validated, with "File corrupted: <file>" errors.
 - Backends:
   - Google Drive: `drive.appdata` scope, `appDataFolder` (google-drive.ts:25, 73, 99).
-  - Dropbox: `/Apps/uBlacklist/`, `client_modified` (dropbox.ts:52-55).
+  - Dropbox: files at `/<filename>` with `client_modified` (dropbox.ts:52-55); that this resolves to `/Apps/uBlacklist/` depends on the Dropbox app-folder setting, which is not in the ref (unverified).
   - OneDrive: `special/approot` (onedrive.ts:133).
   - WebDAV: HEAD for `Last-Modified`, then PUT with `X-OC-Mtime`, `credentials: "omit"` and `cache: "no-store"` (webdav.ts:47-51, 141). It creates the folder recursively with PROPFIND/MKCOL.
   - Browser sync: `lz-string` base64 in 8180-byte chunks, at most 15 chunks (browser-sync.ts:14-19, 44-45).
@@ -196,8 +196,9 @@ MIT. Code may be copied with the copyright notice and license text kept, e.g. in
 - [rule-format-precedence] Use uBlacklist's **"most local tier with any match wins entirely"** algorithm (interactive-ruleset.ts:35-42) to implement §6's scope precedence. Evaluate session, then project, then global, then subscribed lists. The first tier with ≥ 1 matching rule decides, and lower tiers are ignored for that result. It is deterministic, easy to explain ("decided by your project rules, line 4") and easy to property-test. Two gaps must be closed:
   - `important` must lift a rule above tier order. uBlacklist has no `important`; add an "important pass" before the tier walk.
   - A user `allow` must still beat list rules. That falls out of tier order, because user tiers always come first.
+  - Inferred consequence to settle in the ADR: because *any* match in a tier decides, a user `lower` or `raise` on a domain also overrides a subscribed list's `block` for that domain (the same holds in uBlacklist, where a user highlight beats a subscription block). If that is not wanted, restrict the tier shortcut to `allow`/`block`/`pin` and let `lower`/`raise` fall through to the next tier.
 - [rule-format-precedence] Within a tier, resolve by **action priority, not file order**, as `dominantAction` does (interactive-ruleset.ts:147-158). Proposed order: `allow` > `block` > `pin` > `raise`/`lower`, per the plan. Note that uBlacklist ranks highlight *above* unblock and unblock above block. When importing, map `@N` to `raise` (N clamped to 1-10) and record a warning that ranking semantics differ from uBlacklist's colour priority.
-- [lists-subscriptions] **uBlacklist importer: depend on `@ublacklist/ruleset`** (MIT, pure JS) to parse. Do not write our own grammar. Walk its output and translate each rule into the search-hole IR:
+- [lists-subscriptions] **uBlacklist importer: depend on `@ublacklist/ruleset`** (MIT, pure JS) to parse. Do not write our own grammar. Caveat on the API: the package exports `Ruleset` (`exec`, `get`, line iteration, `toJSON`, `extend`), the Lezer `parser` / `bodyParser`, `parseString` and `parseRegExp` (upstream `index.ts`); it has **no ready-made list of structured rules**. Translation therefore means walking the Lezer parse tree (node names such as `String` and `RegExp` are visible in `ruleset-lang.ts`; the rest are upstream and unverified) or decoding `toJSON().ruleMap`. Budget for that work and pin the package version. Translate each rule into the search-hole IR:
 
   | uBlacklist | search-hole IR |
   |---|---|
@@ -221,9 +222,9 @@ MIT. Code may be copied with the copyright notice and license text kept, e.g. in
   - shrink guard and previous-version rollback
   - fetch timeout
   - a per-list lock that works across processes (uBlacklist's `tryLock` is in-process only, subscriptions.ts:20-35)
-- [lists-subscriptions] Read YAML frontmatter `name` (and accept `license`, `homepage`, `expires`) at the top of uBlacklist-format lists (README "For subscription providers"). The Appendix B seed lists use it.
+- [lists-subscriptions] Read YAML frontmatter `name` at the top of uBlacklist-format lists (README "For subscription providers", which documents only `name`). Also accept `license`, `homepage` and `expires` as our own convention: the compiled metadata is an open `Record<string, unknown>` (`shared/types.ts` `PlainRuleset`), so extra keys survive, but uBlacklist assigns them no meaning. Whether the Appendix B seed lists carry frontmatter is unverified.
 - [lists-subscriptions] Default refresh: uBlacklist uses one global interval of **1 day minimum** (intervals.ts:5). For search-hole, use per-list intervals defaulting to 7 days (or the list's `Expires`), with a 4-hour floor (see `ublock.md`) and a 1-day default for first-party lists.
-- [mcp-tool-surface] Model `suggest_rule`'s queued suggestion on uBlacklist's **`Patch`** (interactive-ruleset.ts:9-18): `{mode, target result, rulesToAdd, rulesToRemove (with scope and line numbers), currentAction, listsAction, matchingRules}`. The dashboard, panel or `apply_rule` then shows exactly what changes and refuses to apply a patch that doesn't achieve its mode (`validateRulesToAdd`). Re-run the validation at apply time against the *current* rules, since they may have changed since the suggestion.
+- [mcp-tool-surface] Model `suggest_rule`'s queued suggestion on uBlacklist's **`Patch`** (interactive-ruleset.ts:9-18). The real fields are `{mode, searchResult, rulesToAdd, lineNumbersToRemove, rulesToRemove, userActionNotToRemove, subscriptionsAction, matchingRules}`. The adaptation for search-hole (our additions and renames, not uBlacklist's): add a `scope` per removed rule, and rename `userActionNotToRemove` to `currentAction` and `subscriptionsAction` to `listsAction`. The dashboard, panel or `apply_rule` then shows exactly what changes and refuses to apply a patch that doesn't achieve its mode (`validateRulesToAdd`). Re-run the validation at apply time against the *current* rules, since they may have changed since the suggestion.
 - [ui-ux] The "Block" UX in the dashboard and in-chat panel should copy the dialog:
   - prefilled, editable rule
   - "will remove: …" preview
@@ -268,3 +269,19 @@ MIT. Code may be copied with the copyright notice and license text kept, e.g. in
 - Compiled forms with no version stamp.
 - Highlight colours as ranking priority (it confuses "visual emphasis" with "rank"). Map them explicitly and warn.
 - SERP-specific conditions (`$category`, `$site`) in our core rule language until an engine supplies those props.
+
+## Verification
+- Date: 2026-10-29. Checked against `research/refs/ublacklist` @ e3df713; package-internal claims were additionally checked against `github.com/ublacklist/packages` (`main`, fetched 2026-10-29, via a summarising fetch tool, so exact quotes were not re-read byte for byte). Claims checked: 88 (license header and `LICENSE.txt` / `third-party` licenses, the `dominantAction` snippet against `interactive-ruleset.ts:147-158`, tier precedence and its tests, storage keys and defaults, subscription pipeline, sync model and backends, domains parser, block-dialog behaviour, test layout, and every bullet under "Implications for search-hole").
+- Confirmed with no change: MIT licenses (ref and upstream `LICENSE`, `@ublacklist/ruleset` `package.json`), user-tier-then-subscriptions precedence, `dominantAction` ordering and the pasted MIT snippet (accurate), 1440-minute update floor, no ETag / timeout / size guard, keep-previous-ruleset-on-failure, in-process-only `tryLock`, plain-text sync credentials, upstream trie structure, lazy regex with no ReDoS guard, `RulesetJSON` having no version field.
+- Corrections made:
+  1. `Patch` fields: the bullet listed `target result`, `currentAction`, `listsAction` and "rulesToRemove (with scope ...)"; the real type has `searchResult`, `lineNumbersToRemove`, `userActionNotToRemove`, `subscriptionsAction`. The bullet now gives the real fields and marks the scope field and renames as our adaptation.
+  2. Sync backend time precision: browser sync is `millisecond` (not seconds) and OneDrive is `second`; Dropbox path `/Apps/uBlacklist/` is not in the ref and is marked unverified.
+  3. `Ruleset.extend` claim: in the ref, `validateRulesToAdd` extends a throwaway empty `Ruleset`, not the user's ruleset; the "merges into the existing map" behaviour is upstream and now attributed as such.
+  4. Importer bullet: added that `@ublacklist/ruleset` exports no structured rule list (only `Ruleset`, Lezer `parser`/`bodyParser`, `parseString`, `parseRegExp`), so translation means walking the parse tree or `toJSON().ruleMap`.
+  5. Seed-list claim "about 8 of 13 are uBlacklist rulesets" is unsupported by Appendix B; marked as an unverified estimate.
+  6. Subscribe-link mechanism: the redirect is a `declarativeNetRequest` rule in `background/serpinfo.ts:77-110`, not in `constants.ts`; added the options-page query parameters.
+  7. Frontmatter: uBlacklist documents only `name`; `license`, `homepage` and `expires` are our convention.
+  8. Added an inferred precedence consequence: with "any match in a tier decides", a user `lower`/`raise` also overrides a list `block`; flagged for the precedence ADR.
+  9. Header: recorded the verified upstream license text and package license.
+- The ref contains one pasted code excerpt (`dominantAction`, `getRegistrableDomain` comment block). Both are MIT with the notice requirement noted in the License section; no GPL/AGPL/EUPL code is present.
+

@@ -8,7 +8,7 @@
 ## Purpose
 A **self-hosted search API for agents** (Python 3.11+, FastAPI, `app/main.py`, 1,899 lines) wrapping SearXNG. It adds:
 - cross-engine dedup and scoring
-- named "strategy modes" that also call 11 no-key vertical APIs directly (GitHub, MDN, PyPI, arXiv, …)
+- named "strategy modes" that also call 11 no-key vertical APIs directly (GitHub, MDN, PyPI, arXiv, …; `README.md` counts 11, the code registers 12, and the Reddit one is used by no mode)
 - an escalating extraction "kill chain"
 - domain trust scoring
 - prompt-injection scrubbing
@@ -25,7 +25,7 @@ agent (MCP client) ──stdio──► agent-search-mcp (AGPL, httpx client) �
                                                                               │
               ┌──────────────────────────────────────────────────────────────┤
               ▼                         ▼                          ▼          ▼
-     SearXNG :8080 (JSON)     direct providers (11,      kill chain (direct → readability →  SQLite
+     SearXNG :8080 (JSON)     direct providers (12,      kill chain (direct → readability →  SQLite
      25 engines enabled        no key; app/search_         UA rotation → Wayback → Google      query_log,
      searxng/settings.         providers.py)               cache → search-about → adapters →   content_cache,
      example.yml                                           PDF → YouTube; app/killchain.py)    fetch_log
@@ -44,8 +44,8 @@ agent (MCP client) ──stdio──► agent-search-mcp (AGPL, httpx client) �
 | `app/domain_trust.py` (MIT) | `evaluate_trust(url) → TrustResult{domain, tier, score, reasons, https, domain_age_days, lookalike_of}`. |
 | `app/fetch_security.py` (MIT) | `validate_public_url`, `SafeAsyncNetworkBackend` (pinned connect), `safe_httpx_get` (manual redirects plus byte cap). |
 | `app/killchain.py` (MIT) | Escalating extraction, plus trust gating and tagging and provenance (`FetchedContent{content, fetched_url}`). |
-| `app/scrubber.py` (MIT) | 85 regexes over injection, exfiltration, impersonation and XSS, then encoding normalization, risk score and **redaction**. |
-| `app/search_providers.py` (MIT) | The `SearchProvider` base class plus 11 direct providers (MDN, GitHub, Docker Hub, PyPI, Wikipedia, Wikidata, Hacker News, Reddit, arXiv, Crossref, OpenAlex, Semantic Scholar). |
+| `app/scrubber.py` (MIT) | 73 detection regexes (48 injection, 11 exfiltration, 6 impersonation, 8 XSS; the module docstring says "70+") plus 7 XSS-specific redaction patterns, over injection, exfiltration, impersonation and XSS, then encoding normalization, risk score and **redaction**. |
+| `app/search_providers.py` (MIT) | The `SearchProvider` base class plus 12 direct providers (MDN, GitHub, Docker Hub, PyPI, Wikipedia, Wikidata, Hacker News, Reddit, arXiv, Crossref, OpenAlex, Semantic Scholar). No strategy mode uses Reddit. |
 | `app/query_expansion.py` (MIT) | Rule-based query variations for `/search/deep` (no LLM). |
 | `app/evolver.py` (MIT) | Fetch-failure analysis. Since SPEC R2 it is **analysis-only**. |
 | `mcp-server/agent_search_mcp/server.py` (AGPL) | A low-level MCP `Server` with a hand-written tool list. Each call maps to one HTTP request against the API, and the JSON response is returned as text. |
@@ -53,8 +53,8 @@ agent (MCP client) ──stdio──► agent-search-mcp (AGPL, httpx client) �
 `/search` flow (`app/main.py` lines 1014–1094):
 1. Validate the query (non-empty, ≤ 500 chars) and resolve `engines` against the live `/config` catalog.
 2. Check the in-memory TTL cache, keyed by query, engines, count, domain, excludes and fetch (`app/cache.py`, `ttl = 3600`).
-3. If `domain` is set *and* every selected engine is in category `general`/`web`, prepend `site:<domain>` (`_supports_site_search`, `_domain_scoped_query`).
-4. Call `_query_searxng(count*2)`, which keeps `results[:count*3]`, i.e. **over-fetching 6×** the requested count.
+3. If `domain` is set *and* every selected engine is in category `general`/`web` (or no engines were selected), prepend `site:<domain>` (`_supports_site_search`, `_domain_scoped_query`).
+4. Call `_query_searxng(count*2)`, which keeps `results[:count*3]`, i.e. a **retention cap of 6×** the requested count. This is only a slice limit: SearXNG is sent just `q`, `format=json`, `pageno=1` and optional `engines`/`categories`, never a result count, so the real over-fetch is whatever SearXNG's first page holds (and one SearXNG page will usually hold far fewer than 6×`count` rows (inferred; not measured).
 5. Run `deduplicate_with_scoring`, then `_filter_search_results` (include/exclude by exact-or-subdomain match), then `[:count]`.
 6. With `fetch=true`, run `kill_chain_batch(max_concurrent=5)`.
 7. Write `query_log`, set the cache, and return `SearchResponse{results, meta}`.
@@ -93,7 +93,7 @@ agent (MCP client) ──stdio──► agent-search-mcp (AGPL, httpx client) �
 - **Untrusted feedback never edits lists** (SPEC R1–R3). `/adapt/report` records feedback, and `/adapt/evolve` only recommends. Fixture `evolver_poison.expected.json` asserts `actions_taken: []`, `blocklist_created: false` and `fetch_behavior_changed: false` after five fabricated failure reports.
 
 ## Testing strategy
-- **pytest**, 106 test functions across 10 files (`tests/test_api.py` has 47; `test_live_docker.py` 18; `test_security_repairs.py` 8; …). SearXNG is mocked, so the default run needs no Docker (`README.md` "Verify").
+- **pytest**, 113 test functions across 11 files (106 module-level plus 7 class methods in `test_scrubber.py`; `tests/test_api.py` has 47; `test_live_docker.py` 18; `test_security_repairs.py` 8; …). SearXNG is mocked, so the default run needs no Docker (`README.md` "Verify").
 - **Fixture answer keys**: `tests/fixtures/security/{direct_fetch, evolver_poison, ssrf_targets, derived_content, hostname_spoof, ranking_edges, browser_limits, client_contracts}.json` plus `*.expected.json`. SPEC §5 says the expected files "must not be weakened merely to make implementation pass". The `ssrf_targets` cases are: public v4, public v6, CGNAT `100.64.0.1`, loopback, private, **mixed answers**, **DNS failure** and a **rebind case** (`answers: 8.8.8.8`, `connect_answer: 127.0.0.1` → must block).
 - **Opt-in live tiers**: `AGENTSEARCH_INTEGRATION=1` (a local instance) and `AGENTSEARCH_DOCKER_INTEGRATION=1` (the direct and Tor stacks, including "observes a Tor exit" and "direct-egress probe denied", SPEC R16).
 - **MCP contract** (`tests/test_mcp_contract.py`, MIT, since it lives in `tests/`): it pins the MCP SDK to the verified `1.27.x` line, checks the transport/token policy, and checks that **unknown tools and connection failures come back as protocol-level tool errors** (SPEC R22). It also asserts that the source never offers a CWD token file.
@@ -103,10 +103,10 @@ agent (MCP client) ──stdio──► agent-search-mcp (AGPL, httpx client) �
 - **Provenance as first-class fields** (SPEC §3, R8): `url` (requested), `fetched_url` (actual source), `derived_from` (set when content came from an alternate source such as Wayback or "search-about"), and a separate `trust` and `requested_trust`. Our receipts need exactly this split. "Opened X but the bytes came from archive.org" must be visible.
 - **Upstream health in every response**: `upstream_status` (`ok`/`degraded`/`error`), `unresponsive_engines` (parsed from SearXNG's `unresponsive_engines` JSON), `engine_attempts[]` with per-pack raw counts and latency, and `fallback_reason` (`no_results`/`insufficient_results`) (`app/main.py` `_normalize_upstream_diagnostics`, `_upstream_metadata`). This maps directly onto our receipt line "one engine down: fell back".
 - **A trust tag in-band for low tiers only**: `format_trust_tag` → `[🔴 suspicious source: domain ⚠️ possible typosquat of 'x']`, prepended only when the tier is `suspicious` or `new` (`app/killchain.py` `_tag_content`, lines 874–878). Quiet for normal sources, loud for bad ones.
-- **Liveness vs readiness**: `/live` is cheap, and `/ready` is bounded and cached and returns 503 (SPEC R17). This pattern fits our `doctor` and dashboard health endpoint.
+- **Liveness vs readiness**: `/live` is cheap, and `/ready` is bounded (one 5 s probe of SearXNG `/healthz`) and returns 503 (SPEC R17 asks for "bounded/cached", but the code does not cache it). This pattern fits our `doctor` and dashboard health endpoint.
 
 ## Performance tricks
-- Over-fetch 6× from SearXNG, then dedup and filter (`_query_searxng`, `results[:count*3]` with `count*2` passed in).
+- Keep up to 6× the requested count from SearXNG's single first page, then dedup and filter (`_query_searxng`, `results[:count*3]` with `count*2` passed in). It is a slice cap, not a request-size multiplier, so our "over-fetch 2–3×" must be done by asking each engine for more results or more pages.
 - `kill_chain_batch(max_concurrent=5)` for inline content. The browser renderer has a bounded global queue (SPEC R15).
 - WHOIS is skipped for platform hosts and, in practice, everywhere: every real call passes `check_whois=False` (`app/killchain.py` lines 854, 887; `app/browser_renderer.py` lines 191, 196).
 - Caps everywhere:
@@ -116,7 +116,7 @@ agent (MCP client) ──stdio──► agent-search-mcp (AGPL, httpx client) �
   - snippets ≤ 2,000 chars and other text ≤ 1,000 (`app/search_providers.py` `_safe_text`/`_clean_snippet`)
   - redirects ≤ 5
   - fetch timeout 15 s
-- Weak spots: `deduplicate()` recomputes the engine denominator inside the loop (O(n²), `app/dedup.py` lines 136–139). The provider stats live only in process memory.
+- Weak spots: the unused legacy `deduplicate()` recomputes the engine denominator inside the loop (O(n²), `app/dedup.py` lines 136–139); the live `deduplicate_with_scoring` computes it once (lines 184–189). The provider stats live only in process memory.
 
 ## License and what it means for us
 - **Root (MIT):** we may borrow ideas *and* short code with attribution from `app/`, `adapters/`, `sdk/`, `tests/` and the fixtures. The trust heuristics, URL normalization, SSRF design and fixture shapes are all borrowable. Our code is TypeScript, so in practice we re-implement.
@@ -149,12 +149,12 @@ agent (MCP client) ──stdio──► agent-search-mcp (AGPL, httpx client) �
   - **Typosquat detection**: Levenshtein of the *first label* against 22 brands (threshold 1 for brands of ≤ 5 chars, else 2), "brand embedded with ≤ 8 extra chars", and a guarded prefix near-match (the "brc" vs "bbc" regression in `tests/test_domain_trust.py`).
 
   For us these are good **typed seed lists** (`official`, `platform-hosted`, `suspicious-tld`) and a "lookalike" *warning* in receipts. They should not be ranking constants.
-- [lists-subscriptions] **The heuristics false-positive, and they hard-block.** `kill_chain` refuses to fetch any URL with `lookalike_of` set, unless the TLD is in `.gov/.edu/.mil/.int`. The code comment there admits that `congress.gov` was flagged as `cnn` (`app/killchain.py` lines 856–872). The "embedded brand" rule would also flag ordinary names like `purchase…` → `chase` or `applesauce` → `apple` (inferred; untested). Since only the first label is checked, `login.paypa1.com` → base `login` is missed (inferred). For search-hole: heuristic signals **annotate and warn, never hide**. Only explicit user rules or subscribed lists hide results (Principle 2, "explain everything").
+- [lists-subscriptions] **The heuristics false-positive, and they hard-block.** `kill_chain` refuses to fetch any URL with `lookalike_of` set, unless the TLD is in `.gov/.edu/.mil/.int`. The code comment there admits that `congress.gov` was flagged as `cnn` (`app/killchain.py` lines 856–872); `evaluate_trust` now skips the lookalike check for its established list and trusted TLDs, so that exact case is patched around, not the detector. `is_safe_url` (`app/fetch_policy.py`) also refuses any host ending in one of 10 hard-coded "suspicious" TLDs (`.tk .ml .ga .cf .gq .buzz .top .xyz .work .click`). The "embedded brand" rule would also flag ordinary names like `purchase…` → `chase` or `applesauce` → `apple` (inferred; untested). Since only the first label is checked, `login.paypa1.com` → base `login` is missed (inferred). For search-hole: heuristic signals **annotate and warn, never hide**. Only explicit user rules or subscribed lists hide results (Principle 2, "explain everything").
 - [lists-subscriptions] **SPEC R1–R3**: untrusted feedback can never directly or indirectly mutate a runtime blocklist, and recommendation endpoints are analysis-only. This is independent confirmation of our `suggest_rule` → inbox → user approval model (§12.4). Copy the `evolver_poison` fixture idea: N fabricated model suggestions ⇒ zero rule changes.
 - [security] **SSRF technique, the gold standard of the three** (`app/fetch_security.py`, MIT):
   - (1) Scheme must be `http`/`https`. (2) **Reject userinfo** (`user:pass@host`). (3) Hostname is lowercased, the trailing dot stripped, and it is **IDNA-encoded**, failing closed on error.
   - (4) `getaddrinfo(AF_UNSPEC)`. **Every** answer must pass `_public_address`; mixed, empty or failed answers raise.
-  - (5) **Connection pinning**: a custom `httpcore` network backend runs validation inside `connect_tcp` and connects to the validated numeric address, so every redirect hop and every new connection is checked against the same resolution. Unix sockets are refused.
+  - (5) **Connection pinning**: a custom `httpcore` network backend runs validation inside `connect_tcp` and connects to the validated numeric address, so there is no gap between the check and the connect. Each new connection (including each redirect hop's) re-resolves and re-validates on its own; the pin is per connection, not one resolution reused across hops. Unix sockets are refused.
   - (6) `safe_httpx_get` follows redirects manually (`follow_redirects=False`, max 5), re-validating each `Location`.
   - (7) A streamed 5 MiB cap is enforced against both the declared `Content-Length` and the actual decoded bytes.
   - (8) Optional: all egress goes through a separate `fetch-proxy` container with CoreDNS (`docker-compose.yml`).
@@ -168,8 +168,8 @@ agent (MCP client) ──stdio──► agent-search-mcp (AGPL, httpx client) �
           raise UnsafeURLError(f"Non-global destination blocked: {address}")
       return address.compressed
   ```
-  Node port: an undici `Agent({connect: {lookup}})` whose `lookup` calls `dns.lookup(host, {all: true})`, normalizes each answer with `ipaddr.process()` (which unwraps IPv4-mapped addresses), requires `range() === 'unicast'` for every answer, and returns only validated addresses. Add `maxRedirections: 0` with a manual loop, `headersTimeout`/`bodyTimeout` and a streamed byte counter. Port their `ssrf_targets` fixture, *including the rebind case*, into our mock-engine scenarios (§12.3 "SSRF attempts").
-- [security] **Prompt-injection scrubber** (`app/scrubber.py`): 85 regexes, encoding normalization (base64, hex, URL, homoglyphs, zero-width), a weighted risk score, then **in-place redaction to `[REDACTED]`**, and above risk 0.8 a warning header plus truncation to 3,000 chars. Rewriting content breaks our receipts' fidelity ("what the AI actually saw") and the dashboard's raw view. We should **flag** instruction-like spans as receipt warnings (master plan §12.4 "later") and wrap all external text as untrusted, not mutate it. Their regex list is MIT and could seed our detector's test corpus.
+  Node port: an undici `Agent({connect: {lookup}})` whose `lookup` calls `dns.lookup(host, {all: true})`, normalizes each answer with `ipaddr.process()` (which unwraps IPv4-mapped addresses), requires `range() === 'unicast'` for every answer (checked against ipaddr.js `main` on 2026-10-29: its special-range tables include CGNAT, `198.18.0.0/15`, `64:ff9b::/96` and `2002::/16`, so those are rejected too; the tables are version-dependent, so pin the version and test it), and returns only validated addresses. Add `maxRedirections: 0` with a manual loop, `headersTimeout`/`bodyTimeout` and a streamed byte counter. Port their `ssrf_targets` fixture, *including the rebind case*, into our mock-engine scenarios (§12.3 "SSRF attempts").
+- [security] **Prompt-injection scrubber** (`app/scrubber.py`): 73 detection regexes (plus 7 XSS redaction patterns), encoding normalization (base64, hex, URL, homoglyphs, zero-width), a weighted risk score, then **in-place redaction to `[REDACTED]`**, and above risk 0.8 a warning header plus truncation to 3,000 chars. Rewriting content breaks our receipts' fidelity ("what the AI actually saw") and the dashboard's raw view. We should **flag** instruction-like spans as receipt warnings (master plan §12.4 "later") and wrap all external text as untrusted, not mutate it. Their regex list is MIT and could seed our detector's test corpus.
 - [security] Access logs write the **raw query string at INFO level** (`rate_limit_middleware`, `app/main.py` lines 226–235), which includes the user's search queries. That is the kind of leak our §12.4 query hygiene and pino redaction must prevent.
 - [security] The kill chain fetches **third-party mirrors** (Wayback CDX, Google Cache, "search-about" coverage on other sites) and rotates **browser user agents** (`USER_AGENTS` in `app/killchain.py` and `app/fetch_policy.py`). It does **no robots.txt** handling (`grep robots` → none). That conflicts with our Principle 8 and §12.4 (honest UA, robots). If we ever offer archive fallbacks, they must be opt-in and recorded as `derived_from` in the receipt.
 - [date-extraction] Engine dates are mostly dropped. `SearchResult` has no date field, and SearXNG's `publishedDate` is read only in `/news` and `source_tracer.py` (`app/main.py` line 1594; `app/source_tracer.py` lines 535, 579). Our results table and adapters must carry `published_at`/`updated_at` from the engine as step 1 of the §7 chain.
@@ -205,3 +205,19 @@ agent (MCP client) ──stdio──► agent-search-mcp (AGPL, httpx client) �
 - 16 tools including ops endpoints, loosely typed comma-string params, and pretty-printed unbounded JSON output.
 - In-process-only health stats, ad hoc `ALTER TABLE` migrations without versioning, and raw queries in access logs.
 - Disk-loaded executable adapters in anything that ships as a plugin.
+
+## Verification
+- Date: 2026-10-29. Checked against `research/refs/agent-search` @ f65b7a3. Claims checked: 131 (license header and section, every Implications bullet, and the mechanism claims they rely on: merge formula and tables, URL normalization, domain-trust scoring and tiers, SSRF flow and fixtures, strategy modes, SQLite schemas, scrubber, tool-list measurements, SPEC rules).
+- License confirmed: root `LICENSE` is MIT ("Copyright (c) 2026 AgentSearch Contributors"; `pyproject.toml` and `sdk/pyproject.toml` say MIT); `mcp-server/LICENSE` is a 4-line AGPL-3.0 stub and `mcp-server/pyproject.toml`/`README.md` say AGPL-3.0. Only those two LICENSE files exist, and no other directory carries a license header. No AGPL code or verbatim strings are in this note: from `mcp-server/` it uses only tool names, counts and lengths (re-measured with a read-only `ast` parse, no code run) and facts also stated in the MIT `SPEC.md`. The one code excerpt (`_public_address`) is MIT and attributed.
+- Re-measured and confirmed unchanged: 16 tools, 1,369 description chars, ≈ 6,221 JSON chars, 616 chars of ops tools, per-tool counts; the 0.4/0.3/0.3 score formula; the 9-entry authority table; the 16 tracking keys; domain-trust set sizes (61 / 5 / 24 / 22 / 8) and every score rule; the SSRF steps (1)–(8) and the `ssrf_targets` cases.
+- Corrections:
+  1. "Over-fetching 6×" (twice) was misleading: `count*3` on `count*2` is a retention slice, and SearXNG is never sent a result count (only `q`, `format`, `pageno=1`, optional `engines`/`categories`). Reworded, including the consequence for our "over-fetch 2–3×" plan.
+  2. "11 direct providers": the code registers 12 (README counts 11; Reddit is in no strategy mode). Fixed in three places.
+  3. "85 regexes": the scrubber has 73 detection regexes (48/11/6/8) plus 7 XSS redaction patterns. Fixed in two places.
+  4. "106 test functions across 10 files": 113 across 11 (106 module-level plus 7 class methods). Fixed.
+  5. "`/ready` is bounded and cached": the code is bounded (5 s probe) but not cached; only SPEC R17 asks for caching. Fixed.
+  6. "`deduplicate()` is O(n²)": that function is unused legacy code; the live `deduplicate_with_scoring` computes the denominator once. Fixed.
+  7. Pinning description: validation and connect are atomic per connection, but each connection and redirect hop re-resolves; it is not one resolution reused across hops. Fixed.
+  8. `site:` push-down also applies when no engines are selected. Added.
+  9. Added: `is_safe_url` hard-blocks 10 hard-coded TLDs, and `evaluate_trust` already skips the lookalike check for its established list and trusted TLDs (the `congress.gov` comment describes a case that is now patched around).
+  10. Node-port claim `range() === 'unicast'` checked against ipaddr.js `main`: it covers CGNAT, `198.18.0.0/15`, NAT64 and 6to4 (version-dependent). Added.

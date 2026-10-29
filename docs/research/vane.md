@@ -109,7 +109,7 @@ Browser (React 18, Next 16 app router)                     Docker "full" image (
   - (a) seeds values from env vars on boot (`initializeFromEnv`)
   - (b) renders the Settings dialog and setup wizard (`src/components/Settings/SettingsField.tsx`, `src/components/Setup/SetupWizard.tsx`)
   - Providers coming from env are de-duplicated by `sha256` of the sorted config (`src/lib/utils/hash.ts: hashObj`).
-- **Bundled SearXNG config** (`searxng/settings.yml`, 17 lines, MIT as part of Vane):
+- **Bundled SearXNG config** (`searxng/settings.yml`, 17 lines, MIT as part of Vane; the excerpt below is condensed into flow style, the real file uses block style):
 ```yaml
 use_default_settings: true
 general: { instance_name: 'searxng' }
@@ -117,6 +117,7 @@ search: { autocomplete: 'google', formats: [html, json] }   # json is what avoid
 server: { secret_key: 'a2fb…852b' }   # committed; comment says overridden by ${SEARXNG_SECRET}
 engines: [ { name: wolframalpha, disabled: false } ]
 ```
+  - Nothing in `Dockerfile`, `entrypoint.sh` or `docker-compose.yaml` sets `SEARXNG_SECRET`, so every full image runs with the same committed `secret_key` despite the comment.
   - `searxng/limiter.toml` sets only `[botdetection.ip_limit] link_token = true`. `server.limiter` is never enabled in settings.yml, so this is likely inert (inferred).
   - `searxng/uwsgi.ini` is copied but **unused**: the entrypoint uses Flask's dev server.
   - README "Using Vane with Your Own SearxNG Instance" requires **JSON format enabled** and the **Wolfram Alpha engine enabled**.
@@ -169,7 +170,7 @@ n/a. Vane has **no user rules, blocklists or domain preferences**. The README ad
 - **Anti-pattern:** one embedding call per search result (`embedText([content])` inside `map`) instead of a single batched call, then O(n²) pairwise dedupe.
 
 ## License and what it means for us
-- MIT: we may copy small pieces with attribution, e.g. the `searxng/settings.yml` shape or the `SessionManager` replay idea. It is ideas we need, though, not code.
+- MIT: we may copy pieces provided the copyright and permission notice travel with them, e.g. the `searxng/settings.yml` shape or the `SessionManager` replay idea. It is ideas we need, though, not code.
 - **Caution on SearXNG**: Vane's image *contains* AGPL SearXNG (cloned at build time). If search-hole ships a bundled SearXNG, do it as a **separate, unmodified, pinned official `searxng/searxng` container** in our `compose.yaml`, never baked into our image. Talking to it over HTTP keeps our code outside AGPL (§5.2). Never copy SearXNG code (§10 license hygiene).
 
 ## Implications for search-hole
@@ -179,11 +180,13 @@ n/a. Vane has **no user rules, blocklists or domain preferences**. The README ad
   - keep a ~10 s timeout but add retry/backoff and suspension
   - map **HTTP 403 to "JSON format not enabled"** with a `doctor` hint, instead of Vane's bare `statusText`
 - [engine-adapter] **Source types are a per-request push-down** in SearXNG, as Vane's academic → `arxiv,google scholar,pubmed` and discussions → `reddit` show. Our profiles can push `engines`/`categories` per request even though the hostnames plugin is instance-only (§5 step 3), e.g. coding profile → `categories=it`, research → scholarly engines.
+  - **Engine names drift and fail silently.** At the pinned SearXNG commit (c360868) there is no `reddit` engine in `searx/settings.yml` or `searx/engines/`, while `arxiv`, `google scholar`, `pubmed`, `bing news`, `bing images` and `youtube` do exist. SearXNG drops unknown names in `engines=`, and if none are valid it falls back to the default categories and still returns 200 (`webadapter.py: parse_generic`). So Vane's "discussions" source can quietly turn into a plain web search on a current SearXNG. Our adapter must validate profile engine lists against `/config` and report skipped names in the receipt.
+  - `engines=` also works for engines that are `disabled: true` by default (e.g. `google images`), because disabled engines are loaded; `inactive: true` engines are not.
 - [runtime-packaging] **Bundled SearXNG:**
   - ship `compose.yaml` with the **official image pinned by tag/digest**
   - mount our own minimal `settings.yml` (`use_default_settings: true`, `search.formats: [html, json]`, `server.secret_key` generated at install, *not committed*, limiter decided explicitly)
   - **bind to 127.0.0.1** only, and add a real healthcheck that `doctor` and the gateway read
-  - avoid Vane's unpinned `git clone` of HEAD, Flask dev server on 0.0.0.0, NOPASSWD sudo and committed secret
+  - avoid Vane's unpinned `git clone` of HEAD, Flask dev server on 0.0.0.0, NOPASSWD sudo and committed secret (which nothing overrides)
 - [runtime-packaging] Vane's full/slim split (bundled vs bring-your-own SearXNG URL via `SEARXNG_API_URL`) is the right shape. Our equivalent is `searchhole doctor` offering "start bundled SearXNG (Docker present)" or "point at existing instance URL", plus validation that JSON is enabled.
 - [merge-algorithm] Vane's ranking is **embedding similarity with silent drops** (≤ 0.5), **exact-string URL dedupe** and no engine weighting. It is non-deterministic across embedding models and unexplainable. This confirms our plan: canonical-URL dedupe, then RRF across engines, then rule weights, then pins, then blocks, recording a decision for **every** result including dropped ones (§5 steps 5–6). Never discard a result without a recorded reason.
 - [date-extraction] Vane has **no date handling at all**: it ignores SearXNG `publishedDate` and only tells the LLM today's date. Freshness and receipts are a clear differentiator. Use SearXNG `publishedDate` (when its engines supply it) as tier 1 and fall back to page metadata via `fetch`.
@@ -195,7 +198,7 @@ n/a. Vane has **no user rules, blocklists or domain preferences**. The README ad
   - copy the 3-cards + "View N more" pattern for the in-chat card (it fits Claude's 4–5 data point limit)
   - copy the step timeline for the session receipt
   - copy citation-style index chips for result rows
-  - **don't load favicons from `s2.googleusercontent.com`**: Vane leaks every source URL/domain to Google (`MessageSources.tsx`, `AssistantSteps.tsx`), and MCP App CSP blocks it anyway. Use a letter avatar, or favicons fetched and cached by our own fetcher.
+  - **don't load favicons from `s2.googleusercontent.com`**: Vane leaks the full source URL (`MessageSources.tsx`, `domain_url=` parameter) or the domain (`AssistantSteps.tsx`) of every source to Google, and the MCP App default CSP blocks it anyway (§3). Use a letter avatar, or favicons fetched and cached by our own fetcher.
 - [ui-ux] Vane's domain label regex `url.replace(/.+\/\/|www.|\..+/g,'')` turns `docs.python.org` into `docs`. Use a public-suffix-aware registrable domain plus a mono, middle-truncated full host (§8.4).
 - [dashboard-process-model] The **event-log replay on reconnect** (`session.ts`) is the right resume model for our live log. Implement it with SSE `id:` plus `Last-Event-ID`, mapped to SQLite `rowid > last` (§4 runtime topology). Avoid Vane's NDJSON served as `text/event-stream` without SSE framing, and its in-memory-only state (lost on restart).
 - [upgrades-migrations] **Anti-patterns to rule out in the ADR:**
@@ -203,9 +206,9 @@ n/a. Vane has **no user rules, blocklists or domain preferences**. The README ad
   - startup that continues after a failed migration
   - config overwritten with defaults on a parse error
   - Ours: migrations in a single transaction under a lock; on a newer or failed schema, go read-only with a clear message (§4); on a bad `rules.yaml`, keep the last good compiled rules, show the parse error, **never overwrite the user's file**; atomic writes (temp file + rename).
-- [sqlite-driver] Vane's better-sqlite3 + drizzle is fine inside a Docker image where the native module is compiled at build time. That is the **opposite** of our plugin/npx constraint, so it is no evidence for better-sqlite3 in our case. Its lack of WAL/busy_timeout would also break our multi-writer topology.
+- [sqlite-driver] Vane's better-sqlite3 + drizzle is fine inside a Docker image where the native module is compiled at build time. That is the **opposite** of our plugin/npx constraint, so it is no evidence for better-sqlite3 in our case. It also sets no pragmas, so no WAL (journal mode stays at the default), which would not suit our multi-writer topology. Whether better-sqlite3 applies its own default busy timeout is not visible in this repo (unverified).
 - [key-storage] Vane keeps provider API keys **in plaintext `config.json`** and **returns them unmasked from `GET /api/config`**, and `POST /api/config` lets anyone set any key path. For us: keys never in rules/config files (§6 "Refuse secrets"), the dashboard shows only "set / missing / source", never values (§4), and every write endpoint requires the dashboard session token.
-- [security] **Vane binds 0.0.0.0 with no auth** on any route. A LAN peer can read keys, change `search.searxngURL` (an SSRF pivot) or run the Playwright scraper against internal URLs (no SSRF guard; `--no-sandbox`; stealth UA). search-hole's `fetch` must have: a private-network/SSRF guard, an honest UA, robots.txt, no browser stealth (§2.8 "Respect the web"), and a dashboard bound to 127.0.0.1 with a token and Host allowlist (smart-doctor pattern).
+- [security] **Vane has no auth on any route and is published on all host interfaces** (compose `3000:3000`; the repo sets no bind address for the Next standalone server, so its default applies; the bundled Flask SearXNG binds 0.0.0.0:8080 inside the container but compose does not publish 8080). There is no middleware and no auth code for its own routes. A LAN peer can read keys (`GET /api/config`), change `search.searxngURL` (`POST /api/config`; an SSRF pivot) or make the Playwright scraper fetch internal URLs, via the LLM-driven `scrape_url` tool through `/api/chat` or `/api/search` (no SSRF guard; `--no-sandbox`; stealth UA). search-hole's `fetch` must have: a private-network/SSRF guard, an honest UA, robots.txt, no browser stealth (§2.8 "Respect the web"), and a dashboard bound to 127.0.0.1 with a token and Host allowlist (smart-doctor pattern).
 - [testing] Vane has zero tests, a pipeline that depends on an LLM and embeddings, and no way to replay a search. Our deterministic core (§2.5) plus recorded engine fixtures are what make rules and merging testable offline.
 - [distribution] A one-line `docker run` with a named volume and a full/slim image pair is a proven self-host UX for the v2 remote connector (`compose.yaml` with SearXNG, §9.5). A multi-arch (amd64/arm64) build matrix is table stakes.
 - [other] Positioning: Vane is a *chat app* that owns the answer, so it can't govern Claude Code, Cursor or Codex searches. Our README comparison row (§1) is accurate. Users who run Vane already have a JSON-enabled SearXNG we can reuse (`SEARXNG_API_URL`-style config).
@@ -229,3 +232,14 @@ n/a. Vane has **no user rules, blocklists or domain preferences**. The README ad
 - Third-party favicon services (Google s2) that leak browsing to Google.
 - Browser stealth (webdriver masking, spoofed UA, `--no-sandbox`) and scraping without an SSRF guard or robots.txt.
 - Persisting sources as opaque JSON blobs (we need relational `results` rows for the dashboard and stats).
+
+## Verification
+Date: 2026-10-29. Checked against `research/refs/vane` @ 348feca (read-only; no ref code was run). Claims checked: about 85 (MIT licence and the SearXNG-in-image caveat, every "Implications for search-hole" bullet, and the mechanisms they rely on: SearXNG client, embed/rerank thresholds, iteration and query budgets, schema and migrations, config handling, session replay, Dockerfile/compose/CI, scraper, UI components). No SearXNG code is in the repo and none was copied.
+
+Corrections made:
+- Source-type push-down bullet: `reddit` does not exist as an engine in the pinned SearXNG commit, and unknown `engines=` names are dropped silently with fallback to default categories, so Vane's "discussions" source can quietly become a web search. Added the requirement to validate engine lists against `/config`; noted that `disabled` engines still work with explicit `engines=`.
+- Security bullet: "binds 0.0.0.0" was only partly supported. The repo shows compose publishing `3000:3000` and a Flask SearXNG on 0.0.0.0:8080 (not published by compose); the Next bind default is not set in the repo. Scraper abuse is reachable through the LLM-driven `scrape_url` tool, not a direct route. Added `GET`/`POST /api/config` as the key-read and `searxngURL`-write paths.
+- Committed `secret_key`: nothing in the Dockerfile, entrypoint or compose sets `SEARXNG_SECRET`, so the committed key is always used. Settings excerpt labelled as condensed.
+- Favicon leak: `MessageSources.tsx` sends the full URL (`domain_url=`), `AssistantSteps.tsx` only the domain.
+- SQLite driver bullet: "no busy_timeout" is not provable from this repo (better-sqlite3's own default is not visible); reworded to "no pragmas, no WAL" and marked the busy-timeout point unverified.
+- MIT wording: copying requires the copyright and permission notice to travel with the copied portions.

@@ -160,7 +160,7 @@ n/a: the spec defines no config file. Hosts' MCP config files (`.mcp.json` etc.)
 - `experimental` capability bags.
 
 ## Rules / lists: parsing and compilation
-n/a: protocol spec. The nearest analogue is JSON Schema handling (`basic/index.mdx` §"JSON Schema Usage", line 247): the default dialect is 2020-12, `$ref` resolution is required, and composition keywords have resource bounds. Our zod-derived schemas should stay simple object schemas.
+n/a: protocol spec. The nearest analogue is JSON Schema handling (`basic/index.mdx` §"JSON Schema Usage", line 247): the default dialect is 2020-12, `$ref`s that resolve to a network URI MUST NOT be dereferenced automatically (an opt-in fetch mode must be off by default), and composition keywords SHOULD have resource bounds. Our zod-derived schemas should stay simple object schemas.
 
 ## Testing strategy
 - The schema is TypeScript-first. `npm run check:schema` runs `tsc --noEmit` + eslint + prettier, regenerates `schema.json` with `--check`, validates every example under `schema/<rev>/examples/` (`scripts/validate-examples.ts`), and diffs the typedoc-rendered `schema.mdx` (`package.json` scripts). SEPs are rendered and checked (`check:seps`). Docs links are checked with `mint broken-links`.
@@ -178,7 +178,7 @@ n/a: protocol spec. The nearest analogue is JSON Schema handling (`basic/index.m
 - No resumability and no sessions: a broken stream simply means "re-issue the request" (`changelog.mdx` major 9). The gateway needs no event store.
 
 ## License and what it means for us
-The license is permissive. We may implement the spec freely, vendor `schema.json` and examples as test fixtures, and quote short passages of spec text with attribution. Documentation prose (not the spec) is CC-BY-4.0, so attribute anything adapted from `docs/docs/**` or the blog. No copyleft concerns.
+The license is permissive. We may implement the spec freely, vendor `schema.json` and examples as test fixtures (keeping a copy of the root `LICENSE`, which carries the Apache-2.0 text and the MIT notice, next to the vendored files), and quote short passages of spec text with attribution. Documentation prose (not the spec) is CC-BY-4.0, so attribute anything adapted from `docs/docs/**` or the blog. No copyleft concerns.
 
 ## Implications for search-hole
 - [session-definition] **The spec settles it: "session" cannot be a process or connection.** *"a server must not treat connection or process identity as a proxy for conversation or session continuity"*, and hosts are told not to tie stdio process lifetime to conversations (`basic/index.mdx` §"Statelessness"). So the ADR should define a **search-hole session as an explicit, server-minted handle**. `search` mints a `receiptId`, a ≥128-bit opaque id such as `rcpt_<base64url 22 chars>`, the first time it is called without one. It accepts an optional `receiptId` argument so the model threads it through later searches and fetches. `receipt` takes `receiptIds`. This is exactly the SEP-2567 "explicit state handle" pattern (`seps/2567-sessionless-mcp.md` §"Explicit state handles"; `server/tools.mdx` §"Stateful Tools"). Process lifetime plus an idle gap can remain a **fallback grouping label** for hosts that never pass a handle (Desktop), but never as the source of truth. In Claude Code, the hook `session_id` stays the strongest correlation key for the Stop-hook line.
@@ -202,7 +202,7 @@ The license is permissive. We may implement the spec freely, vendor `schema.json
   - `apply_rule` (app-only): `{readOnlyHint:false, destructiveHint:true}`
 
   Annotations are untrusted hints to the host (they drive auto-approve UX), not security controls.
-- [mcp-tool-surface] `tools/list` must be identical for every connection (`server/tools.mdx` §Capabilities). We cannot hide `apply_rule` for non-Apps clients or vary tools by profile; the per-client difference has to live in `_meta.ui.visibility` (host-enforced) and in argument handling. Use a deterministic order, and return `ttlMs` + `cacheScope:'public'` on `tools/list` and `server/discover` (`caching.mdx`). Tool names `search`, `fetch`, `receipt`, `suggest_rule`, `apply_rule` all satisfy the name rules. Hosts may prefix them when they aggregate servers (§"Tool Names" note).
+- [mcp-tool-surface] `tools/list` *"MUST NOT vary per-connection or as a side effect of other requests on the connection"*; it MAY vary by the authorization on the request (`server/tools.mdx` §Capabilities). The spec says nothing explicit about varying it by per-request client capabilities. The conservative reading, which this note adopts (inferred), is: don't hide `apply_rule` for non-Apps clients, and don't change the list at runtime after a profile switch made through another request. The per-client difference then lives in argument handling, plus the MCP Apps tool `visibility` field. That field is **not documented in this ref**: it comes from `@modelcontextprotocol/ext-apps` (the Inspector reads it in `core/mcp/apps.ts`), so verify it in the ext-apps note. Use a deterministic order, and return `ttlMs` + `cacheScope:'public'` on `tools/list` and `server/discover` (`caching.mdx`). Tool names `search`, `fetch`, `receipt`, `suggest_rule`, `apply_rule` all satisfy the name rules. Hosts may prefix them when they aggregate servers (§"Tool Names" note).
 - [mcp-tool-surface] **The text-vs-structured trade-off is deliberate.** The spec says a tool returning `structuredContent` SHOULD also return the *serialized JSON* as text, for backwards compatibility (`server/tools.mdx` §"Structured Content"). Our token budget (`search` ≤ ~2.5k tokens) argues for a **compact human-readable text block** (numbered results, dates, a hidden-count line) instead of a JSON dump, since the model mostly reads `content`. Record this as a conscious deviation from a SHOULD in the tool-surface ADR, and keep the text deterministic and complete enough that a host which drops `structuredContent` loses nothing material.
 - [mcp-tool-surface] Error mapping. Engine down, blocked domain, expired receipt id, bad freshness value and the like are **tool execution errors** (`isError:true` + an actionable message such as "No healthy engine — run `searchhole doctor`"), so the model can recover (`server/tools.mdx` §"Error Handling"). Use JSON-RPC errors only for protocol faults. Never invent codes in `-32020…-32099`; app-specific codes, if any, go outside `-32768…-32000` (`basic/index.mdx` §"Error Codes").
 - [ui-ux] **Ask-first via MRTR is spec-legal for `tools/call`**, with these constraints (`basic/patterns/mrtr.mdx`):
@@ -213,27 +213,30 @@ The license is permissive. We may implement the spec freely, vendor `schema.json
   - for clients without elicitation, fall back to "plan as text" (plan §5 step 2)
 
   Elicitation is Active, not deprecated (`client/elicitation.mdx`).
-- [security] Elicitation form mode **must not ask for API keys** (`client/elicitation.mdx` §"User Interaction Model"). `doctor`/first-run cannot collect a Brave or Kagi key through an in-chat form. Use host `userConfig`/MCPB `user_config` (keychain), env vars, the CLI, or a URL-mode elicitation that opens the local dashboard's key page (the user enters the key out of band; the dashboard is token-protected, so it can verify the opener) (inferred design).
+- [security] Elicitation form mode **must not ask for API keys** (`client/elicitation.mdx` §"User Interaction Model"). `doctor`/first-run cannot collect a Brave or Kagi key through an in-chat form. Use host `userConfig`/MCPB `user_config` (keychain), env vars, the CLI, or a URL-mode elicitation that points at the local dashboard's key page, where the user enters the key out of band (inferred design). Spec constraints on that last option (`client/elicitation.mdx` §"Safe URL Handling"):
+  - send it only if the request declares `elicitation.url`. A bare `elicitation: {}` means form only.
+  - the server **MUST NOT** send a pre-authenticated URL, so the dashboard token must **not** ride in the elicited URL (not even in the fragment). The user's browser has to authenticate to the dashboard separately.
+  - the URL must not carry credentials or PII, and SHOULD be HTTPS outside development.
 - [security] `requestState` and handles: integrity-protect anything that influences business logic, bind the TTL and the originating method, and enforce single-use server-side where needed (`mrtr.mdx` server requirements 4–5). Rule changes must never be authorised by `requestState` or by possessing a handle. They stay with the user-action paths (§12.4).
 - [security] HTTP mode (v2 connector, or a local HTTP entry if ever used):
   - **validate `Origin` (403)**, bind 127.0.0.1 when local
   - require and verify `MCP-Protocol-Version`/`Mcp-Method`/`Mcp-Name` against the body (`-32020`, 400)
   - answer GET/DELETE with `405`, ignore `Mcp-Session-Id` and `Last-Event-ID`
-  - cap body size (`basic/transports/streamable-http.mdx` §"Security & Endpoint", §"Server Validation")
+  - cap body size (our own rule, not a spec one; the TS SDK defaults to 4 MiB with `413`, see `mcp-typescript-sdk.md`)
 
-  Avoid `x-mcp-header` on `query` (it would put user queries in HTTP headers seen by intermediaries; inferred privacy risk).
+  Sources: `basic/transports/streamable-http.mdx` §"Security & Endpoint", §"Server Validation" and §"Earlier Streamable HTTP Revisions". Avoid `x-mcp-header` on `query` (it would put user queries in HTTP headers seen by intermediaries; inferred privacy risk).
 - [security] Auth for the v2 connector:
   - PRM (RFC 9728) whose `resource` is the canonical server URI
-  - an AS that advertises `client_id_metadata_document_supported: true`, so claude.ai/ChatGPT use CIMD (HTTPS `client_id` URL, `token_endpoint_auth_method:"none"`)
-  - DCR only as a deprecated fallback, with `application_type`
-  - `iss` in authorization responses (RFC 9207)
-  - issuer-bound client credentials (`basic/authorization/client-registration.mdx`, `changelog.mdx` minor 7–9)
+  - an AS that advertises `client_id_metadata_document_supported: true`, so CIMD-capable clients pick CIMD over DCR (HTTPS `client_id` URL with a path; the spec's example uses `token_endpoint_auth_method:"none"`). That claude.ai and ChatGPT do so comes from plan §3, not this ref.
+  - DCR only as a deprecated fallback (`application_type` is a client MUST when registering)
+  - `iss` in authorization responses (RFC 9207; an AS SHOULD)
+  - issuer-bound credentials are a **client** MUST (key by issuer, never reuse across ASes); nothing to implement server-side unless we are also the client (`basic/authorization/client-registration.mdx`, `changelog.mdx` minor 7–9)
 
   Over stdio, the spec says SHOULD NOT do OAuth: engine keys come from the environment, which matches plan §4's key-resolution order.
 - [other] Our own `_meta` keys (e.g. a receipt id on results for the Stop hook or the Apps panel, `dev.searchhole/receiptId`) must use a **non-reserved reverse-DNS prefix**. The second label must not be `mcp` or `modelcontextprotocol` (`basic/index.mdx` §"`_meta`" key format). Put the receipt id in `structuredContent` too, because hosts may strip unknown `_meta` (inferred).
 - [runtime-packaging] stdio duties (`basic/transports/stdio.mdx`): exit promptly on stdin EOF (otherwise orphaned gateways hold DB handles across host restarts); never write non-MCP bytes to stdout; expect to be restarted after a crash, with in-flight calls lost. Startup must therefore be fast and idempotent, consistent with the <300 ms target.
 - [dual-protocol] Cancellation semantics differ by transport: stdio sends `notifications/cancelled`; HTTP closes the response stream (`basic/patterns/cancellation.mdx`). Either way, the gateway must abort engine fan-out and record the search as `cancelled` in the log, not as an error.
-- [ui-ux] The extension matrix (`docs/extensions/client-matrix.mdx`) confirms the plan: the MCP Apps receipt panel renders in Claude web/Desktop, Cursor, VS Code, ChatGPT and Goose, but **not in Claude Code**. When the client doesn't declare `io.modelcontextprotocol/ui`, the server **MUST** revert to core behaviour (`versioning.mdx` §"Extension Negotiation"), so `receipt` always returns full text + `structuredContent`. Claude Code supports the **Tasks** extension: a later option for very long `deep` searches (a durable task handle plus polling) without blocking the turn (`docs/extensions/tasks/overview.mdx`).
+- [ui-ux] The extension matrix (`docs/extensions/client-matrix.mdx`, which describes itself as community-maintained) confirms the plan: the MCP Apps receipt panel renders in Claude web/Desktop, Cursor, VS Code, ChatGPT and Goose, but **not in Claude Code**. When the client doesn't declare `io.modelcontextprotocol/ui`, the server **MUST** revert to core behaviour (`versioning.mdx` §"Extension Negotiation"), so `receipt` always returns full text + `structuredContent`. Claude Code supports the **Tasks** extension: a later option for very long `deep` searches (a durable task handle plus polling) without blocking the turn (`docs/extensions/tasks/overview.mdx`). Caveat: TS SDK v2 (2.4.0) has no Tasks extension support yet. `ROADMAP.md` lists it as pending (#2189), and `tasks/*` must be served with hand-written custom-method handlers (`docs/migration/support-2026-07-28.md` §"Tasks: deprecated wire vocabulary"), so this option has a real implementation cost.
 - [testing] Our e2e tests should assert raw wire invariants from this spec:
   - every result carries `resultType`
   - `tools/list` and `server/discover` carry `ttlMs ≥ 0` + `cacheScope`
@@ -249,7 +252,7 @@ The license is permissive. We may implement the spec freely, vendor `schema.json
   - elicitation is not "replaced": it remains, delivered via MRTR, while sampling, roots and logging are deprecated
   - cache hints are required on `server/discover`, `resources/read` and `resources/templates/list` as well as lists
   - `Mcp-Name` is required only for `tools/call`, `resources/read` and `prompts/get`
-  - DCR is deprecated with earliest removal after 2027-07-28
+  - DCR is deprecated; earliest removal is the "first revision released on or after 2027-07-28" (`deprecated.mdx`)
   - which hosts default to 2026-07-28 is **not documented in this repo**; the GA post lists SDKs, not hosts (`blog/content/posts/2026-07-28-spec-ga/index.md` §SDKs). So the P2 spike must measure it.
 
 ## Borrow / avoid
@@ -267,3 +270,16 @@ The license is permissive. We may implement the spec freely, vendor `schema.json
 - Asking for secrets via form elicitation; trusting `requestState` or handles for authorisation.
 - Codes in `-32020…-32099` we didn't get from the spec; `x-mcp-header` on query text.
 - DCR-first auth for the connector (CIMD first, DCR fallback only).
+
+## Verification
+- Date: 2026-10-29. Checked against `research/refs/mcp-spec` @ 9850cae.
+- Claims checked: 52 (license header and section; every "Implications for search-hole" bullet; the mechanisms they rely on: changelog major/minor items, `deprecated.mdx` dates, `basic/index.mdx` statelessness, `_meta` key rules, error-code ranges, `versioning.mdx` era matrix, stdio and Streamable HTTP rules, `caching.mdx`, `server/tools.mdx` list, name, structured-content and handle rules, `ToolAnnotations` defaults, MRTR server requirements, elicitation rules, the authorization registration order, the extension client matrix, SEP-2567, schema line numbers and file counts).
+- Corrections:
+  1. [mcp-tool-surface] `tools/list`: the spec forbids variation per connection or as a side effect of other requests, and allows it by authorization. "Cannot hide `apply_rule` for non-Apps clients" is marked as a conservative reading. `_meta.ui.visibility` is not documented in this ref (it comes from ext-apps).
+  2. [security] key collection via URL-mode elicitation: the spec says a server MUST NOT send a pre-authenticated URL, so the dashboard token cannot travel in the elicited URL. The request also needs `elicitation.url` declared, since a bare `{}` means form only.
+  3. [security] HTTP: "cap body size" is not a spec rule. It is now marked as our own rule (the TS SDK default is 4 MiB).
+  4. [security] auth: that claude.ai and ChatGPT use CIMD comes from plan §3, not this ref. Issuer-bound credentials and DCR `application_type` are client obligations. `iss` is an AS SHOULD.
+  5. [ui-ux] Tasks option: TS SDK v2 has no Tasks extension support yet (`ROADMAP.md` #2189), so it needs hand-written handlers. Also noted that the client matrix is community-maintained.
+  6. [other] DCR removal: "first revision released on or after 2027-07-28", not "after".
+  7. JSON Schema rules: "`$ref` resolution is required" replaced with the actual rule (network `$ref`s must not be auto-dereferenced).
+  8. License section: vendoring `schema.json` and the examples means keeping the root `LICENSE` next to them.

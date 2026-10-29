@@ -1,5 +1,5 @@
 # langfuse/langfuse
-> Ref: `research/refs/langfuse` @ b1067f3 (2026-10-28) · License: **MIT ("Expat") with an Enterprise carve-out.** Root `LICENSE` ("Copyright (c) 2023-2026 ClickHouse, Inc.") says everything under `ee/`, `web/src/ee/`, `worker/src/ee/` and `packages/shared/src/server/ee/` is under `ee/LICENSE` (the commercial "Langfuse Enterprise license"). Everything else is MIT. The EE directories hold `web/src/ee/features/{admin-api,audit-log-viewer,billing,multi-tenant-sso,sfdc-sync,sso-settings,ui-customization,verified-domains}`, `worker/src/ee/{dataRetention,cloudUsageMetering,…}` and `packages/shared/src/server/ee/{ingestionMasking,fips,licenseCheck,clickhouseBilling}`. `.agents/skills/skill-creator/license.txt` belongs to a vendored agent skill and is irrelevant. Root `package.json` `"version": "4.71.0"`, `"license": "MIT"`.
+> Ref: `research/refs/langfuse` @ b1067f3 (2026-10-28) · License: **MIT ("Expat") with an Enterprise carve-out.** Root `LICENSE` ("Copyright (c) 2023-2026 ClickHouse, Inc.") says everything under `ee/`, `web/src/ee/`, `worker/src/ee/` and `packages/shared/src/server/ee/` is under `ee/LICENSE` (the commercial "Langfuse Enterprise license"). Everything else is MIT (third-party components keep their own licenses). The EE directories hold `web/src/ee/features/{admin-api,audit-log-viewer,billing,multi-tenant-sso,sfdc-sync,sso-settings,ui-customization,verified-domains}`, `worker/src/ee/{dataRetention,cloudUsageMetering,…}` and `packages/shared/src/server/ee/{ingestionMasking,fips,licenseCheck,clickhouseBilling}`. `.agents/skills/skill-creator/license.txt` belongs to a vendored agent skill and is irrelevant. Root `package.json` `"version": "4.71.0"`, `"license": "MIT"`.
 
 ## Purpose
 Langfuse is an open-core LLM observability platform: traces, observations/spans, sessions, scores, evals, prompts and datasets. It is the best open-source reference for a **dense trace/log explorer in React**. It shows how to build data tables with filters in the URL, a peek (side detail) panel with j/k navigation, saved views, a virtualized span tree and a log view. That matches the search-hole dashboard's Live log, its expandable search→results rows, and the later Sessions/receipts view (§8.3). Its backend (Postgres + ClickHouse + Redis/BullMQ + S3, two services) is far heavier than we need. It is mostly useful as a list of what **not** to build for a single-user local tool.
@@ -37,7 +37,7 @@ browser ◄─ tRPC v11 + React Query (polling, no push) ◄─ web
 | j/k detail nav | `web/src/features/navigate-detail-pages/DetailPageNav.tsx:105-131` | Window keydown; ignores inputs, `role="textbox"` and meta/ctrl |
 
 ## Data model and storage
-- **Postgres (Prisma 6.19)**: `packages/shared/prisma/schema.prisma` has 83 `model`s and 463 migration dirs (`packages/shared/prisma/migrations`). It holds the "control plane": orgs, projects, users, API keys, prompts, and the UI state that needs persisting:
+- **Postgres (Prisma 6.19)**: `packages/shared/prisma/schema.prisma` has 83 `model`s and 462 migration dirs (`packages/shared/prisma/migrations`). It holds the "control plane": orgs, projects, users, API keys, prompts, and the UI state that needs persisting:
   - `TableViewPreset` (line 1920): `name`, `tableName`, `filters Json`, `columnOrder Json`, `columnVisibility Json`, `searchQuery`, `orderBy Json`, `createdBy`/`updatedBy`.
   - `DefaultView` (line 1947): a per-user or per-project default view, with `viewId` deliberately un-FK'd so frontend-defined system presets (prefix `__langfuse_`) can be defaults.
 - **ClickHouse**: `packages/shared/clickhouse/migrations/canonical/` has 53 up/down pairs. `0001_traces.up.sql` uses `ReplacingMergeTree(event_ts, is_deleted)`, `PARTITION BY toYYYYMM(timestamp)` and `ORDER BY (project_id, toDate(timestamp), id)`, with `bloom_filter` skip indexes on `id` and on metadata map keys/values, and `ZSTD(3)` codecs on `input`/`output`. `0002_observations.up.sql` adds `parent_observation_id`, `level`, the usage/cost maps and `type LowCardinality(String)`. Soft delete and upserts work through the version column and `is_deleted`.
@@ -86,17 +86,17 @@ n/a. Langfuse has no block/allow rules. The nearest analogue is the **typed filt
    - Removed columns are ignored.
    - Invalid filters or orderBy are dropped with a warning toast.
    - Deleted-view permalinks fall back to defaults silently.
-   - Editing filters, sort or columns deselects the view, but no-op edits keep it.
+   - On the Tracing tables, editing filters, search, sort or columns deselects the view, but no-op edits keep it.
    - "Permalink" copies `?viewId=`.
 4. **Row density switch** (`components/table/data-table-row-height-switch.tsx`): Small/Medium/Large = `h-7`/`h-24`/`h-64` (28/96/256 px) plus a custom height up to 4000 px. Resizing updates only the dragged row's DOM during the drag, and commits one shared height on release (`components/table/README.md`).
 5. **Faceted sidebar filters** with a summary line per facet (`components/table/FacetHeader.tsx`, `features/filters/lib/facet-display.ts`). Options come from a dedicated `filterOptions` query, not from the visible page.
 6. **Setup page that polls until data arrives**: `TracesSetupPage.tsx:104-120` uses `refetchInterval: project?.hasTraces ? false : 5000`, so the empty state flips to the table automatically. That is the "empty states teach" pattern from §8.4.8.
 7. **Typography and token discipline** (`web/src/styles/globals.css`):
    - Exactly two font weights (`--font-weight-regular: 400`, `--font-weight-bold: 600`); "font-medium / font-semibold… are drift".
-   - Mono is IBM Plex Mono, loaded locally (`styles/fonts.ts`, `next/font/local`).
-   - Unused Tailwind palettes are disabled (`--color-cyan-*: initial;` …) so off-token colors can't be used.
+   - Mono is IBM Plex Mono, loaded locally (`styles/fonts.ts`, `next/font/local`). The sans face is deliberately deferred: the app ships system stacks and the weight roles stay font-relative.
+   - Some unused Tailwind palettes are disabled (`--color-cyan-*: initial;`, lime, sky, fuchsia, rose, neutral, stone, slate, zinc, indigo) so off-token colors can't be used. A TODO in the file says the rest (red, orange, amber, yellow, green, emerald, teal, blue, violet, purple, pink, gray) are still enabled.
    - Tailwind v4 `@theme static` / `@theme inline`, with `@custom-variant dark (&:where(.dark, .dark *))`.
-8. **Design-system boundary** (`components/design-system/README.md`): presentational components only, one export per folder, compound subcomponents via `Object.assign`, and no imports from `features/`. Icons go through a typed wrapper package (`packages/icons/README.md`: `size="sm|base|lg"` = 12/14/20 px over Lucide `^0.552.0`).
+8. **Design-system boundary** (`components/design-system/README.md`): presentational components only, one export per folder, compound subcomponents via `Object.assign`, and no imports from `features/`. Icons go through a typed wrapper package (`packages/icons/README.md`: `size="sm|base|lg|xl"` = 12/14/20/28 px, `base` is the default, over Lucide `^0.552.0`).
 9. **Charts are hand-rolled on d3 primitives** (`d3-scale`, `d3-shape`, `d3-zoom` in `web/package.json`; `components/design-system/internal/charts/{SeriesChartCore,BarChartCore}.tsx`). **There is no Recharts dependency in this ref**, which corrects the premise in our §8.2 that "Langfuse… use… Recharts".
 10. The **dense timeline** (`features/traces/components/TraceTimelineDense/TimelineDense.tsx` header comment) is driven "like a map": no scrollbars, wheel pans both axes, ⌘/ctrl+wheel and pinch zoom about the cursor, drag-box zoom, and double-click to focus an element. That fits a future receipt timeline. It is overkill for v1.
 
@@ -124,7 +124,7 @@ n/a. Langfuse has no block/allow rules. The nearest analogue is the **typed filt
 - Its stack (Next.js, tRPC, Prisma, ClickHouse) is not ours, so in practice we will borrow patterns, not code.
 
 ## Implications for search-hole
-- [dashboard-process-model] Langfuse has **no push channel**. Tables auto-refresh by polling at fixed intervals `Off/30s/1m/5m/15m` (`components/table/utils/refresh-intervals.ts`), and setup pages poll every 5 s. Our "live but calm" Live log needs a push tail (SSE over `rowid > last`, per §4). Langfuse is evidence that a manual refresh plus an interval selector is an acceptable fallback for the non-live tables (Rules, Engines, Sources).
+- [dashboard-process-model] Langfuse's **tables and trace views have no push channel**. Tables auto-refresh by polling at fixed intervals `Off/30s/1m/5m/15m` (`components/table/utils/refresh-intervals.ts`, a `setInterval` that invalidates the queries in `TracesTable.tsx:255-258`), and the setup page polls every 5 s until the project has traces. The only SSE in the web app is the in-app agent chat stream (`features/in-app-agent/server/watchHandler.ts` returns `text/event-stream` and takes a `cursor` query param, i.e. a resumable cursor like our `Last-Event-ID` idea), which is not used for lists. Our "live but calm" Live log needs a push tail (SSE over `rowid > last`, per §4). Langfuse is evidence that a manual refresh plus an interval selector is an acceptable fallback for the non-live tables (Rules, Engines, Sources).
 - [ui-ux] Split every table query into **rows (keyset page) / count / per-row metrics**, as `TracesTable.tsx:515-535` does. That way a slow `COUNT(*)` over 100k SQLite rows never blocks first paint. Show "≥ N" or a skeleton until the count arrives.
 - [ui-ux] Take Langfuse's **paginate history, virtualize bounded lists** split, adapted for us:
   - **Live log**: a virtualized window over a bounded in-memory ring of the latest N searches (fixed row height in compact mode), plus keyset "load older".
@@ -144,7 +144,7 @@ n/a. Langfuse has no block/allow rules. The nearest analogue is the **typed filt
   - disable unused Tailwind v4 palettes in `@theme`
   - one typed icon wrapper with 3 sizes
 - [ui-ux] §8.2 says Langfuse uses Recharts. This ref uses **d3 primitives in its own design system** instead. That doesn't change our pick (shadcn charts + uPlot), but SYNTHESIS should correct the claim.
-- [upgrades-migrations] Borrow the **byte-lock on shipped migrations**. A test hashes every released migration file and fails if one changes, so fixes must be new forward migrations (`clickhouse/migrations/README.md`). Forward-only, so `down` files are not shipped.
+- [upgrades-migrations] Borrow the **byte-lock on shipped migrations**, but note what Langfuse actually locks. `prepareMigrations.test.ts` feeds the rendered files for migrations 0001-0047 (94 files, `up` and `down`) into one SHA-256 per mode (clustered, unclustered) and compares it with a hard-coded hash (`historicalMigrationCount = 94`, `historicalMigrationVersion = 47`). Later migrations (0048-0053) are not locked, and the point of the lock is to prove the template renderer still produces the historical bytes, not to police each file. The README rule is that shipped files keep their numbers and names and change only as a deliberate forward fix. For us: hash every released migration file (a manifest of per-file hashes gives a better failure message than one aggregate) and fix mistakes with a new forward migration. Langfuse itself ships `down` files, so "no `down` files" is our choice, not theirs.
 - [sqlite-driver] Langfuse's two-store split (Postgres control plane vs ClickHouse append-only events with `ReplacingMergeTree` versioning and monthly partitions) maps to two table families in **one** SQLite file:
   - mutable config tables: `rules`, `lists`, `suggestions`, `views`
   - append-only, retention-pruned event tables: `searches`, `results`, `fetches`
@@ -177,3 +177,15 @@ n/a. Langfuse has no block/allow rules. The nearest analogue is the **typed filt
 - `use-query-params` string codecs: use TanStack Router typed search params instead.
 - Anything in the EE directories (license).
 - Shipping 83-model complexity in UI state. Keep views and preferences tiny.
+
+## Verification
+Date: 2026-10-29. Claims checked: 78 (license header and section, EE directory list, every "Implications for search-hole" bullet, and the mechanisms they rely on: refresh intervals, query split, virtualization settings, peek behavior, filter schema and URL codec, saved-view rules, ClickHouse migration files and byte-lock test, token CSS, test config, queue and writer defaults, cited paths).
+
+Corrections made:
+- [dashboard-process-model] "no push channel" was too broad. Tables and trace views poll, but `features/in-app-agent/server/watchHandler.ts` serves `text/event-stream` with a `cursor` parameter. Rewritten to say lists have no push channel.
+- [upgrades-migrations] The byte-lock does not hash "every released migration file". It is one SHA-256 per mode over the rendered migrations 0001-0047 (94 files, up and down), hard-coded in `prepareMigrations.test.ts`. Also Langfuse ships `down` files; "no down files" is our choice. Bullet rewritten.
+- Token CSS: only some Tailwind palettes are disabled (a TODO lists the rest), the sans face is system fonts (only mono is IBM Plex), and the icon wrapper has 4 sizes (sm/base/lg/xl = 12/14/20/28), not 3.
+- Saved views: "editing deselects the view" applies to the Tracing tables.
+- Counts: 462 migration directories (463 entries include `migration_lock.toml`).
+- License section: noted that third-party components keep their own licenses.
+- Verified, no change: MIT root license with the four EE directories under `ee/LICENSE`, version 4.71.0, no Recharts anywhere in the repo (the plan's claim about Langfuse and Recharts is wrong), vaul in the peek README, overscan 16 / threshold 350 / row heights / `getItemKey`, filter operators and `discriminatedUnion`, URL codec format.

@@ -1,5 +1,5 @@
 # mitmproxy/mitmproxy
-> Ref: `research/refs/mitmproxy` @ df14a28 (2026-10-27) · License: **MIT** (`LICENSE`, "Copyright (c) 2013, Aldo Cortesi. All rights reserved." followed by the MIT grant). Vendored exceptions: `mitmproxy/contrib/click/LICENSE.BSD-3` (BSD-3-Clause, Pallets) and `mitmproxy/contrib/kaitaistruct/LICENSE` ("Either MIT or CC-0 - see the individual .ksy files"). `test/wg-test-client/LICENSE` is test-only. `release/installbuilder/license.xml.enc` is an encrypted installer licence and irrelevant. No copyleft.
+> Ref: `research/refs/mitmproxy` @ df14a28 (2026-10-27) · License: **MIT** (`LICENSE`, "Copyright (c) 2013, Aldo Cortesi. All rights reserved." followed by the MIT grant). Vendored exceptions under `mitmproxy/contrib/`: `click/LICENSE.BSD-3` (BSD-3-Clause, Pallets), `kaitaistruct/LICENSE` ("Either MIT or CC-0 - see the individual .ksy files"), `wbxml/` (MIT, David P. Shaw, notice in each file header) and `imghdr.py` (PSF-2.0, copied from CPython 3.12). `test/wg-test-client/LICENSE` is test-only. `release/installbuilder/license.xml.enc` is an encrypted installer licence and irrelevant. No copyleft.
 
 ## Purpose
 An interactive HTTP(S)/TCP/UDP/DNS intercepting proxy with three front-ends:
@@ -20,7 +20,7 @@ WebMaster (mitmproxy/tools/web/master.py) ─► ClientConnection.broadcast_flow
                                            ▲                      │ per-connection compiled filters
 REST: /flows, /events, /options, /state, /flows/<id>/replay|duplicate|revert|kill|resume, …
                                            │                      ▼
-React 19 SPA (web/src/js) ◄── fetch snapshot + WebSocket deltas ── Redux Toolkit store (hand-written reducers)
+React 19 SPA (web/src/js) ◄── fetch snapshot + WebSocket deltas ── Redux Toolkit store (flows reducer hand-written)
 ```
 - Web deps (`web/package.json`): `react ^19.1.0`, `@reduxjs/toolkit ^2.8.1`, `react-redux ^9.2.0`, `codemirror ^6.0.1`, `vite ^7.2.2`, `typescript ^5.8.3`, `jest ^29.7.0`. **No virtualization library and no table library**: list virtualization is hand-written (`components/helpers/VirtualScroll.tsx`).
 - `mitmweb` defaults (`mitmproxy/tools/web/webaddons.py: WebAddon.load`): `web_host "127.0.0.1"`, `web_port 8081`, `web_open_browser True`, `web_theme "system"` (choices system/dark/light), `web_columns ["tls","icon","path","method","status","size","time"]`.
@@ -34,7 +34,7 @@ React 19 SPA (web/src/js) ◄── fetch snapshot + WebSocket deltas ── Red
 | `mitmproxy/proxy/layers/http/_hooks.py` | HTTP hooks: `HttpRequestHeadersHook`, `HttpRequestHook`, `HttpResponseHeadersHook`, `HttpResponseHook`, `HttpErrorHook`, `HttpConnectHook`, `HttpConnectUpstreamHook`, `HttpConnectedHook`, `HttpConnectErrorHook` |
 | `mitmproxy/flowfilter.py` (848 lines) | Filter language, a pyparsing grammar (`_make()`, line 737), `parse()`, `match()`, generated `help` list |
 | `mitmproxy/addons/view.py` | The in-memory store the UI reflects: `sortedcontainers.SortedListWithKey`, options `view_filter`, `view_order`, `view_order_reversed`; signals |
-| `mitmproxy/addons/blocklist.py` | `block_list` option `"/flow-filter/status"`; first matching spec sets `flow.metadata["blocklisted"] = True` and answers with that status (444 = kill) |
+| `mitmproxy/addons/blocklist.py` | `block_list` option `"/flow-filter/status"`; the `request` hook loops over **all** specs with no `break`, so every matching spec sets `flow.metadata["blocklisted"] = True` (a bare boolean, not a rule id) and writes its response, and the last match wins (444 = kill) |
 | `mitmproxy/addons/clientplayback.py` | Replay: re-injects the request through the proxy core via a `MockServer` layer, sets `is_replay = "request"`, `client_replay_concurrency` ∈ {-1, 1} |
 | `mitmproxy/addons/export.py` | `curl_command`, `httpie_command`, raw; exposed as the `export` command |
 | `mitmproxy/addons/eventstore.py` | Event log, `collections.deque(maxlen=10000)` |
@@ -53,6 +53,7 @@ React 19 SPA (web/src/js) ◄── fetch snapshot + WebSocket deltas ── Red
 2. On open, flush queued client messages and GET `./state`, `./flows`, `./events` and `./options` in parallel.
 3. While a resource is being fetched, buffer its WebSocket messages in `activeFetches[resource]`. After the snapshot arrives, dispatch `*_RECEIVE` and then replay the buffer.
 4. `flows/reset` / `events/reset` trigger a refetch.
+5. There is no automatic reconnect: `onClose` only dispatches a connection error (`backends/websocket.tsx`). Resume-after-reconnect is something we get from `EventSource` plus `Last-Event-ID`, not from mitmweb.
 
 Server → client message types:
 - `flows/add`, `flows/update`: `{flow, matching_filters: {search?: bool, highlight?: bool}}`
@@ -60,7 +61,7 @@ Server → client message types:
 - `flows/filterUpdate`: `{name, matching_flow_ids | null}`
 - `flows/reset`, `events/add`, `events/reset`, `options/update`, `state/update`
 
-Client → server: only `flows/updateFilter {name, expr}`. The **server compiles and evaluates the filter** for each connection (`app.py: ClientConnection.update_filter`, line 467) and returns the matching ids. Each later add/update carries per-connection `matching_filters` (`_broadcast_flow`, line 449). The reducer comment (`ducks/flows/index.ts:72-77`) documents the race: "We may see flows/add events for flows that are already in the view, or update/remove events for flows that aren't known at all. The reducer needs to handle these cases gracefully."
+Client → server: only `flows/updateFilter {name, expr}`. The **server compiles and evaluates the filter** for each connection (`app.py: ClientConnection.update_filter`, line 467) and returns the matching ids. Each later add/update carries per-connection `matching_filters` (`_broadcast_flow`, line 449). The reducer comment (`ducks/flows/index.ts:75-81`) documents the race: "We may see flows/add events for flows that are already in the view, or update/remove events for flows that aren't known at all. The reducer needs to handle these cases gracefully."
 
 ## Data model and storage
 - In-memory only. `View` holds the flows. Persistence is opt-in: the `.mitm` flow-dump format via `mitmproxy/io` and the `save` addon (`addons/save.py`), and `savehar.py` for HAR. There is no database.
@@ -68,7 +69,7 @@ Client → server: only `flows/updateFilter {name, expr}`. The **server compiles
 - The client keeps `list` (server order) and `view` (filtered + sorted) arrays with **id→index `Map`s** (`_listIndex`, `_viewIndex`) for O(1) lookups (`ducks/flows/_utils.ts: buildIndex`).
 
 ## Config format
-- Typed options registered by addons (`loader.add_option(name, type, default, help, choices)`, `addonmanager.py: Loader.add_option`, line 70). Options are set by CLI `--set k=v`, a YAML config file (`~/.mitmproxy/config.yaml`, inferred from docs naming), or the web Options editor (`/options`, `/options/save`). `configure(updated: set[str])` is called with the changed keys, including all keys at startup (`hooks.py: ConfigureHook`).
+- Typed options registered by addons (`loader.add_option(name, type, default, help, choices)`, `addonmanager.py: Loader.add_option`, line 70). Options are set by CLI `--set k=v`, a YAML config file (`config.yaml` in the confdir, default `~/.mitmproxy/`; `mitmproxy/tools/main.py:88`), or the web Options editor (`/options`, `/options/save`). `configure(updated: set[str])` is called with the changed keys, including all keys at startup (`hooks.py: ConfigureHook`).
 - Web-specific options include `web_password`. A value starting with `$` is an **argon2 hash**, otherwise plaintext with a warning. If it is empty, a random `secrets.token_hex(16)` token is generated at startup (`webaddons.py: WebAuth`).
 - TS option types are **generated** from Python (`web/gen/options_js.py` → `web/src/js/ducks/_options_gen.ts`).
 
@@ -100,14 +101,14 @@ The filter language (`mitmproxy/flowfilter.py` docstring and classes):
 - Compilation: `parse(s)` → a tree of callable `_Token`s (`FAnd/FOr/FNot` + actions). Each node has a **human-readable `__str__`** ("domain matches /x/i", "response code is 404", " and "-joined). `help` is generated from each class's `code`/`help` and served at `/filter-help.json` (`app.py: FilterHelp`, route line 891).
 - The client has a **second grammar** in PEG.js (`web/src/js/filt/filt.peg` → `filt.js`), used only to validate input live and show `.desc` in the filter tooltip (`components/Header/FilterInput.tsx:64-81`). Matching always happens on the server, so the two grammars can drift.
 - Two **named filters** run at once: `search` (hides non-matching rows) and `highlight` (marks matching rows, keeps all), via `ducks/ui/filter.ts: FilterName`.
-- Blocklist spec: `/flow-filter/status` with any separator character, parsed by `blocklist.py: parse_spec`. **First match wins**, and the decision is recorded on the object (`flow.metadata["blocklisted"]`).
+- Blocklist spec: `/flow-filter/status` with any separator character, parsed by `blocklist.py: parse_spec`. Specs are evaluated in order but **not short-circuited**: each matching spec overwrites `flow.response` (or kills the flow), so the **last** match decides. The only record is the boolean `flow.metadata["blocklisted"] = True`; it does not say which spec fired, and no test in `test_blocklist.py` covers two overlapping specs.
 
 ## Testing strategy
-- Python: pytest under `test/mitmproxy/**` (242 `.py` files), mirroring the package layout (`test_flowfilter.py`, `test_addonmanager.py`, `test_hooks.py`, `tools/web/test_app.py`…). Fixtures are factories in the package itself: `mitmproxy/test/tflow.py` (`tflow(resp=True, err=True, ws=True)`), `taddons.py` (a test context for addons) and `tutils.py`.
+- Python: pytest under `test/mitmproxy/**` (226 `.py` files; 242 under `test/`), mirroring the package layout (`test_flowfilter.py`, `test_addonmanager.py`, `test_hooks.py`, `tools/web/test_app.py`…). Fixtures are factories in the package itself: `mitmproxy/test/tflow.py` (`tflow(resp=True, err=True, ws=True)`), `taddons.py` (a test context for addons) and `tutils.py`.
 - **Per-file 100 % coverage gate**: `test/individual_coverage.py`, `pyproject.toml [tool.pytest.individual_coverage]` (line 155) with an exclude list, run by tox env `individual_coverage` (line 317).
 - **Security invariant test**: `test_app.py: test_all_handlers_have_auth` asserts every route handler subclasses `AuthRequestHandler` (line 48).
 - **Generated-file drift test**: `test_generated_files` imports every `web/gen/*.py` generator, re-generates and asserts the checked-in TS equals the output, failing with "must be regenerated by running …" (`test_app.py:39-45`). Generators: `web/gen/tflow_js.py` → `web/src/js/__tests__/ducks/_tflow.ts` (fixture flows from the real Python model), `options_js.py`, `state_js.py`, `backend_consts.py`, `web_columns.py`.
-- Web: Jest (`web/jest.config.js`) with 124 test files under `web/src/js/__tests__/` (ducks, components, backends, `urlStateSpec.tsx`).
+- Web: Jest (`web/jest.config.js`, `testRegex` `__tests__/.*Spec.(js|ts)x?$`) with 120 `*Spec` files among the 124 files under `web/src/js/__tests__/` (ducks, components, backends, `urlStateSpec.tsx`).
 - Web app tests use `tornado.testing.AsyncHTTPTestCase` with a real `WebMaster` (`test_app.py:53+`).
 
 ## UX patterns worth copying
@@ -120,7 +121,7 @@ The filter language (`mitmproxy/flowfilter.py` docstring and classes):
    - Mouse: click selects, ⌘/ctrl-click toggles and shift-click selects a range (`FlowRow.tsx`).
 4. **Detail inspector tabs derived from the data** (`FlowView.tsx: tabsForFlow`): request, then response/websocket only if present, then error only if present, then connection, timing and comment. Each tab is deep-linkable.
 5. **Quick actions on row hover** (a `quickactions` column that "only shows its buttons over the row on hover"; `FlowTable.tsx` comment). Resizable columns, with widths persisted to localStorage (`ducks/ui/columnWidths.ts`). A column chooser via the `web_columns` option.
-6. **Autoscroll only when pinned to the bottom**: `getSnapshotBeforeUpdate` records `isAtBottom` and `componentDidUpdate` restores it (`components/helpers/AutoScroll.tsx`). If the user has scrolled up, new rows never move the viewport.
+6. **Autoscroll only when pinned to the bottom**: `FlowTable.tsx:71-82` (and `EventLog/EventList.tsx`) records `isAtBottom` in `getSnapshotBeforeUpdate` and calls `adjustScrollTop` in `componentDidUpdate`; the two helpers live in `components/helpers/AutoScroll.tsx`. If the user has scrolled up, new rows never move the viewport. A list at `scrollTop === 0` counts as not pinned.
 7. **Connection indicator + event log pane** (`components/Header/ConnectionIndicator.tsx`, `components/EventLog.tsx`) and a **command bar** for power users (`components/CommandBar.tsx`).
 8. **Theme option `system|dark|light`** (`webaddons.py`, `components/helpers/ThemeManager.tsx`, `useTheme.ts`).
 9. **Static export** of the same UI for sharing a capture read-only (`static_viewer.py` + `backends/static.tsx`).
@@ -135,16 +136,16 @@ The filter language (`mitmproxy/flowfilter.py` docstring and classes):
     start = Math.max(0, Math.floor(newViewportTop / rowHeight) - 1) & ~1;
     end = Math.min(itemCount, start + Math.ceil(viewportHeight / rowHeight) + 2);
     ```
-  - It clamps `viewportTop` when many rows disappear at once (PR #5658 note, `FlowTable.tsx:157-166`).
+  - It clamps `viewportTop` when many rows disappear at once (`calcVScroll`, and the PR #5658 note in `FlowTable.tsx:onViewportUpdate`, lines 146-154).
   - It recomputes the window only when the list, row height or column widths change, to avoid a setState loop (comment at lines 80-92).
-- **Hand-written reducers instead of Immer**: "RTK's createSlice always uses Immer, which is orders of magnitude slower" (`ducks/flows/index.ts:71`).
+- **Hand-written reducers instead of Immer** for the flows slice: "RTK's createSlice always uses Immer, which is orders of magnitude slower" (`ducks/flows/index.ts:75`). This is a comment, not a benchmark in the repo, and the reducer is still O(n) per event: `flows/add` spreads `list`, copies the `_listIndex` and `byId` Maps and splices `view` plus a copy of `_viewIndex`, and a prepend (`orderReversed`) re-indexes the whole view.
 - **Incremental sorted maintenance**:
   - `insertViewItem` does a sorted insert.
-  - `updateViewItem` bubbles the item up or down only as far as the comparator requires, rewriting just the shifted indices ("is this overoptimized? yes. was it fun? also yes.", `ducks/flows/_utils.ts`).
+  - `updateViewItem` bubbles the item up or down only as far as the comparator requires, rewriting just the shifted indices ("is this overoptimized? yes. was it fun? also yes.", `ducks/flows/_utils.ts`), though it still copies the view array first.
   - `removeViewItemAt` re-indexes from `pos` only.
 - Column names are fetched once at table level rather than in N row subscriptions (`FlowTable.tsx` connect comment). Rows are `React.memo`.
 - The server serializes each flow **once** per broadcast and evaluates only per-connection filters per client (`broadcast_flow` → `_broadcast_flow(type, f, flow_json)`, `app.py:440-465`).
-- **Per-connection asyncio send queue**: a slow socket doesn't block broadcasts, and a closed socket is dropped (`WebSocketEventBroadcaster.send_task`, `app.py:403-417`).
+- **Per-connection asyncio send queue**: a slow socket doesn't block broadcasts, and a closed socket is dropped (`WebSocketEventBroadcaster.send_task`, `app.py:403-417`). The queue is an unbounded `asyncio.Queue()`, so a stalled client grows memory without limit. `broadcast_flow` also calls `flow_to_json` even when no client is connected.
 - Lazy bodies (contentLength/contentHash on the list, content on demand). Event log bounded at 10 000 entries.
 - Gzip for API and flow files (`GZipContentAndFlowFiles`, `app.py:882`).
 
@@ -160,12 +161,12 @@ MIT (with BSD-3/MIT-or-CC0 vendored bits we don't need). We may copy short snipp
   - Use `rowid` as the SSE event id, so `Last-Event-ID` resumes after a reconnect and a `reset` event forces a refetch (for example after retention pruning or "delete all data").
   - This removes the WebSocket requirement entirely: our client never needs to send filters over the socket if filtering is done by keyset SQL plus a client-side matcher (see the next items).
 - [dashboard-process-model] Copy the server-side habits:
-  - serialize each new row once, with a per-client send queue
-  - skip work when there are no clients
+  - serialize each new row once, with a per-client send queue (bounded in ours: mitmweb's queue is unbounded; on overflow drop the client or send `reset`)
+  - skip work when there are no clients (mitmweb itself does not: `broadcast_flow` serializes even with zero connections. The guard is Uptime Kuma's `emitHeartbeat`)
   - **send summaries, not bodies**: SSE pushes `searches` rows (query, client, counts, latency, decision summary), and `results` for a search load when the row expands (`flow_to_json` lazy-content pattern)
-- [ui-ux] For the 100k-row requirement, mitmweb shows that **fixed row height + spacer rows** (or TanStack Virtual with fixed `estimateSize`) plus **hand-written, index-map reducers** stay fast with very large live lists, without Immer and without a table library. Concretely:
-  - keep `list` + `view` arrays and `id→index` Maps
-  - insert new rows by sorted position (newest first is just a prepend)
+- [ui-ux] For the 100k-row requirement, mitmweb shows the pattern of **fixed row height + spacer rows** (or TanStack Virtual with fixed `estimateSize`) plus **hand-written, index-map reducers**, without Immer and without a table library. It is not proof of 100k rows at 60 fps: the repo has no benchmark and every add/update copies the arrays and Maps (O(n) per event; a prepend re-indexes every row). For us this only works with a bounded ring (the plan's ~2-5k live rows), deltas batched per animation frame, and ideally an index that is arithmetic (rowid offset) rather than a rebuilt Map. Concretely:
+  - keep `list` + `view` arrays and `id→index` Maps (or rowid-based lookup)
+  - insert new rows by sorted position (newest first is a prepend, which is O(n) with a Map index)
   - pause autoscroll unless pinned, which our "23 new" pill already implies
 - [ui-ux] [rule-format-precedence] Define a **search-hole log filter language** in mitmproxy style, compiled to one AST shared by `searchhole log --filter`, the dashboard filter bar and the "test a query" sandbox. Proposed vocabulary (our own):
   - text: `~q <rex>` query text, `~d <rex>` result domain, `~u <rex>` result URL
@@ -181,10 +182,10 @@ MIT (with BSD-3/MIT-or-CC0 vendored bits we don't need). We may copy short snipp
   - a random 128-bit token printed in the URL (`?token=`), also accepted as `Authorization: Bearer`
   - the first valid hit sets a **signed, HttpOnly, SameSite=Strict cookie named per port**
   - constant-time compare (`hmac.compare_digest`), an optional argon2 hash for a fixed password
-  - XSRF cookie; **non-GET requests rejected when `Sec-Fetch-Site` is not `same-origin`/`none`**
-  - CSP `default-src 'self'; connect-src 'self' ws:; img-src 'self' data:`, `X-Frame-Options: DENY`, `nosniff`
+  - XSRF cookie (`_mitmproxy_xsrf`, SameSite=Strict); **non-GET/HEAD/OPTIONS requests rejected when a `Sec-Fetch-Site` header is present and is not `same-origin`/`none`**. A request with no `Sec-Fetch-Site` header (old browsers, curl) is not rejected by that check; it still needs the auth cookie/token and the XSRF token. The check lives in `RequestHandler.prepare`, not in the WebSocket handler
+  - CSP `default-src 'self'; connect-src 'self' ws:; img-src 'self' data:; style-src 'self' 'unsafe-inline'` (so not fully strict: inline styles are allowed), `X-Frame-Options: DENY`, `nosniff`
   - **every handler auto-wrapped with auth** (`__init_subclass__`) and a test that enforces it (`app.py:224-320`; `test_app.py:48`)
-  - mitmweb has **no Host-header allowlist** (inferred: no rebinding or allowed-host check in `mitmproxy/tools/web/*.py`). We add one, plus `127.0.0.1` binding, which mitmweb also defaults to.
+  - mitmweb has **no Host-header allowlist** (grep of `mitmproxy/tools/web/*.py` finds no rebinding, allowed-host or `check_origin` override; Tornado's default same-origin check for WebSockets still applies). We add one, plus `127.0.0.1` binding, which mitmweb also defaults to.
 - [testing] Copy two invariants as tests:
   - (1) "every dashboard route goes through the auth + Host-check middleware" (enumerate the Hono routes)
   - (2) "generated client artifacts are current": generate dashboard/receipt-app types and fixture rows from the zod schemas in `packages/shared` and fail CI if they are stale (`web/gen/*.py` + `test_generated_files`)
@@ -195,7 +196,7 @@ MIT (with BSD-3/MIT-or-CC0 vendored bits we don't need). We may copy short snipp
   - each listener wrapped in a `safecall` that logs and continues, so a failing listener (for example the DB is read-only) never breaks the search path
   - a `configure(updated)`-style hook when rules or lists reload
   - This matches the smart-doctor `AsyncLocalStorage` run-bus idea in §10.
-- [rule-format-precedence] `blocklist.py` confirms the simple semantics we want to explain in the UI: **first matching rule decides, and the decision is stamped on the item** (`flow.metadata["blocklisted"]`). We store `results.decision` + `rule_id` + `list_id`. Our precedence (pin > block > raise/lower …) is richer, but the "stamp the deciding rule" rule is the same.
+- [rule-format-precedence] `blocklist.py` is **not** evidence for first-match-wins: its loop has no `break`, so the last matching spec decides, and what it stamps on the item is only the boolean `flow.metadata["blocklisted"]`, not the deciding rule. Treat it as a cautionary example. We must define precedence explicitly (pin > block > raise/lower …, then first match inside a level, documented and tested with overlapping rules) and stamp the deciding rule ourselves: `results.decision` + `rule_id` + `list_id`.
 - [mcp-tool-surface] [other] **Replay** = "re-run this logged search through today's rules and engines" (`R`), and **dry-run replay** = re-apply only the rules to the stored engine results, with no network. That is cheap, deterministic and good for the "what changed since list v42?" question. **Export** = copy as `searchhole search --explain "<query>" --profile coding --engines brave` (cf. `export.py: curl_command`). Neither needs a new MCP tool. Both are dashboard and CLI features.
 - [distribution] Dashboard start UX: print the tokenized URL and open the browser through a short curated list of openers that degrades to printing the URL on headless machines (`webaddons.py: open_browser`). On a port clash, the error suggests the next port (`master.py:113-118`, "Try specifying a different port by using `--set web_port=…`"). Our single-instance lockfile should instead **reuse the running dashboard** and print its URL.
 - [other] Static export (`static_viewer.py`) → a later "export receipt as a self-contained HTML file" can reuse the dashboard bundle with a static data backend. Low priority, but it argues for a backend interface (`live | static`) in the dashboard data layer from the start.
@@ -220,3 +221,15 @@ MIT (with BSD-3/MIT-or-CC0 vendored bits we don't need). We may copy short snipp
 - No Host allowlist on the UI server.
 - Class components with `getSnapshotBeforeUpdate`: in React 19 use a layout effect plus a ref for the pinned-to-bottom check.
 - Plaintext passwords in options. If we ever add a fixed dashboard password, store only an argon2/scrypt hash, but a random per-run token is enough for v1.
+
+## Verification
+Date: 2026-10-29. Claims checked: 82 (license header and section incl. every vendored directory, every "Implications for search-hole" bullet, and the mechanisms they rely on: filter grammar and operators, blocklist semantics, hook and addon manager behavior, sync protocol, reducer behavior, virtualization snippet, auth and header handling, route table, test invariants, cited paths).
+
+Corrections made:
+- [rule-format-precedence] Wrong: `blocklist.py` is not first-match-wins. Its `request` loop has no `break`, so every matching spec runs and the last one decides, and the only stamp is the boolean `flow.metadata["blocklisted"] = True`, not the deciding rule. Key-modules row, Rules section and the Implications bullet rewritten; our precedence must be defined and tested explicitly.
+- [ui-ux] "Stays fast with very large live lists" is not supported by the source. The flows reducer is hand-written, but each add copies the list and both Maps, and a prepend re-indexes the whole view (O(n) per event); there is no benchmark. Bullet and the performance notes rewritten: pattern yes, 100k-row proof no.
+- [dashboard-process-model] "Skip work when there are no clients" is not a mitmweb habit (`broadcast_flow` serializes with zero connections); the guard comes from Uptime Kuma. The per-client send queue is unbounded. Bullet annotated.
+- [security] The `Sec-Fetch-Site` check only rejects when the header is present and not `same-origin`/`none` (missing header passes), and lives in `RequestHandler.prepare`. CSP also has `style-src 'self' 'unsafe-inline'`. "No Host allowlist" upgraded from inferred to grep-confirmed.
+- License header: added the vendored `mitmproxy/contrib/wbxml/` (MIT, David P. Shaw) and `imghdr.py` (PSF-2.0). Still no copyleft. The pasted `calcVScroll` snippet is MIT, 3 lines, attributed.
+- Smaller fixes: `config.yaml` location confirmed (no longer "inferred"); no automatic WebSocket reconnect in the client; autoscroll logic is in `FlowTable.tsx:71-82` (helpers in `AutoScroll.tsx`); comment line cites (`ducks/flows/index.ts:75`, `FlowTable.tsx:146-154`); test counts (226 under `test/mitmproxy`, 120 `*Spec` Jest files); "hand-written reducers" applies to the flows slice only.
+- Verified, no change: filter code list, naked word = `~u`, juxtaposition = AND, case-insensitive default, `describe()` strings, server-side filter evaluation with per-connection `matching_filters`, argon2/`token_hex(16)`/`compare_digest`, HttpOnly SameSite=Strict cookie per port, `test_all_handlers_have_auth`, `test_generated_files`, 100 % per-file coverage gate, event order, `safecall` isolation.

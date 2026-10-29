@@ -1,5 +1,5 @@
 # pi-hole/web
-> Ref: `research/refs/pi-hole-web` @ fb699c4 (2026-10-17) · License: **EUPL-1.2** for the repo (root `LICENSE`), **except `vendor/`**, "whose licenses are located therein". `vendor/LICENSE` is MIT (AdminLTE, © almasaeed2010). The other vendored libraries (Bootstrap 3, jQuery, DataTables, Chart.js, Select2, moment, daterangepicker, Font Awesome, etc.) carry their own upstream licences. `package.json` declares `"license": "EUPL-1.2"`. **Pi-hole's own files: ideas only.**
+> Ref: `research/refs/pi-hole-web` @ fb699c4 (2026-10-17) · License: **EUPL-1.2** for the repo (root `LICENSE`), **except `vendor/`**, "whose licenses are located therein". `vendor/LICENSE` is MIT (AdminLTE, © almasaeed2010). The other vendored libraries (Bootstrap 3, jQuery, DataTables, Chart.js, Select2, moment, daterangepicker, Font Awesome, etc.) carry their own upstream licences, mostly MIT in their headers. **`vendor/qrious/` is GPL v3** (header of `qrious.min.js`), so nothing under `vendor/` should be lifted without reading the individual header. `package.json` declares `"license": "EUPL-1.2"`. **Pi-hole's own files: ideas only.**
 
 ## Purpose
 The Pi-hole v6 admin UI is a set of **Lua server pages** (`*.lp`) plus plain browser JS (`scripts/js/*.js`, about 11k lines) and CSS themes. The FTL daemon serves it directly (CivetWeb plus embedded Lua; see `pi-hole-ftl.md`). There is **no build step and no SPA framework**: jQuery 3.7, Bootstrap 3.4, AdminLTE 2.4, DataTables 1.10, Chart.js 4.5 (`package.json` dependencies). Every data call is a `fetch` or `$.ajax` to the FTL REST API at `document.body.dataset.apiurl`.
@@ -60,11 +60,11 @@ n/a: no plugin mechanism. Customisation comes from themes, the boxed layout flag
 The UI does no parsing. It does three client-side transforms worth noting:
 - The **wildcard checkbox** on the Domains page turns `example.com` into an anchored "subdomain-or-self" regex and strips a leading `*.` (`groups-domains.js` ~L503-512). The CLI does the same (`pi-hole.md`, `list.sh`).
 - Domains are displayed as the **Unicode form followed by the punycode form in parentheses** when they differ (`groups-domains.js` rowCallback, `data.unicode` vs `data.domain`).
-- List rows show **health from FTL's status codes** (`groups-lists.js: setStatusText`): 1 "List download was successful (OK)", 2 "unchanged upstream, Pi-hole used a local copy (OK)", 3 "unavailable, Pi-hole used a local copy (check list)", 4 "unavailable, no local copy (replace list)", 0 unknown. They also show an icon (check / history / exclamation / times / question), entries, ABP entries, invalid count, and "last updated" as relative time with the absolute date in a tooltip.
+- List rows show **health from FTL's status codes** (`groups-lists.js: setStatusText`): 1 downloaded fine (label "OK"), 2 unchanged upstream so the local copy was used ("OK"), 3 unavailable so the local copy was used (label "check list"), 4 unavailable with no local copy (label "replace list"), 0 not downloaded yet or disabled (anything else shows "unknown"). They also show an icon (check / history / exclamation / times / question), entries, ABP entries, invalid count, and "last updated" as relative time with the absolute date in a tooltip.
 
 ## Testing strategy
 - No unit or E2E tests in this repo. `npm test` runs `prettier --check` plus `xo` (ESLint with `eslint-plugin-compat` against a browserslist that includes "Firefox ESR" and "last 2 major versions") (`package.json` scripts, `xo.config.js`).
-- CI workflows: `codeql.yml`, `codespell.yml`, `editorconfig-checker.yml`, `test.yml` (`.github/workflows/`). API behaviour is tested in the FTL repo (`pi-hole-ftl.md` "Testing strategy").
+- CI workflows: `codeql.yml`, `codespell.yml`, `editorconfig-checker.yml`, `test.yml` (`.github/workflows/`). `test.yml` runs `npm run testpr` (autoprefix, prettier fix, a clean-diff check, then xo), not plain `npm test`. API behaviour is tested in the FTL repo (`pi-hole-ftl.md` "Testing strategy").
 
 ## UX patterns worth copying
 **Query log** (`queries.lp`, `scripts/js/queries.js`):
@@ -101,7 +101,7 @@ The UI does no parsing. It does three client-side transforms worth noting:
 
 ## Performance tricks
 - Server-side paging, capped page sizes, a frozen cursor and an in-memory history DB on the FTL side keep the log fast on a Pi with millions of rows. The client never loads the full log (`queries.js` `serverSide`; FTL `api/queries.c` cap of 10,000).
-- From/until parameters are **omitted** when they cover the whole available range, so the DB skips the time predicate ("speed up the database lookups notably on slow devices", `getAPIURL`).
+- From/until parameters are **omitted** when they cover the whole available range, so the DB skips the time predicate (a code comment in `getAPIURL` credits this with faster lookups on slow devices).
 - Each widget polls on its own interval, pauses when the tab is hidden, and an earlier request's timer is cancelled before a new one is set (`utils.setTimer` keeps `func.timer`). That avoids duplicate in-flight polls.
 - Static assets are cache-busted with a version query (`pihole.fileversion(...)` in `header*.lp`), so they can be cached long-term.
 - `chartjs-plugin-deferred` renders charts only when scrolled into view (`package.json`, `header_authenticated.lp`).
@@ -110,7 +110,7 @@ The UI does no parsing. It does three client-side transforms worth noting:
 EUPL-1.2 on Pi-hole's own JS, Lua pages and CSS means **no copying** of code, markup, CSS, status strings or icon mappings. We describe patterns only. `vendor/` is third-party (AdminLTE is MIT) but irrelevant: our stack is React plus a modern table (§8.2). Don't reuse Pi-hole's themes, colours, logo or wording, and don't use "Pi-hole" in the branding.
 
 ## Implications for search-hole
-- [ui-ux] Make the log row explain itself with **colour, icon and word** (Pi-hole puts the word only in a `title` tooltip, which fails §8.4.7). Put the **rule or list name inline** with a link to it. Pi-hole only says "Query was blocked, search lists" and makes the user search (`queries.js: formatInfo`). We already store `rule_id`/`list_id`, so render "Hidden by **ai-content-farms** (`||contentfarm.example^`)" directly.
+- [ui-ux] Make the log row explain itself with **colour, icon and word** (in the status column Pi-hole puts the word only in a `title` tooltip, which fails §8.4.7; the action button and the details row do carry words). Put the **rule or list name inline** with a link to it. Pi-hole only says "Query was blocked, search lists" and makes the user search (`queries.js: formatInfo`). We already store `rule_id`/`list_id`, so render "Hidden by **ai-content-farms** (`||contentfarm.example^`)" directly.
 - [ui-ux] Replace Pi-hole's modal-then-auto-close allow/deny (`utils.js: addFromQueryLog`) with **optimistic apply plus an Undo toast**, and a scope and duration picker (global, project or session; permanent or for N days), per §8.4.2-3. Keep Pi-hole's provenance idea: auto-comment "Added from log, search #123".
 - [ui-ux] Live log: copy Pi-hole's **cursor freeze** for paging (`queries.js` `cursor`; FTL `api/queries.c`), but go beyond its 2 s full redraw. Stream new rows over SSE into a buffer, show "N new" while the user is scrolled or hovering, and insert in batches (§8.3 "Live log"). Keep `callIfVisible`-style pausing for any polling fallback.
 - [ui-ux] Read **and write** filters and the time range to the URL. Pi-hole reads `?domain=&client_ip=&from=&until=` but never updates the URL as filters change (`queries.js` `parseQueryString` only at load). Our §8.4.4 wants typed search params both ways. Copy its deep links from dashboard tiles and top lists into a filtered log (`index.js` L336, L414).
@@ -146,3 +146,15 @@ EUPL-1.2 on Pi-hole's own JS, Lua pages and CSS means **no copying** of code, ma
 - One-way URL state (read at load, never written back).
 - jQuery globals and per-call-site manual HTML escaping; no UI tests.
 - An "All rows" page size (Pi-hole had to remove it; cap at about 1,000 per page).
+
+## Verification
+Checked 2026-10-29 against `research/refs/pi-hole-web` @ fb699c4 (read-only; nothing was run). Claims checked: about 55. They cover the licence header (root `LICENSE`, `vendor/LICENSE`, `package.json`, and a scan of the licence headers inside `vendor/`), all 16 "Implications for search-hole" bullets, and the mechanisms they rely on: the `REFRESH_INTERVAL` table, the global CSRF header and meta tag, `addFromQueryLog` (modal, payload, auto-close timings, no undo), cursor paging and page sizes, the "All" fallback, read-only URL state (no `pushState` anywhere), live mode, details-row text, list-status handling, wildcard-to-regex and Unicode/punycode display, taillog `nextID` and `pid` reset, streamed gravity output, the disable-blocking presets, env-locked settings, and the test and CI setup. FTL-side references (`api/queries.c` cap, `api/logs.c`, `lua_web.c` login redirect, theme names) were cross-checked in `research/refs/pi-hole-ftl`.
+
+Corrections made:
+- Licence header: `vendor/` is not uniformly permissive. `vendor/qrious/qrious.min.js` carries a GPL v3 header, so the note now says to read each vendored header before lifting anything (MIT for AdminLTE and most others was confirmed).
+- List-status descriptions: status 0 means "not downloaded yet or disabled", not just "unknown"; the four quoted UI sentences were replaced by short paraphrases (licence hygiene).
+- Status column: the word appears only in a `title` tooltip in the icon cell, but the action button and the details row do carry words; the Implications bullet now says so.
+- CI: `test.yml` runs `npm run testpr` (autoprefix, prettier fix, clean-diff check, xo), not plain `npm test`.
+- Licence hygiene: one paraphrased source comment about omitting `from` / `until`.
+
+Confirmed unchanged: EUPL-1.2 for the repo outside `vendor/`; poll intervals (0.5 s logs, 1 s summary, 2 s query log, 60 s messages, 600 s history); modal-then-auto-close allow/deny with a provenance comment and no undo; the URL is read at load and never written back; no UI tests (lint only).

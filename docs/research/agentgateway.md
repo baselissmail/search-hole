@@ -1,7 +1,7 @@
 # agentgateway/agentgateway
 > Ref: `research/refs/agentgateway` @ a94094d (2026-10-28) · License: **Apache-2.0** (root `LICENSE`; `Cargo.toml` line 52 `license = "Apache-2.0"`). No `NOTICE` file. Per-directory exceptions:
 > - `crates/pool/LICENSE` is **MIT** ("Copyright (c) 2023-2025 Sean McArthur", a hyper-util pool fork), even though `crates/pool/Cargo.toml` inherits the workspace license
-> - `crates/cel-fork/cel/Cargo.toml` declares `license = "MIT"` (a cel-rust fork; no LICENSE file in that dir)
+> - `crates/cel-fork/cel/Cargo.toml` and `crates/cel-fork/cel-derive/Cargo.toml` declare `license = "MIT"` (a cel-rust fork; no LICENSE file in that dir)
 > - `crates/htpasswd-verify-fork/Cargo.toml` is Apache-2.0
 > - `crates/agentgateway/src/cel/mod.rs` header: "Portions ... heavily inspired from ... Kuadrant/wasm-shim ... Apache 2.0"
 >
@@ -14,7 +14,7 @@ Why it matters to search-hole:
 1. It is the most complete reference for **MCP protocol-version handling across the `2026-07-28` break**. It speaks both eras on one endpoint and documents *why* it does not translate between them (`crates/agentgateway/src/mcp/README.md`).
 2. Its **CEL policy engine** shows how to compile user expressions once, extract what each needs, and explain decisions. These patterns carry over to our rules engine even though we won't use CEL.
 3. It ships **SQLite (WAL) request logs + SSE live tail + budgets with an upsert-delta table**, the same local-first storage shape we plan.
-4. Its **outlier detection** (EWMA health, eviction with multiplicative backoff, Retry-After parsing across vendor headers) maps one-to-one onto engine suspension.
+4. Its **outlier detection** (EWMA health, eviction with multiplicative backoff, Retry-After parsing across vendor headers) maps closely onto engine suspension. Caveats: by default only 5xx, connection failures and server-side gRPC codes count as unhealthy (a 429 counts only with a custom `unhealthyExpression`, for example `response.code == 429`), and eviction happens only when an `eviction` block is configured (`http/health.rs`, `telemetry/log.rs: default_unhealthy_for_status`).
 
 ## Architecture sketch
 ```text
@@ -48,7 +48,7 @@ The MCP relay (`mcp/handler.rs` `Relay`) fans a request out to the selected targ
 | DNS rebinding | opt-in Host/Origin localhost check | `mcp/dns_rebinding.rs` |
 | CEL | `Expression::new_strict` / `new_permissive`, attribute extraction, `ContextBuilder`, optimizer | `crates/policy-core/src/expression.rs`, `crates/agentgateway/src/cel/mod.rs`, `crates/celx/src/optimize.rs` |
 | Authorization rules | `RuleSet{allow, deny, require}` evaluation order | `http/authorization.rs: validate` (lines 254-274) |
-| Health/eviction | `Policy::eviction_decision`, EWMA health `ALPHA = 0.3`, `DEFAULT_EVICTION_SECS = 3` | `http/health.rs`, `types/loadbalancer.rs` (lines 1002-1180) |
+| Health/eviction | `Policy::eviction_decision`, EWMA health `ALPHA = 0.3` (initial 1.0), `DEFAULT_EVICTION_SECS = 3`; called through `DropOnLog::eviction_decision`, which passes `retry_after.or(retry_backoff)` as the fallback duration | `http/health.rs`, `telemetry/log.rs` (lines 873-895), `types/loadbalancer.rs` (lines 1002-1180) |
 | Retry-After parsing | `retry_after(status, headers)` only on 429 | `http/outlierdetection.rs` |
 | Budgets | in-memory counters + pending deltas flushed every 5 s to `budget_usage` | `http/budget/{mod.rs,database.rs,sqlite_schema.sql,sqlite_upsert.sql}` |
 | Request log DB | crossbeam channel → dedicated writer thread → batched insert; search/get/tail/analytics queries | `telemetry/log_store.rs`, `telemetry/log_store/sqlite.rs`, `sqlite_migrations/*.sql` |
@@ -61,13 +61,13 @@ The MCP relay (`mcp/handler.rs` `Relay`) fans a request out to the selected targ
 1. Version gate (`validate_request_protocol`). For a modern header version: removed or unknown methods → **404 MethodNotFound**. A missing `_meta.protocolVersion` → InvalidParams. Header ≠ body version → `VersionMismatch`. A body-only modern version without the header → `InvalidProtocolVersion` (`streamablehttp.rs` lines 470-530).
 2. `mcpAuthentication` (JWT) → `mcpAuthorization` (CEL with `mcp.tool.name`, `jwt.*`, `apiKey.*`) → `localRateLimit` (token bucket keyed by CEL, for example `apiKey.client + "/" + mcp.tool.target + "/" + mcp.tool.name`, `examples/mcp-keyed-rate-limit/config.yaml`).
 3. Resolve the target from the prefixed name (or list every target when `prefixMode: never`) → forward → guardrails per method phase (`mcp/guardrails/phase.rs`) → merge → log.
-4. On rate limit (`Error::RateLimited`) the JSON-RPC error uses code `RESOURCE_EXHAUSTED` and carries `data: {limit, remaining, retryAfterSeconds}` (`mcp/mod.rs` lines 317-336). That is a good shape for our spend-cap and suspension tool errors.
+4. On rate limit (`Error::RateLimited`), a **`tools/call` is answered with an `isError: true` tool result** whose text ends "(retry after Ns; limit L, remaining R)" (`tool_error_body`, `mcp/mod.rs` lines 220-235, 281-296), so the model can see it. Only other methods get the JSON-RPC error with code `RESOURCE_EXHAUSTED` and `data: {limit, remaining, retryAfterSeconds}` (lines 317-336). Since our `search`/`fetch` are tool calls, the isError-with-retry-after-in-text form is the relevant precedent for our spend-cap and suspension errors.
 
 ## Data model and storage
 - **SQLite connection** (`crates/agentgateway/src/database.rs`): `create_if_missing(true)`, `journal_mode(Wal)`, `synchronous(Normal)`, `busy_timeout(5s)`, pool `DEFAULT_MAX_CONNECTIONS = 5`. A `postgres://` URL switches to Postgres.
 - **`request_logs`** (`telemetry/log_store/sqlite_migrations/0001_create_request_log_schema.sql`):
   - columns: `id TEXT PK, started_at, completed_at, duration_ms, trace_id, span_id, http_status, error, gen_ai_operation_name, gen_ai_provider_name, gen_ai_request_model, gen_ai_response_model, input_tokens, output_tokens, total_tokens, cost REAL, agentgateway_user, agentgateway_group, user_agent_name, has_payload INTEGER, attributes_json TEXT NOT NULL`
-  - indexes are all `(<dimension>, completed_at DESC, id DESC)`
+  - eight indexes, each including `completed_at DESC`: `(completed_at DESC, id DESC)`, and `(<dimension>, completed_at DESC[, id DESC])` for user, group, user agent and request model; the `http_status`, `gen_ai provider+model` and `completed_at, total_tokens, cost` ones omit `id`
   - prompt/completion content lives in **`request_log_payloads(log_id PK REFERENCES request_logs(id) ON DELETE CASCADE, request_prompt_json, response_completion_json)`**
   - migration `0002` does `ALTER TABLE … ADD COLUMN` for five metrics, then **backfills them from `attributes_json` with `json_extract`**, which is how to promote a JSON attribute to a column later
   - migrations run via `sqlx::migrate!` with a custom table name (`sqlite.rs: SqliteLogStore::from_pool`)
@@ -164,7 +164,7 @@ The MCP relay (`mcp/handler.rs` `Relay`) fans a request out to the selected targ
   - `limit` clamped to 1-500
   - on DB error sends an `error` event and closes
 
-  This is exactly the "tail rowid > last every ~250 ms, push over SSE" design in §4, already working.
+  This is close to the "tail rowid > last every ~250 ms, push over SSE" design in §4, with one difference: agentgateway's cursor is `(completed_at, id)`, not a rowid, and it has a single writer process. With several gateway processes writing one DB, a timestamp cursor can skip a row that commits late with an earlier `completed_at`, so keep the plan's rowid cursor.
 - **Raw config editor** (`pages/RawConfig.tsx`, `configMonaco.ts`): Monaco + `monaco-yaml` with the generated schema, a `SchemaHelpPanel`, and **`ConfigDiffDrawer` showing the diff before save**. In hybrid mode file writes are read-only with "Copy this diff and update the configuration file directly" (`components/ConfigDiffDrawer.tsx`).
 - **CEL playground**: `pages/Cel.tsx` + `celMonaco.ts` (syntax/completion) + `POST /api/cel` + `celSampleContext.json`. Users test an expression against a sample context. Our analog: a **"test a rule against a URL/result"** box.
 - **Home page warnings**: a "UI is exposed without authentication" banner linking to settings (`pages/Home.tsx` lines 234-246) and a config-warnings banner. Also per-client **setup cards** with copy-paste snippets for Claude Code, Claude Desktop, Codex CLI, opencode, Cursor, VS Code Copilot and Windsurf (`pages/ClientSetup.tsx`).
@@ -182,12 +182,12 @@ The MCP relay (`mcp/handler.rs` `Relay`) fans a request out to the selected targ
 Apache-2.0 (permissive, with patent grant). We **may copy code or short snippets with attribution** and must keep the license text. There is no NOTICE file to carry. Because we write TypeScript, the realistic reuse is **SQL** (the `budget_usage` schema and upsert), **schemas** (the `request_logs` column set), **algorithms** (eviction decision, Retry-After parsing, rule precedence, DNS-rebinding check) and **docs structure**. If we port `outlierdetection.rs` or `dns_rebinding.rs` logic closely, add an attribution line in the file header and `THIRD_PARTY_NOTICES`. `crates/pool` and `crates/cel-fork` are MIT (also fine); we have no reason to touch them. Choosing Apache-2.0 for search-hole (§13.2) would make this attribution the most natural.
 
 ## Implications for search-hole
-- [dual-protocol] agentgateway proves the **one-endpoint, two-era** design. Legacy clients send `initialize` and get sessions; modern clients send `server/discover` plus per-request `_meta`. It **does not bridge** between eras ("we do not implement this mode", `mcp/README.md`). As a *server* we only need to serve both, which the SDK v2 `serveStdio`/`createMcpHandler` should do. Copy its **validation rules into our conformance tests**:
+- [dual-protocol] agentgateway proves the **one-endpoint, two-era** design. Legacy clients send `initialize` and get sessions; modern clients send `server/discover` plus per-request `_meta`. It **does not translate** between eras: a modern client facing an old-only upstream gets the upstream's error so it falls back to `initialize` ("we do not implement this mode" refers to a downgrade-on-behalf-of-the-client compatibility mode, `mcp/README.md`), and for old clients the gateway speaks `2025-11-25` to its upstreams (`mcp/session.rs: get_client_info`). As a *server* we only need to serve both, which the SDK v2 `serveStdio`/`createMcpHandler` should do. Copy its **validation rules into our conformance tests**:
   - removed methods (`initialize`, `ping`, `logging/setLevel`, `resources/subscribe`, `resources/unsubscribe`) → 404 under a modern header
   - modern request without `_meta.protocolVersion` → InvalidParams
   - header ≠ body version → mismatch error
   - modern version in the body but no `MCP-Protocol-Version` header → error
-  - unknown version → `UNSUPPORTED_PROTOCOL_VERSION` with `data.supported`
+  - unknown version → `UNSUPPORTED_PROTOCOL_VERSION` with `data: {supported, requested}` (`supported` is omitted when the request is `initialize`)
 - [dual-protocol] The test names in `mcp_tests.rs` are a ready-made matrix for our P2 MCP end-to-end suite: old client vs new client, × stdio vs HTTP, × capability stripping, × MRTR (`input_required`) failing cleanly for clients that can't do it.
 - [mcp-tool-surface] agentgateway sets `ttlMs: 0` and `cacheScope: Private` on everything it presents, because its policies make responses non-cacheable (`handler.rs: merge_discover`; README "Caching"). Our `tools/list` is static per binary version. Unless descriptions vary by project config, we can advertise a real TTL; if they do vary (per-profile hints), follow agentgateway and use private/0.
 - [mcp-tool-surface] MCP Apps: current SDKs emit **both `_meta.ui.resourceUri` and the deprecated flat `ui/resourceUri`**, and hosts fall back to the flat key. Some hosts reject `+` in `ui://` URIs (`mcp/apps.rs` header comments). Emit both keys and keep our `ui://` URIs to `[a-z0-9-/]`. Re-verify against `ext-apps` 2.0.4.
@@ -200,17 +200,17 @@ Apache-2.0 (permissive, with patent grant). We **may copy code or short snippets
 - [sqlite-driver] Concrete settings to start from: WAL, `synchronous=NORMAL`, `busy_timeout=5000`, small pool (`database.rs`). One writer queue per process with batched transactions (`log_store.rs`). With several gateway processes on one file we still need `BEGIN IMMEDIATE` plus retry, but batching keeps lock time tiny.
 - [upgrades-migrations] Promote JSON attributes to columns with forward-only migrations: `ALTER TABLE ADD COLUMN` then a `json_extract` backfill (`0002_add_request_log_analytics_columns.sql`). Keep an `attributes_json` catch-all so older binaries ignore new fields and newer ones can backfill. Store migration history in a named table (`dangerous_set_table_name`).
 - [sqlite-driver] Put large or sensitive content (snippets, page text) in a **child table with `ON DELETE CASCADE`** and a `has_payload` flag, so retention can drop content while keeping decisions and counts (`request_log_payloads`). This matches per-engine retention (Tavily). agentgateway has **no retention job**; we must add one.
-- [dashboard-process-model] Copy the SSE tail exactly: cursor `(ts, id)` starting at now, a poll interval (1 s there, our target ≤250 ms), a 15 s heartbeat, limit clamp, and an `error` event then close. The client uses `fetch` streaming with a POST body for filters and keeps a 200-row ring buffer. This works with a separate on-demand `searchhole ui` process reading the shared DB, with no IPC.
+- [dashboard-process-model] Copy the SSE tail shape: a cursor starting at now (use a rowid cursor, not `(ts, id)`; see above), a poll interval (1 s there, our target ≤250 ms), a 15 s heartbeat, limit clamp (default 100, clamped to 1-500), and an `error` event then close. The client uses `fetch` streaming with a POST body for filters and keeps a 200-row ring buffer. This works with a separate on-demand `searchhole ui` process reading the shared DB, with no IPC.
 - [engine-adapter] Engine suspension algorithm to port:
   - EWMA health (α = 0.3, success = 1, failure = 0)
   - `consecutiveFailures` and/or `healthThreshold` gates; if neither is set, one bad response evicts
-  - eviction duration = `Retry-After`-derived value, else configured base, else 3 s, **× (timesEjected + 1)**
+  - eviction duration = configured `eviction.duration`, else the fallback (`Retry-After`-derived value, else retry backoff), else 3 s, **× (timesEjected + 1)**. The configured duration wins over `Retry-After` (`eviction_duration().or(fallback_duration)`)
   - `timesEjected` resets on the first success
   - `restoreHealth` (e.g. 0.2) on return for gradual recovery
   - count an ejection only when a *new* window starts
   - if all engines are evicted, the load balancer "falls back to returning evicted endpoints" rather than hard-failing (`http/health.rs: eviction_decision` comment, `types/loadbalancer.rs: finish_request`)
 
-  Persist `{health, consecutive_failures, times_ejected, evicted_until, last_error_class}` per engine in `engine_health`.
+  Persist `{health, consecutive_failures, times_ejected, evicted_until, last_error_class}` per engine in `engine_health`. Two defaults must not be ported blindly: agentgateway treats a connection failure (no status) as unhealthy, which would poison engine health when the machine is merely offline (litellm avoids that, see its note), and it treats 429 as healthy unless a custom expression says otherwise.
 - [engine-adapter] Port `process_rate_limit_headers` for 429s:
   - `Retry-After` (seconds or HTTP-date)
   - `retry-after-ms`
@@ -218,18 +218,18 @@ Apache-2.0 (permissive, with patent grant). We **may copy code or short snippets
   - the smallest of `x-ratelimit-reset-requests|tokens|requests-day|tokens-minute` (durations like `1m30s`, or bare seconds)
 
   Add Brave/Tavily/Exa-specific headers as adapters reveal them (`http/outlierdetection.rs`).
-- [other] Per-engine spend caps: reuse the **`budget_usage` table and upsert** (integer units: queries, or nano-dollars for cost). Check before the call (`used >= limit` → block with `retryAfter = window_end − now` rounded up) and settle after (`http/budget/mod.rs: check`, `settle`). Use `Audit` (soft: record and flag in the receipt) vs `Block` (hard). agentgateway's windows are **epoch-aligned fixed durations, not calendar months** (`budget_window`). Engines bill per calendar month, so we need a calendar-month window kind (UTC; verify per engine). Its check-then-settle allows concurrent overshoot of a few requests; acceptable for query caps, or use litellm's reserve step for strictness.
+- [other] Per-engine spend caps: reuse the **`budget_usage` table and upsert** (integer units: queries, or nano-dollars for cost; agentgateway's own units are only `USD` and `Tokens`, charged per API key after LLM responses, so a `queries` unit is our extension; the `unit` column is free text). Check before the call (`used >= limit` → block with `retryAfter = window_end − now` rounded up) and settle after (`http/budget/mod.rs: check`, `settle`). Use `Audit` (soft: record and flag in the receipt) vs `Block` (hard). agentgateway's windows are **epoch-aligned fixed durations, not calendar months** (`budget_window`). Engines bill per calendar month, so we need a calendar-month window kind (UTC; verify per engine). Its check-then-settle allows concurrent overshoot of a few requests; acceptable for query caps, or use litellm's reserve step for strictness.
 - [rule-format-precedence] Use the RuleSet ladder as a model for our block/allow semantics: **deny beats require beats allow**, with default denylist semantics when no allow rules exist. Use most-specific-wins pattern matching with a documented, total tie-break (exact > prefix > suffix > catch-all, longer wins, then lexical) for domain and path patterns, so outcomes are deterministic and explainable (`authorization.rs`, `guardrails/phase.rs`). Pins and raise/lower weights still follow §5 step 6.
-- [rule-format-precedence] **Strict vs permissive compile.** The user's own `rules.yaml` / `.searchhole.yaml` is strict: a bad rule fails the load with a precise error, and we keep the last good config, per hot reload. A subscribed list is permissive: a bad line becomes a counted, reported no-op (never a silent pass and never a crash), mirroring `new_strict` / `new_permissive`.
+- [rule-format-precedence] **Strict vs permissive compile.** The user's own `rules.yaml` / `.searchhole.yaml` is strict: a bad rule fails the load with a precise error, and we keep the last good config, per hot reload. A subscribed list is permissive: a bad line becomes a counted, reported no-op (never a silent pass and never a crash), mirroring `new_strict` / `new_permissive`. Note agentgateway's own warning that a failing deny expression fails to deny (`http/authorization.rs` lines 132-139): for a block rule, a no-op means the site is not blocked, so the report matters.
 - [rule-format-precedence] At compile time, record which *inputs* each rule needs (domain only, path, title/snippet text, date). Evaluate cheap domain rules first and only extract text or dates when some rule needs them (`ContextBuilder` attribute flags).
-- [security] List regexes must be ReDoS-safe. agentgateway gets this free from Rust `regex`; in TS we need an RE2-class engine, or restrict list regex syntax and enforce a compile-time complexity limit (inferred from `celx/src/optimize.rs` using `regex::Regex`).
+- [security] List regexes must be ReDoS-safe. agentgateway gets this from Rust `regex` for literal patterns it precompiles (`celx/src/optimize.rs`; the non-literal `matches` path in `cel-fork` was not checked); in TS we need an RE2-class engine, or restrict list regex syntax and enforce a compile-time complexity limit.
 - [security] Borrow `dns_rebinding.rs` semantics for the dashboard:
   - Host must be `localhost`, `127.0.0.1` or `[::1]` (with any port)
   - Origin, if present, must be a bare localhost origin with no userinfo/path/query
   - **reject duplicate Origin headers**
   - reject `Origin: null`
 
-  agentgateway's admin UI has no token by default (no Host/Origin/CSRF checks found in `ui.rs` / `management/admin.rs`); it only shows a warning banner. Our plan's random session token + Host allowlist is stricter.
+  agentgateway's admin UI has no token by default and no Host/Origin check (none found in `ui.rs` / `management/admin.rs`; `dns_rebinding.rs` is wired only into the MCP router, opt-in via `dns_rebinding_protection`); its only cross-origin guard is that raw-config writes require `Content-Type: application/yaml` (`ui.rs` line ~501), and it shows a warning banner. Our plan's random session token + Host allowlist is stricter.
 - [security] Redact secrets by type: `SecretString` + `ser_redact` → `"<redacted>"` in any config dump, and CEL exposes `apiKey.key` / `jwt.rawToken` redacted unless `.unredacted()` is called (`schema/cel.md`). Our config/`doctor` output must never print key values.
 - [ui-ux] Config UX: generate a JSON Schema for `rules.yaml` / `.searchhole.yaml` and put a `# yaml-language-server: $schema=` line in templates so VS Code autocompletes. Show a **diff drawer before saving** config from the dashboard. Add a "test rule" playground (`ConfigDiffDrawer.tsx`, `Cel.tsx`).
 - [testing] Add a CI test that validates every example config in `docs/` and `lists/` with the same code path as `searchhole rules validate` (`tests/validate_examples.rs`). Fuzz the rule/list parsers (`fuzz/fuzz_targets/cel_expression.rs`). Run Playwright visual regression for the dashboard.
@@ -264,3 +264,19 @@ Apache-2.0 (permissive, with patent grant). We **may copy code or short snippets
 - `ttlMs: 0` / private caching everywhere when our tool list is static (a needless re-list cost), unless descriptions really vary.
 - Flattening multiple upstream tool lists with a `{target}_{name}` prefix. Not relevant to us, since we expose our own 4 tools, but a reminder never to proxy other MCP servers' tools into our surface.
 - Kubernetes/xDS complexity: we are a single-user local tool.
+
+## Verification
+Date: 2026-10-29. Claims checked: 71 (license files and Cargo.toml license fields per crate, all 23 "Implications" bullets and the mechanisms behind them: protocol-version gate order and error codes, removed-method list, `merge_initialize`/`merge_discover`, MCP Apps URI rewriting, session-header detection, SQLite settings/schema/migrations/writer batch, SSE tail, budget schema/upsert/check/settle/windows, EWMA/eviction decision and Retry-After parsing, authorization precedence, method-pattern resolution, strict/permissive CEL, DNS-rebinding check, admin-UI protections, UI stack versions, test names and example paths).
+Corrections:
+- Eviction duration order was inverted: configured `eviction.duration` wins over `Retry-After`, which wins over retry backoff, then 3 s (`Policy::eviction_decision`: `eviction_duration().or(fallback_duration)`).
+- Default "unhealthy" is 5xx, connection failure (no status) and server-side gRPC codes. 429 is healthy unless a custom `unhealthyExpression` is set, and no eviction happens without an `eviction` block. Added the warning that porting the connection-failure default would poison engine health when offline. Purpose item 4 softened from "one-to-one".
+- Rate-limit error shape: for `tools/call` agentgateway returns an `isError: true` tool result with the retry-after in text, not a JSON-RPC `RESOURCE_EXHAUSTED` error (that shape is for non-tool-call methods). Our `search`/`fetch` are tool calls, so the precedent is the isError form.
+- SSE tail "exactly the rowid design" was overstated: the cursor is `(completed_at, id)` with a single writer; a timestamp cursor can skip late-committed rows with several writer processes, so keep the rowid cursor.
+- "Does not bridge between eras" tightened: it forwards errors so modern clients fall back, and speaks `2025-11-25` to upstreams for old clients; the unimplemented part is a downgrade-on-behalf mode.
+- `UNSUPPORTED_PROTOCOL_VERSION` carries `data: {supported, requested}` only when the request is not `initialize`.
+- Budget units are `USD`/`Tokens` per API key charged after LLM responses; a `queries` unit is our extension.
+- `request_logs` indexes: not all are `(<dim>, completed_at DESC, id DESC)`.
+- Admin UI: no Host/Origin check, but raw-config writes require `Content-Type: application/yaml`; `dns_rebinding.rs` is wired only into the MCP router (opt-in).
+- ReDoS claim narrowed to literal patterns that are precompiled with Rust `regex`.
+- License header: `crates/cel-fork/cel-derive` is also MIT.
+No GPL/AGPL/EUPL code present or pasted. The ~10-line Apache-2.0 SQL excerpt in "Data model and storage" is attributed and permitted.
