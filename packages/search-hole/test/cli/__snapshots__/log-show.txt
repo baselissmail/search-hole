@@ -1,0 +1,9 @@
+Search #12: react compiler
+2026-10-30 14:02 · coding/standard · searxng+brave · 812 ms · claude-code
+receipt rcpt_b · 8 kept · 3 hidden
+
+  1  searxng  pinned  https://react.dev/learn/react-compiler  official
+      React Compiler
+  2  brave    hidden  https://pinterest.com/pin/123                     r_blk0000002 (global) "pinterest.com"
+      Pin 123
+  3  searxng  hidden  old.example.org                                   stale

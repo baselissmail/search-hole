@@ -1,0 +1,6 @@
+ID            SCOPE    ACTION   MATCH                NOTES
+r_blk0000002  global   block    pinterest.com        from rules.yaml:9
+r_rai0000004  project  raise 2  github.com/orgname/  profile coding · until 2026-12-31 · "our org"
+r_imp0000005  session  lower 3  *.medium.com         important
+
+3 rules

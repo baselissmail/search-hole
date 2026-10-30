@@ -1,0 +1,15 @@
+{
+  "name": "search-hole-local",
+  "owner": {
+    "name": "Basel Issmail"
+  },
+  "description": "Local test marketplace for the search-hole plugin. The plugin directory next to this file is assembled by scripts/build-plugin.mjs.",
+  "plugins": [
+    {
+      "name": "search-hole",
+      "source": "./search-hole",
+      "description": "A local search gateway for AI assistants: choose the engines and sites your AI searches, see every search, get source receipts.",
+      "category": "search"
+    }
+  ]
+}

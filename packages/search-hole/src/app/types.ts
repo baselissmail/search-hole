@@ -7,7 +7,8 @@
  *
  * Additive changes only: the CLI and gateway are built against this file.
  */
-import type { PageFetchResult } from '../fetch/fetchPage.ts'
+import type { PageFetcherConfig, PageFetchResult } from '../fetch/fetchPage.ts'
+import type { RunCommand, SecretStore } from '../shared/keys/types.ts'
 import type {
   Depth,
   EngineId,
@@ -23,7 +24,16 @@ import type {
 } from '../shared/types.ts'
 
 /** Which host launched this process (ADR-0012 host profiles). `cli` = the terminal. */
-export type HostProfile = 'claude-code' | 'claude-desktop' | 'cursor' | 'codex' | 'vscode' | 'goose' | 'zed' | 'generic' | 'cli'
+export type HostProfile =
+  | 'claude-code'
+  | 'claude-desktop'
+  | 'cursor'
+  | 'codex'
+  | 'vscode'
+  | 'goose'
+  | 'zed'
+  | 'generic'
+  | 'cli'
 
 /** Claude Code search mode (ADR-0018). */
 export type SearchMode = 'auto' | 'builtin' | 'engines'
@@ -35,6 +45,27 @@ export interface AppOptions {
   env: Readonly<Record<string, string | undefined>>
   cwd: string
   now?: () => number
+  /** Test and embedding seams; production callers omit them. */
+  seams?: AppSeams
+}
+
+/**
+ * Replaceable dependencies of the app (additive). Production code passes none of these: the
+ * defaults are the OS key store, the public-web SSRF guard and real child processes.
+ */
+export interface AppSeams {
+  /** Key stores: `write` for `keys.set/remove`, `read` for resolution (default: OS store + insecure file). */
+  keyStores?: { write: SecretStore; read: readonly SecretStore[] }
+  /** Page-fetcher configuration (tests pass a loopback-allowing guard policy). */
+  pageFetcher?: PageFetcherConfig
+  /** Runs `docker info` for `doctor` (default: a real child process without a shell). */
+  runCommand?: RunCommand
+  /** Defaults to `process.platform`. */
+  platform?: NodeJS.Platform
+  /** Defaults to `os.homedir()`. */
+  homedir?: string
+  /** Store busy timeout in ms (default 100 for gateways, 5000 for the CLI, ADR-0003). */
+  storeBusyTimeoutMs?: number
 }
 
 /** Per-request context resolved by the caller (gateway: from hooks/_meta/env, ADR-0005; CLI: fixed). */
@@ -68,7 +99,13 @@ export interface FetchArgs {
 /** A fetch result, or a refusal explained with the deciding rule. */
 export type FetchOutcome =
   | ({ kind: 'page'; receiptId: string } & PageFetchResult)
-  | { kind: 'refused'; receiptId: string; reason: 'rule' | 'ssrf' | 'robots' | 'unsupported' | 'error'; message: string; rule?: RuleRef }
+  | {
+      kind: 'refused'
+      receiptId: string
+      reason: 'rule' | 'ssrf' | 'robots' | 'unsupported' | 'error'
+      message: string
+      rule?: RuleRef
+    }
 
 export interface EngineStatus {
   engine: EngineId
@@ -237,7 +274,10 @@ export interface App {
   /** Apply rules to built-in WebSearch results; logs a search row with mode 'builtin'. */
   filterBuiltinResults(query: string, results: BuiltinResult[], ctx: RequestCtx): Promise<BuiltinFilterResult>
   /** Rule check for a URL the model is about to open with WebFetch or our fetch. */
-  checkUrl(url: string, ctx: RequestCtx): Promise<{ allowed: true } | { allowed: false; message: string; rule?: RuleRef }>
+  checkUrl(
+    url: string,
+    ctx: RequestCtx,
+  ): Promise<{ allowed: true } | { allowed: false; message: string; rule?: RuleRef }>
   /** Record a page the model opened with the built-in WebFetch (for the receipt). */
   recordBuiltinFetch(url: string, ctx: RequestCtx): Promise<void>
   /** Query hygiene verdict (ADR-0015 point 4) without searching. */
@@ -253,6 +293,17 @@ export interface App {
   openTurn(ctx: RequestCtx): Promise<{ receiptId: string }>
   /** Stop: close the turn receipt; returns the one-line receipt if the turn searched. */
   closeTurn(ctx: RequestCtx): Promise<{ receiptLine?: string; receiptId?: string }>
+  /**
+   * After the gateway re-keys a hook session (SessionStart / UserPromptSubmit, ADR-0014 point 1):
+   * `resume` and `compact` (same project) carry the session rules from `previousKey` to
+   * `ctx.session.key`; `clear` drops them (ADR-0005); `startup` changes nothing. Optional so
+   * that existing fakes stay valid; `createApp` always provides it.
+   */
+  rekeySession?(
+    previousKey: string,
+    ctx: RequestCtx,
+    source: 'startup' | 'resume' | 'clear' | 'compact',
+  ): Promise<{ movedRules: number }>
 
   // ── Admin (CLI, slash commands; never model-reachable) ──
   rules: {

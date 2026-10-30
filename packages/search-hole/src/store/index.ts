@@ -18,6 +18,7 @@ import { decideMode, type ModeDecision, writerTooOld } from './compat.ts'
 import { type Db, isBusyError, openDb } from './driver.ts'
 import { migrate } from './migrate.ts'
 import { latestSchemaOf, MIGRATIONS } from './migrations/index.ts'
+import { insertFetch, listFetchesByReceipt } from './queries/fetches.ts'
 import { getHealth, listHealth, putHealth } from './queries/health.ts'
 import {
   acquireLease,
@@ -28,6 +29,7 @@ import {
   releaseLease,
   renewLease,
 } from './queries/jobs.ts'
+import { getSearchLog, hiddenReasonCounts, listRecentSearches, listSearchesByReceipt } from './queries/log.ts'
 import {
   bumpDataEpoch,
   kvGet,
@@ -40,9 +42,35 @@ import {
   readUserVersion,
 } from './queries/meta.ts'
 import { DEFAULTS, pruneSteps } from './queries/retention.ts'
+import {
+  clearSessionRules,
+  deleteSessionRule,
+  deleteTrust,
+  findPendingSuggestion,
+  getSuggestion,
+  getTrust,
+  insertSessionRule,
+  insertSuggestion,
+  latestLastGood,
+  listSessionRules,
+  listSuggestions,
+  putLastGood,
+  putTrust,
+  resolveSuggestion,
+} from './queries/rules.ts'
 import { getSearch, listResults, listSearchesAfter, maxSearchId, writePlan } from './queries/searches.ts'
+import {
+  ensureReceipt,
+  getReceipt,
+  getSession,
+  latestReceiptForSession,
+  listGateways,
+  setReceiptClosed,
+  upsertGateway,
+  upsertSession,
+} from './queries/sessions.ts'
 import { readCounts, refundUsage, reserveUsage } from './queries/usage.ts'
-import { planRecord, type RecordPlan } from './record.ts'
+import { planBuiltinRecord, planRecord, type RecordPlan } from './record.ts'
 import { RETRY_MAX_AGE_MS, RetryQueue } from './retry-queue.ts'
 import type {
   AcquireResult,
@@ -55,6 +83,7 @@ import type {
   MigrationState,
   OpenStoreOptions,
   PruneReport,
+  RecordBuiltinInput,
   RecordSearchInput,
   RecordSearchResult,
   ReserveResult,
@@ -66,6 +95,8 @@ import { encodeUserVersion } from './version.ts'
 
 export type { Migration } from './migrations/index.ts'
 export { LATEST_SCHEMA_VERSION, MIGRATIONS } from './migrations/index.ts'
+export { BUILTIN_ENGINE } from './queries/log.ts'
+export { urlHash } from './record.ts'
 export type * from './types.ts'
 export { SHARED_KEY_FP } from './types.ts'
 
@@ -307,10 +338,10 @@ export async function openStore(opts: OpenStoreOptions): Promise<Store> {
     return result
   }
 
-  const recordSearch = (input: RecordSearchInput): RecordSearchResult => {
+  const recordPlanned = (make: () => RecordPlan): RecordSearchResult => {
     let plan: RecordPlan
     try {
-      plan = planRecord(input, input.createdAt ?? now())
+      plan = make()
     } catch (error) {
       stats.skipped++
       return { status: 'skipped', reason: 'error', warning: skippedWarning('error', error) }
@@ -334,6 +365,22 @@ export async function openStore(opts: OpenStoreOptions): Promise<Store> {
         return { status: 'skipped', reason: 'error', warning: skippedWarning('error', r.error) }
     }
   }
+
+  const recordSearch = (input: RecordSearchInput): RecordSearchResult =>
+    recordPlanned(() => planRecord(input, input.createdAt ?? now()))
+
+  const recordBuiltinSearch = (input: RecordBuiltinInput): RecordSearchResult =>
+    recordPlanned(() => planBuiltinRecord(input, input.createdAt ?? now()))
+
+  /** A best-effort write of mutable state: false when skipped or busy; programming errors throw. */
+  const softWrite = <R>(fn: (d: Db) => R): { ok: true; value: R } | { ok: false } => {
+    const r = write(fn)
+    if (r.kind === 'ok') return { ok: true, value: r.value }
+    if (r.kind === 'error') throw r.error
+    return { ok: false }
+  }
+  const clampLimit = (n: number, max: number): number =>
+    Number.isFinite(n) ? Math.min(max, Math.max(1, Math.floor(n))) : 1
 
   // ── lease helpers ──────────────────────────────────────────────────────
 
@@ -364,6 +411,7 @@ export async function openStore(opts: OpenStoreOptions): Promise<Store> {
       pending: queue.length,
     }),
     recordSearch,
+    recordBuiltinSearch,
     flushRetries,
     getSearch: (id) => read((d) => getSearch(d, id), undefined),
     listSearchesAfter: (afterId, limit) => {
@@ -511,6 +559,84 @@ export async function openStore(opts: OpenStoreOptions): Promise<Store> {
         maintain(`PRAGMA incremental_vacuum(${Math.max(1, Math.floor(pages))})`)
       },
       optimize: () => maintain('PRAGMA optimize'),
+    },
+
+    searchLog: {
+      recent: ({ limit, hiddenOnly }) =>
+        read((d) => listRecentSearches(d, clampLimit(limit, MAX_SEARCHES_PER_TAIL), hiddenOnly === true), []),
+      get: (id) => read((d) => getSearchLog(d, id), undefined),
+      byReceipt: (receiptId) => read((d) => listSearchesByReceipt(d, receiptId), []),
+      hiddenReasons: (ids) => read((d) => hiddenReasonCounts(d, ids), new Map()),
+    },
+
+    sessions: {
+      upsert: (w) => softWrite((d) => upsertSession(d, w, now())).ok,
+      get: (id) => read((d) => getSession(d, id), undefined),
+    },
+
+    receipts: {
+      ensure: (id, sessionId) => softWrite((d) => ensureReceipt(d, id, sessionId ?? null, now())).ok,
+      get: (id) => read((d) => getReceipt(d, id), undefined),
+      close: (id) => {
+        const r = softWrite((d) => setReceiptClosed(d, id, now(), now()))
+        return r.ok && r.value
+      },
+      reopen: (id) => {
+        const r = softWrite((d) => setReceiptClosed(d, id, null, now()))
+        return r.ok && r.value
+      },
+      latestForSession: (sessionId) => read((d) => latestReceiptForSession(d, sessionId), undefined),
+    },
+
+    fetches: {
+      record: (w) => softWrite((d) => insertFetch(d, w, now())).ok,
+      byReceipt: (receiptId) => read((d) => listFetchesByReceipt(d, receiptId), []),
+    },
+
+    suggestions: {
+      add: (w) => {
+        const r = softWrite((d) => insertSuggestion(d, w, now()))
+        return r.ok ? r.value : undefined
+      },
+      get: (id) => read((d) => getSuggestion(d, id), undefined),
+      list: (limit = 200) => read((d) => listSuggestions(d, clampLimit(limit, 1000)), []),
+      findPending: (key) => read((d) => findPendingSuggestion(d, key), undefined),
+      resolve: (id, status) => {
+        const r = softWrite((d) => resolveSuggestion(d, id, status, now()))
+        return r.ok && r.value
+      },
+    },
+
+    sessionRules: {
+      add: (w) => softWrite((d) => insertSessionRule(d, w, now())).ok,
+      list: (sessionId) => read((d) => listSessionRules(d, sessionId, now()), []),
+      remove: (id) => {
+        const r = softWrite((d) => deleteSessionRule(d, id))
+        return r.ok && r.value
+      },
+      clear: (sessionId) => {
+        const r = softWrite((d) => clearSessionRules(d, sessionId))
+        return r.ok ? r.value : 0
+      },
+    },
+
+    projectTrust: {
+      get: (path) => read((d) => getTrust(d, path), undefined),
+      set: (path, sha) => softWrite((d) => putTrust(d, path, sha, now())).ok,
+      remove: (path) => {
+        const r = softWrite((d) => deleteTrust(d, path))
+        return r.ok && r.value
+      },
+    },
+
+    rulesLastGood: {
+      put: (w) => softWrite((d) => putLastGood(d, w, now())).ok,
+      latest: (sourcePath) => read((d) => latestLastGood(d, sourcePath), undefined),
+    },
+
+    gateways: {
+      heartbeat: (w) => softWrite((d) => upsertGateway(d, w, now())).ok,
+      list: (since) => read((d) => listGateways(d, since), []),
     },
 
     dataEpoch: () => read((d) => readDataEpoch(d), 0),

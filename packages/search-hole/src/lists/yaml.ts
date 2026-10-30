@@ -274,10 +274,13 @@ const pathText = (path: Path): string =>
   path.reduce<string>((s, seg) => (typeof seg === 'number' ? `${s}[${seg}]` : s ? `${s}.${seg}` : seg), '')
 
 class Positions {
-  constructor(
-    private readonly doc: Document,
-    private readonly lc: LineCounter,
-  ) {}
+  private readonly doc: Document
+  private readonly lc: LineCounter
+
+  constructor(doc: Document, lc: LineCounter) {
+    this.doc = doc
+    this.lc = lc
+  }
 
   /** Line/column of the deepest node on `path`; `key: true` points at the last key instead of its value. */
   at(path: Path, key = false): { line: number; col: number } | undefined {

@@ -1,0 +1,39 @@
+Search: react compiler
+profile coding · depth standard · 812 ms · receipt rcpt_abc123
+
+Kept (2)
+  1. React Compiler – React
+     https://react.dev/learn/react-compiler
+     date 2025-10-07 (modified, high, engine:brave.page_age) · official · searxng #1, brave #3
+     flags: pinned, updated
+     why: pinned (order 1) by r_pin0000001 (global) "react.dev" @ rules.yaml:4
+  2. Compiler tracking issue
+     https://github.com/facebook/react/issues/1
+     date unknown · repo · searxng #2
+     flags: date_unknown, raised
+     why: raised ×1.5 by r_rai0000004 (session) "github.com"
+     why: profile prefers this source (×1.2)
+     why: audit: would be hidden by r_lst0000003 (list dev-filter) "||w3schools.com^"
+
+Hidden (3)
+  - [rule] Pin 123
+    https://pinterest.com/pin/123
+    why: r_blk0000002 (global) "pinterest.com" @ rules.yaml:9
+  - [list] React Tutorial
+    https://www.w3schools.com/react/
+    why: r_lst0000003 (list dev-filter) "||w3schools.com^"
+  - [stale] Old post
+    https://old.example.org/post
+    why: older than the freshness limit; date 2019-02-01 (published, medium, jsonld:datePublished, time zone assumed)
+  1 block rule (r_blk0000002) ran inside the engines; their hits are not observable.
+
+Engines
+  searxng  ok       12 results, 690 ms
+  brave    error    rate_limited: HTTP 429
+  tavily   skipped  missing_key
+    searxng/wikipedia: timeout (suspended)
+  fallback: brave → searxng (rate_limited)
+
+Warnings
+  ⚠ No official or docs source among the results.
+  ⚠ brave could not answer; searxng was used instead.

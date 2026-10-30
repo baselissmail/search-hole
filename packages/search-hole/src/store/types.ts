@@ -10,10 +10,14 @@ import type {
   EngineId,
   EngineRetention,
   EngineRun,
+  FoundDate,
   HealthState,
   HiddenReason,
   MergedResult,
   RawResult,
+  ResultFlag,
+  RuleRef,
+  SourceType,
   Visibility,
   Warning,
 } from '../shared/types.ts'
@@ -375,6 +379,225 @@ export interface MetaSnapshot {
 
 export type CheckpointMode = 'PASSIVE' | 'FULL' | 'RESTART' | 'TRUNCATE'
 
+// ── Built-in WebSearch searches (ADR-0018) ───────────────────────────────
+
+/**
+ * One result of Claude Code's built-in WebSearch. Anthropic's terms are treated like
+ * decisions-only retention: only the URL hash, registrable domain, ranks and the decision
+ * are stored, never the title or the URL.
+ */
+export interface BuiltinRecordedResult {
+  readonly url: string
+  /** 1-based position in the built-in result list. */
+  readonly rank: number
+  readonly visibility: Visibility
+  readonly reason?: HiddenReason
+  readonly rule?: RuleRef
+  /** 1-based position after filtering and reordering, for kept results. */
+  readonly outRank?: number
+  readonly flags: readonly ResultFlag[]
+  readonly sourceType: SourceType
+}
+
+export interface RecordBuiltinInput {
+  readonly receiptId: string
+  readonly sessionId?: string
+  /** Already redacted (ADR-0015 point 4). */
+  readonly queryRedacted: string
+  readonly profile: string
+  readonly latencyMs: number
+  readonly toolUseId?: string
+  readonly results: readonly BuiltinRecordedResult[]
+  /** Epoch ms; defaults to the store clock. */
+  readonly createdAt?: number
+}
+
+/** A search as the log shows it: the summary plus its mode and the session's client name. */
+export interface SearchLogRow extends SearchSummary {
+  readonly mode: 'engines' | 'builtin'
+  readonly clientName: string | null
+}
+
+// ── Sessions, receipts, gateways (ADR-0004, ADR-0005) ────────────────────
+
+export interface SessionWrite {
+  readonly id: string
+  readonly hostProfile: string
+  readonly hostKey?: string
+  /** 'hook' | 'meta' | 'env' | 'fallback' (read tolerantly). */
+  readonly keySource: string
+  readonly clientName?: string
+  readonly clientVersion?: string
+  readonly protocolEra?: string
+  readonly projectDir?: string
+  readonly gatewayId?: string
+  /** Omitted means no open receipt. */
+  readonly openReceiptId?: string
+  readonly turnOpen: boolean
+}
+
+export interface SessionRow {
+  readonly id: string
+  readonly hostProfile: string
+  readonly hostKey: string | null
+  readonly keySource: string
+  readonly clientName: string | null
+  readonly clientVersion: string | null
+  readonly protocolEra: string | null
+  readonly projectDir: string | null
+  readonly gatewayId: string | null
+  readonly openReceiptId: string | null
+  readonly turnOpen: boolean
+  readonly startedAt: number
+  readonly lastSeenAt: number
+}
+
+export interface ReceiptRow {
+  readonly id: string
+  readonly sessionId: string | null
+  readonly createdAt: number
+  readonly updatedAt: number
+  readonly closedAt: number | null
+  readonly searchCount: number
+  readonly fetchCount: number
+  readonly duplicateOf: string | null
+}
+
+export interface GatewayWrite {
+  readonly id: string
+  readonly pid: number
+  readonly hostProfile: string
+  readonly clientName?: string
+  readonly clientVersion?: string
+  readonly appVersion: string
+  readonly schemaVersionKnown?: number
+  readonly startedAt: number
+}
+
+export interface GatewayRow {
+  readonly id: string
+  readonly pid: number
+  readonly hostProfile: string
+  readonly clientName: string | null
+  readonly clientVersion: string | null
+  readonly appVersion: string
+  readonly schemaVersionKnown: number | null
+  readonly startedAt: number
+  readonly lastSeenAt: number
+}
+
+// ── Fetches ──────────────────────────────────────────────────────────────
+
+/** One opened (or refused) page. URLs are stored only as hashes; page text never. */
+export interface FetchWrite {
+  readonly receiptId: string
+  readonly sessionId?: string
+  readonly toolUseId?: string
+  readonly urlHash: string
+  readonly finalUrlHash?: string
+  readonly host?: string
+  readonly registrableDomain?: string
+  readonly status?: number
+  readonly contentType?: string
+  readonly bytes?: number
+  readonly title?: string
+  /** 'opened' | 'refused' (read tolerantly). */
+  readonly decision: string
+  /** Refusal reason, or 'builtin_webfetch' for pages Claude Code's WebFetch opened. */
+  readonly reason?: string
+  readonly ruleId?: string
+  readonly dates?: readonly FoundDate[]
+  readonly effectiveDate?: FoundDate
+  readonly latencyMs?: number
+}
+
+export interface FetchRow {
+  readonly id: number
+  readonly receiptId: string
+  readonly sessionId: string | null
+  readonly toolUseId: string | null
+  readonly urlHash: string
+  readonly finalUrlHash: string | null
+  readonly host: string | null
+  readonly registrableDomain: string | null
+  readonly status: number | null
+  readonly contentType: string | null
+  readonly bytes: number | null
+  readonly title: string | null
+  readonly decision: string | null
+  readonly reason: string | null
+  readonly ruleId: string | null
+  readonly dates: readonly StoredDate[]
+  readonly effectiveDate: string | null
+  readonly latencyMs: number | null
+  readonly createdAt: number
+}
+
+// ── Rule state (ADR-0008) ────────────────────────────────────────────────
+
+export interface SessionRuleWrite {
+  readonly id: string
+  readonly sessionId: string
+  /** JSON-serialisable rule body. */
+  readonly rule: unknown
+  /** Epoch ms after which the rule no longer applies. */
+  readonly until?: number
+}
+
+export interface SessionRuleRow {
+  readonly id: string
+  readonly sessionId: string
+  /** Parsed `rule_json`; null when unreadable. Validate before use. */
+  readonly rule: unknown
+  readonly createdAt: number
+  readonly until: number | null
+}
+
+export interface TrustRow {
+  /** Absolute path of the project rules file. */
+  readonly path: string
+  readonly sha256: string
+  readonly trustedAt: number
+}
+
+export interface LastGoodWrite {
+  readonly sourcePath: string
+  readonly sha256: string
+  readonly compilerVersion: string
+  /** JSON-serialisable loaded rules. */
+  readonly compiled: unknown
+}
+
+export interface LastGoodRow {
+  readonly sourcePath: string
+  readonly sha256: string
+  readonly compilerVersion: string
+  /** Parsed `compiled_json`; null when unreadable. Validate before use. */
+  readonly compiled: unknown
+  readonly savedAt: number
+}
+
+export interface SuggestionWrite {
+  readonly sessionId?: string
+  readonly receiptId?: string
+  /** JSON-serialisable proposal; a `dedupeKey` field is used by `findPending`. */
+  readonly rule: unknown
+  readonly reason?: string
+}
+
+export interface SuggestionRow {
+  readonly id: number
+  readonly sessionId: string | null
+  readonly receiptId: string | null
+  /** 'pending' | 'approved' | 'rejected' (read tolerantly). */
+  readonly status: string
+  /** Parsed `rule_json`; null when unreadable. Validate before use. */
+  readonly rule: unknown
+  readonly reason: string | null
+  readonly createdAt: number
+  readonly resolvedAt: number | null
+}
+
 // ── The store ────────────────────────────────────────────────────────────
 
 export interface EngineHealthApi {
@@ -442,6 +665,69 @@ export interface MaintenanceApi {
   optimize(): void
 }
 
+export interface SearchLogApi {
+  /** Newest first; `limit` is clamped to 1..500. */
+  recent(opts: { limit: number; hiddenOnly?: boolean }): SearchLogRow[]
+  get(id: number): SearchLogRow | undefined
+  byReceipt(receiptId: string): SearchLogRow[]
+  /** Hidden-result counts by reason, per search id. */
+  hiddenReasons(searchIds: readonly number[]): Map<number, Record<string, number>>
+}
+
+/** Write methods return false when the write was skipped (read-only, no history) or the database was busy. */
+export interface SessionsApi {
+  upsert(w: SessionWrite): boolean
+  get(id: string): SessionRow | undefined
+}
+
+export interface ReceiptsApi {
+  ensure(id: string, sessionId?: string): boolean
+  get(id: string): ReceiptRow | undefined
+  close(id: string): boolean
+  reopen(id: string): boolean
+  latestForSession(sessionId: string): ReceiptRow | undefined
+}
+
+export interface FetchesApi {
+  /** Records a fetch and bumps its receipt in one transaction. */
+  record(w: FetchWrite): boolean
+  byReceipt(receiptId: string): FetchRow[]
+}
+
+export interface SuggestionsApi {
+  /** Returns the new id, or undefined when the write was skipped. */
+  add(w: SuggestionWrite): number | undefined
+  get(id: number): SuggestionRow | undefined
+  list(limit?: number): SuggestionRow[]
+  findPending(dedupeKey: string): SuggestionRow | undefined
+  resolve(id: number, status: 'approved' | 'rejected'): boolean
+}
+
+export interface SessionRulesApi {
+  add(w: SessionRuleWrite): boolean
+  /** Unexpired rules of one session, or of every session. */
+  list(sessionId?: string): SessionRuleRow[]
+  remove(id: string): boolean
+  clear(sessionId: string): number
+}
+
+export interface ProjectTrustApi {
+  get(path: string): TrustRow | undefined
+  set(path: string, sha256: string): boolean
+  remove(path: string): boolean
+}
+
+export interface LastGoodApi {
+  put(w: LastGoodWrite): boolean
+  latest(sourcePath: string): LastGoodRow | undefined
+}
+
+export interface GatewaysApi {
+  heartbeat(w: GatewayWrite): boolean
+  /** Gateways seen at or after `since` (epoch ms). */
+  list(since: number): GatewayRow[]
+}
+
 export interface Store {
   readonly dbPath: string
   status(): StoreStatus
@@ -452,6 +738,8 @@ export interface Store {
    * BUSY goes to the retry queue; read-only and errors become `skipped` with a warning.
    */
   recordSearch(input: RecordSearchInput): RecordSearchResult
+  /** Logs a built-in WebSearch (decisions only), with the same write discipline as `recordSearch`. */
+  recordBuiltinSearch(input: RecordBuiltinInput): RecordSearchResult
   /** Retries queued searches now (also runs on a jittered timer). Drops entries older than 10 s. */
   flushRetries(): FlushReport
 
@@ -467,6 +755,15 @@ export interface Store {
   readonly meta: MetaApi
   readonly retention: RetentionApi
   readonly maintenance: MaintenanceApi
+  readonly searchLog: SearchLogApi
+  readonly sessions: SessionsApi
+  readonly receipts: ReceiptsApi
+  readonly fetches: FetchesApi
+  readonly suggestions: SuggestionsApi
+  readonly sessionRules: SessionRulesApi
+  readonly projectTrust: ProjectTrustApi
+  readonly rulesLastGood: LastGoodApi
+  readonly gateways: GatewaysApi
 
   dataEpoch(): number
   /** Bumps `data_epoch` (any process that deletes in bulk). Undefined when skipped. */

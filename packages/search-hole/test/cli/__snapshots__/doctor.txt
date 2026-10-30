@@ -1,0 +1,19 @@
+search-hole 0.1.0 doctor
+
+✓ Node 26.13.0 — meets >=22.13
+! No search engine is set up — Claude Code's own search is used
+    → searchhole searxng up
+✗ Database cannot be opened
+    → Check permissions on ~/.searchhole
+
+Engines
+  searxng  inactive  unhealthy · last error unreachable
+  tavily   inactive  missing_key
+
+Paths
+  config     /home/u/.searchhole
+  data       /home/u/.searchhole
+  run        /home/u/.searchhole/run
+  chosen by  dot-dir
+
+1 problem to fix, 1 warning.

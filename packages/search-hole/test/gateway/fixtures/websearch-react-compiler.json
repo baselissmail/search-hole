@@ -1,0 +1,44 @@
+{
+  "_comment": "Claude Code 2.1.312 WebSearch hook data, shape as recorded in docs/research/spikes-2026-10-30.md §6 (titles and URLs only; one result block plus the search step's summary string). tool_input and tool_response arrive in mcp_tool hooks as JSON strings (spikes addendum).",
+  "tool_input": { "query": "react compiler" },
+  "tool_response": {
+    "query": "react compiler",
+    "results": [
+      {
+        "tool_use_id": "srvtoolu_01KXWbQwq1Bm7bJ1oYf6Xq3d",
+        "content": [
+          { "title": "React Compiler – React", "url": "https://react.dev/learn/react-compiler" },
+          {
+            "title": "React Compiler: A complete guide - LogRocket Blog",
+            "url": "https://blog.logrocket.com/react-compiler-complete-guide/"
+          },
+          { "title": "React Compiler – React", "url": "https://az.react.dev/learn/react-compiler" },
+          {
+            "title": "How fast is the React Compiler? - DebugBear",
+            "url": "https://www.debugbear.com/blog/react-compiler"
+          },
+          {
+            "title": "next.config.js: reactCompiler | Next.js",
+            "url": "https://nextjs.org/docs/app/api-reference/config/next-config-js/reactCompiler"
+          },
+          { "title": "Online React Compiler", "url": "https://www.programiz.com/react/online-compiler/" },
+          {
+            "title": "reactwg/react-compiler · Discussions · GitHub",
+            "url": "https://github.com/reactwg/react-compiler/discussions"
+          },
+          {
+            "title": "React Compiler v1.0 – React",
+            "url": "https://react.dev/blog/2025/10/07/react-compiler-1"
+          },
+          {
+            "title": "React Compiler explained - DEV Community",
+            "url": "https://dev.to/devwriter/react-compiler-explained-3k2j"
+          }
+        ]
+      },
+      "React Compiler is a build-time tool that automatically memoizes React components and hooks. According to the React docs and a LogRocket guide, it removes most manual useMemo and useCallback calls; DebugBear measured faster interactions on real apps."
+    ],
+    "durationSeconds": 6.214,
+    "searchCount": 1
+  }
+}

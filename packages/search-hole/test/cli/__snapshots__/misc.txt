@@ -1,0 +1,14 @@
+#3  pending  block spam.example  (global)  "SEO copy of the docs"  2026-10-30 11:00
+
+Approve: searchhole approve <id>   Reject: searchhole reject <id>
+---
+No suggestions waiting.
+---
+tavily  set      keychain
+brave   not set
+---
+auto (working as builtin): Claude Code's own WebSearch runs, with your rules applied to it.
+---
+https://pinterest.com/pin/1
+hidden by rule
+  T3 global: block pinterest.com

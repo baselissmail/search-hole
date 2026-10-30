@@ -1,0 +1,154 @@
+{
+  "description": "search-hole hooks: turn bracketing, built-in WebSearch/WebFetch filtering, rule-change guard, one-line receipt, Node preflight. All answered by the search-hole gateway except the preflight.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ". \"${CLAUDE_PLUGIN_ROOT}/hooks/preflight.ps1\"",
+            "onFailure": "continue",
+            "timeout": 5
+          },
+          {
+            "type": "mcp_tool",
+            "server": "plugin:search-hole:search-hole",
+            "tool": "hook",
+            "input": {
+              "event": "SessionStart",
+              "sessionId": "${session_id}",
+              "source": "${source}"
+            },
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "plugin:search-hole:search-hole",
+            "tool": "hook",
+            "input": {
+              "event": "UserPromptSubmit",
+              "sessionId": "${session_id}"
+            },
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "WebSearch|WebFetch",
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "plugin:search-hole:search-hole",
+            "tool": "hook",
+            "timeout": 15,
+            "input": {
+              "event": "PreToolUse",
+              "sessionId": "${session_id}",
+              "agentType": "${agent_type}",
+              "toolName": "${tool_name}",
+              "toolInput": "${tool_input}"
+            }
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "plugin:search-hole:search-hole",
+            "tool": "hook",
+            "timeout": 15,
+            "input": {
+              "event": "PreToolUse",
+              "sessionId": "${session_id}",
+              "agentType": "${agent_type}",
+              "toolName": "${tool_name}",
+              "command": "${tool_input.command}"
+            }
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "plugin:search-hole:search-hole",
+            "tool": "hook",
+            "timeout": 15,
+            "input": {
+              "event": "PreToolUse",
+              "sessionId": "${session_id}",
+              "agentType": "${agent_type}",
+              "toolName": "${tool_name}",
+              "filePath": "${tool_input.file_path}"
+            }
+          }
+        ]
+      },
+      {
+        "matcher": "NotebookEdit",
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "plugin:search-hole:search-hole",
+            "tool": "hook",
+            "timeout": 15,
+            "input": {
+              "event": "PreToolUse",
+              "sessionId": "${session_id}",
+              "agentType": "${agent_type}",
+              "toolName": "${tool_name}",
+              "filePath": "${tool_input.notebook_path}"
+            }
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "WebSearch|WebFetch",
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "plugin:search-hole:search-hole",
+            "tool": "hook",
+            "input": {
+              "event": "PostToolUse",
+              "sessionId": "${session_id}",
+              "toolName": "${tool_name}",
+              "toolInput": "${tool_input}",
+              "toolResponse": "${tool_response}"
+            },
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "plugin:search-hole:search-hole",
+            "tool": "hook",
+            "input": {
+              "event": "Stop",
+              "sessionId": "${session_id}"
+            },
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

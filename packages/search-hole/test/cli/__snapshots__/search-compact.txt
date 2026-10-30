@@ -1,0 +1,14 @@
+search-hole · 2 results · 3 hidden (1 rule, 1 list, 1 stale) · searxng 690ms, brave failed (rate_limited), tavily skipped (missing_key) · receipt rcpt_abc123
+
+1. React Compiler – React  [official · 2025-10-07 · pinned · updated]
+   https://react.dev/learn/react-compiler
+   The React Compiler is a build-time tool that automatically memoizes your components.
+
+2. Compiler tracking issue  [repo · no date · raised]
+   https://github.com/facebook/react/issues/1
+   Tracking issue
+
+⚠ No official or docs source among the results.
+⚠ brave could not answer; searxng was used instead.
+
+3 results hidden (pinterest.com, w3schools.com). Add --explain to see why.

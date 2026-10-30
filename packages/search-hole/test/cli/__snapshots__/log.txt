@@ -1,0 +1,4 @@
+#12  2026-10-30 14:02  "react compiler"            coding/standard          8 kept · 3 hidden  searxng+brave  812 ms
+#11  2026-10-30 13:40  "node sqlite DatabaseSync"  coding/quick (built-in)  6 kept             -              40 ms
+
+Details: searchhole log show <id>

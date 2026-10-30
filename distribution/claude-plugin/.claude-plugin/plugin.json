@@ -1,0 +1,36 @@
+{
+  "name": "search-hole",
+  "version": "0.1.0",
+  "description": "A local search gateway for AI assistants: choose the engines and sites your AI searches, see every search, get source receipts.",
+  "author": {
+    "name": "Basel Issmail",
+    "url": "https://github.com/baselissmail"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/baselissmail/search-hole",
+  "repository": "https://github.com/baselissmail/search-hole",
+  "keywords": ["search", "web-search", "privacy", "mcp", "source-filtering"],
+  "userConfig": {
+    "brave_api_key": {
+      "type": "string",
+      "title": "Brave Search API key (optional)",
+      "description": "Optional extra engine. Brave gives $5 of free credit per month (about 1,000 searches) but asks for a card and an attribution link; sign up at https://brave.com/search/api/. Leave empty to skip.",
+      "sensitive": true,
+      "required": false
+    },
+    "tavily_api_key": {
+      "type": "string",
+      "title": "Tavily API key (optional)",
+      "description": "Optional extra engine with the easiest free tier: 1,000 searches per month, no credit card. Sign up at https://app.tavily.com and paste the key. Leave empty to skip.",
+      "sensitive": true,
+      "required": false
+    },
+    "search_mode": {
+      "type": "string",
+      "title": "Search mode",
+      "description": "auto (default): use your engines when one is healthy, otherwise filter Claude's built-in WebSearch. builtin: always filter the built-in WebSearch. engines: always route searches through search-hole's engines. Values: auto, builtin, engines.",
+      "options": ["auto", "builtin", "engines"],
+      "default": "auto"
+    }
+  }
+}

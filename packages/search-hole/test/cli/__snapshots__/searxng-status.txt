@@ -1,0 +1,26 @@
+docker      available
+container   search-hole-searxng running
+image       pinned image
+port        127.0.0.1:8888
+health      healthy
+url         http://127.0.0.1:8888
+files       /home/u/.searchhole/searxng
+---
+docker      available
+container   search-hole-searxng not created
+url         http://127.0.0.1:8888
+files       /home/u/.searchhole/searxng
+
+→ Start it with: searchhole searxng up
+---
+docker      not installed
+url         http://127.0.0.1:8888
+files       /home/u/.searchhole/searxng
+
+→ Install Docker, or use a free Tavily key: searchhole keys set tavily
+---
+docker      installed, but the daemon is not running
+url         http://127.0.0.1:8888
+files       /home/u/.searchhole/searxng
+
+→ Start Docker, then run: searchhole searxng up

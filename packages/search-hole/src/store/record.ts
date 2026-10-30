@@ -6,8 +6,10 @@
  * queries/searches.ts only inserts what this plan contains.
  */
 import { createHash } from 'node:crypto'
+import { canonicalKey, hostOf, registrableDomain } from '../core/url.ts'
 import type { EngineId, EngineRetention, MergedResult, RuleRef } from '../shared/types.ts'
-import type { RecordedResult, RecordSearchInput } from './types.ts'
+import { BUILTIN_ENGINE } from './queries/log.ts'
+import type { RecordBuiltinInput, RecordedResult, RecordSearchInput } from './types.ts'
 
 const HOUR_MS = 3_600_000
 const DAY_MS = 86_400_000
@@ -231,5 +233,89 @@ export function planRecord(input: RecordSearchInput, createdAt: number): RecordP
     results: input.results.map((r) => buildResult(r, input.retention, createdAt, capDays)),
     day: new Date(createdAt).toISOString().slice(0, 10),
     stats: buildStats(input),
+  }
+}
+
+/**
+ * Builds the rows for one built-in WebSearch (ADR-0018). Stored like a decisions-only
+ * engine: URL hash, registrable domain, ranks, decision and rule; never title or URL. The
+ * single engine run `builtin` marks the search's mode.
+ */
+export function planBuiltinRecord(input: RecordBuiltinInput, createdAt: number): RecordPlan {
+  let kept = 0
+  let hidden = 0
+  const results: ResultRow[] = input.results.map((r) => {
+    const isHidden = r.visibility === 'hidden'
+    if (isHidden) hidden++
+    else kept++
+    const key = canonicalKey(r.url)
+    const host = hostOf(r.url) ?? ''
+    const rule = r.rule
+    const rank = Number.isFinite(r.rank) && r.rank >= 1 ? Math.floor(r.rank) : 0
+    return {
+      engine: BUILTIN_ENGINE,
+      rawRank: rank,
+      positionsJson: JSON.stringify({ [BUILTIN_ENGINE]: rank }),
+      canonicalKey: null,
+      urlHash: urlHash(key ?? r.url),
+      registrableDomain: clip(host === '' ? '' : registrableDomain(host), MAX_DOMAIN),
+      decision: r.visibility,
+      reason: isHidden && r.reason !== undefined ? r.reason : null,
+      ruleId: rule?.ruleId ?? null,
+      tier: rule?.tier ?? null,
+      listId: rule?.listId ?? null,
+      ruleText: rule === undefined ? null : clip(rule.text, MAX_RULE_TEXT),
+      flagsJson: JSON.stringify(r.flags),
+      sourceType: r.sourceType,
+      datesJson: '[]',
+      effectiveDate: null,
+      effectiveKind: null,
+      effectiveConfidence: null,
+      outRank: isHidden ? null : (r.outRank ?? null),
+      fused: 0,
+      adjusted: 0,
+      payloads: [],
+    }
+  })
+  const latencyMs = Math.max(0, Math.round(input.latencyMs))
+  return {
+    search: {
+      receiptId: input.receiptId,
+      sessionId: input.sessionId ?? null,
+      queryRedacted: clip(input.queryRedacted, MAX_QUERY),
+      profile: input.profile,
+      depth: 'standard',
+      enginesJson: JSON.stringify([
+        { engine: BUILTIN_ENGINE, status: 'ok', returned: input.results.length, latencyMs },
+      ]),
+      latencyMs,
+      keptCount: kept,
+      hiddenCount: hidden,
+      pushedRuleIdsJson: null,
+      toolUseId: input.toolUseId ?? null,
+      createdAt,
+    },
+    results,
+    day: new Date(createdAt).toISOString().slice(0, 10),
+    stats: [
+      {
+        engine: BUILTIN_ENGINE,
+        searches: 1,
+        resultsReturned: input.results.length,
+        kept: 0,
+        hidden: 0,
+        errors: 0,
+        latencyMsTotal: latencyMs,
+      },
+      {
+        engine: '*',
+        searches: 1,
+        resultsReturned: input.results.length,
+        kept,
+        hidden,
+        errors: 0,
+        latencyMsTotal: latencyMs,
+      },
+    ],
   }
 }

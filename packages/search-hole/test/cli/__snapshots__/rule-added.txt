@@ -1,0 +1,2 @@
+✓ block pinterest.com (global) as r_blk0000002 · from rules.yaml:9
+  Undo with: searchhole unrule r_blk0000002

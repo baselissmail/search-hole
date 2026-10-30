@@ -202,10 +202,12 @@ function parseJson<T>(text: string | null, schema: z.ZodType<T>, fallback: T): T
   }
 }
 
-const SEARCH_COLUMNS = `id, receipt_id, session_id, query_redacted, profile, depth, engines_json, latency_ms,
+/** Column list of `searches` as this version reads it. */
+export const SEARCH_COLUMNS = `id, receipt_id, session_id, query_redacted, profile, depth, engines_json, latency_ms,
   kept_count, hidden_count, pushed_rule_ids_json, tool_use_id, created_at`
 
-function toSummary(raw: unknown): SearchSummary {
+/** Parses one `searches` row (tolerant JSON columns). */
+export function toSummary(raw: unknown): SearchSummary {
   const r = searchRow.parse(raw)
   const engines: StoredEngineRun[] = parseJson(r.engines_json, engineRunJson, []).map((e) => ({
     engine: e.engine,

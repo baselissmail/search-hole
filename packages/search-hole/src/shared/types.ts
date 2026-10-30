@@ -13,7 +13,15 @@
 export type EngineId = 'searxng' | 'brave' | 'tavily' | 'exa' | 'mojeek' | 'kagi' | 'marginalia'
 
 /** Every EngineId, in default display order. */
-export const ENGINE_ID_LIST = ['searxng', 'brave', 'tavily', 'exa', 'mojeek', 'kagi', 'marginalia'] as const satisfies readonly EngineId[]
+export const ENGINE_ID_LIST = [
+  'searxng',
+  'brave',
+  'tavily',
+  'exa',
+  'mojeek',
+  'kagi',
+  'marginalia',
+] as const satisfies readonly EngineId[]
 
 export type Depth = 'quick' | 'standard' | 'deep'
 
