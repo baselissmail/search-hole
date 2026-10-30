@@ -13,7 +13,8 @@ afterEach(async () => {
   open = []
 })
 
-async function connected(era: (typeof ERAS)[number], h = harness()) {
+// Structured output is for hosts that render it; Claude Code gets text only (see the last test).
+async function connected(era: (typeof ERAS)[number], h = harness({ host: 'generic' })) {
   const c = await connect(h.gateway, era)
   open.push(c)
   return { h, client: c.client }
@@ -57,7 +58,7 @@ const RECEIPT: Receipt = {
 }
 
 describe.each(ERAS)('tool calls (%s era)', (era) => {
-  test('search renders compact text and structuredContent, and passes the request context', async () => {
+  test('search renders compact text (Claude Code: no structuredContent) and passes the request context', async () => {
     const { h, client } = await connected(
       era,
       harness({ env: { CLAUDE_PROJECT_DIR: '/work/project', CLAUDE_CODE_SESSION_ID: 'sess-env' } }),
@@ -74,9 +75,7 @@ describe.each(ERAS)('tool calls (%s era)', (era) => {
     )
     expect(text).toContain('1. Result 1 title  [docs]')
     expect(text.endsWith(UNTRUSTED_FOOTER)).toBe(true)
-    const sc = result.structuredContent as Record<string, unknown>
-    expect(sc.receiptId).toBe('rcpt_AAAAAAAAAAAAAAAAAAAAAA')
-    expect((sc.results as unknown[]).length).toBe(3)
+    expect(result.structuredContent).toBeUndefined()
 
     const call = h.app()?.callsTo('search')[0]
     expect(call?.args[0]).toEqual({ query: 'react compiler', depth: 'quick', maxAgeDays: 30, limit: 10 })
@@ -87,8 +86,16 @@ describe.each(ERAS)('tool calls (%s era)', (era) => {
     expect(call?.ctx?.signal).toBeInstanceOf(AbortSignal)
   })
 
+  test('other hosts get structuredContent with the receipt id and results', async () => {
+    const { client } = await connected(era)
+    const result = await client.callTool({ name: 'search', arguments: { query: 'react compiler' } })
+    const sc = result.structuredContent as Record<string, unknown>
+    expect(sc.receiptId).toBe('rcpt_AAAAAAAAAAAAAAAAAAAAAA')
+    expect((sc.results as unknown[]).length).toBe(3)
+  })
+
   test('host conversation keys in _meta become the session (ADR-0005)', async () => {
-    const { h, client } = await connected(era, harness({ env: {}, cwd: '/home/tester' }))
+    const { h, client } = await connected(era, harness({ host: 'generic', env: {}, cwd: '/home/tester' }))
     for (const [key, value] of [
       ['openai/session', 'conv-openai'],
       ['vscode.conversationId', 'conv-vscode'],
@@ -101,7 +108,7 @@ describe.each(ERAS)('tool calls (%s era)', (era) => {
     await client.callTool({ name: 'search', arguments: { query: 'q' } })
     const last = h.app()?.callsTo('search').at(-1)?.ctx
     expect(last?.session?.source).toBe('fallback')
-    expect(last?.session?.key).toMatch(/^fallback:claude-code:4242:/)
+    expect(last?.session?.key).toMatch(/^fallback:generic:4242:/)
     expect(last?.projectDir).toBeUndefined()
   })
 
@@ -116,7 +123,7 @@ describe.each(ERAS)('tool calls (%s era)', (era) => {
   })
 
   test('unexpected failures become a generic tool error and are logged', async () => {
-    const { h, client } = await connected(era, harness({ fake: { failing: ['search'] } }))
+    const { h, client } = await connected(era, harness({ host: 'generic', fake: { failing: ['search'] } }))
     const result = await client.callTool({ name: 'search', arguments: { query: 'q' } })
     expect(result.isError).toBe(true)
     expect(textOf(result)).toBe(INTERNAL_ERROR_TEXT)
@@ -124,7 +131,7 @@ describe.each(ERAS)('tool calls (%s era)', (era) => {
   })
 
   test('a failed App start is a tool error, and the next call retries', async () => {
-    const { h, client } = await connected(era, harness({ failCreate: 1 }))
+    const { h, client } = await connected(era, harness({ host: 'generic', failCreate: 1 }))
     const first = await client.callTool({ name: 'search', arguments: { query: 'q' } })
     expect(first.isError).toBe(true)
     const second = await client.callTool({ name: 'search', arguments: { query: 'q' } })
@@ -147,7 +154,7 @@ describe.each(ERAS)('tool calls (%s era)', (era) => {
         mergedResult(i + 1, { title: `T${i} ${long}`, snippet: long }),
       ),
     })
-    const { client } = await connected(era, harness({ fake: { search: () => outcome } }))
+    const { client } = await connected(era, harness({ host: 'generic', fake: { search: () => outcome } }))
     const result = await client.callTool({ name: 'search', arguments: { query: 'q', depth: 'quick' } })
     const text = textOf(result)
     expect(text).toMatch(/\+\d+ more \(raise limit or use deep\)/)
@@ -175,7 +182,10 @@ describe.each(ERAS)('tool calls (%s era)', (era) => {
   })
 
   test('fetch of a blocked site is a tool error naming the rule', async () => {
-    const { client } = await connected(era, harness({ fake: { blockedDomains: ['pinterest.com'] } }))
+    const { client } = await connected(
+      era,
+      harness({ host: 'generic', fake: { blockedDomains: ['pinterest.com'] } }),
+    )
     const result = await client.callTool({
       name: 'fetch',
       arguments: { url: 'https://www.pinterest.com/pin/1' },
@@ -187,7 +197,7 @@ describe.each(ERAS)('tool calls (%s era)', (era) => {
   })
 
   test("receipt with no ids shows the session's latest; unknown ids are an error", async () => {
-    const { client } = await connected(era, harness({ fake: { receipts: [RECEIPT] } }))
+    const { client } = await connected(era, harness({ host: 'generic', fake: { receipts: [RECEIPT] } }))
     const latest = await client.callTool({ name: 'receipt', arguments: {} })
     expect(latest.isError).not.toBe(true)
     expect(textOf(latest)).toContain('receipt rcpt_CCCCCCCCCCCCCCCCCCCCCC · 1 search · 11 results')
@@ -236,5 +246,21 @@ describe.each(ERAS)('tool calls (%s era)', (era) => {
       results.push(JSON.stringify(r.structuredContent))
     }
     expect(results[0]).toBe(results[1])
+  })
+
+  describe('Claude Code profile', () => {
+    test.each(ERAS)(
+      '%s era: tools return the compact text only, no structuredContent or outputSchema',
+      async (era) => {
+        const h = harness({ host: 'claude-code' })
+        const c = await connect(h.gateway, era)
+        open.push(c)
+        const { tools } = await c.client.listTools()
+        for (const t of tools) expect(t.outputSchema, t.name).toBeUndefined()
+        const res = await c.client.callTool({ name: 'search', arguments: { query: 'react compiler' } })
+        expect(res.structuredContent).toBeUndefined()
+        expect(textOf(res)).toContain('search-hole')
+      },
+    )
   })
 })

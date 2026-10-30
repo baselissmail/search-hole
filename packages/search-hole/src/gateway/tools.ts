@@ -77,6 +77,9 @@ const text = (t: string): CallToolResult['content'] => [{ type: 'text', text: t 
 /** Registers the tools for this host profile on one server instance. */
 export function registerTools(server: McpServer, deps: ToolDeps): void {
   const legacy = server.server
+  // Claude Code hands a tool's structuredContent (not its text) to the model, as the live E2E on
+  // 2026-10-30 showed. It renders no MCP Apps, so it gets the compact, budgeted text only (ADR-0012).
+  const structured = deps.host !== 'claude-code'
   const ctxOf = (ctx: HandlerContextLike) =>
     buildRequestCtx(requestContext(ctx, deps.era, legacy), deps.sessions, deps.proc)
 
@@ -93,7 +96,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
     {
       description: TOOL_DESCRIPTIONS.search,
       inputSchema: searchInput,
-      outputSchema: searchOutput,
+      ...(structured ? { outputSchema: searchOutput } : {}),
       annotations: { readOnlyHint: true, openWorldHint: true },
       _meta: { 'anthropic/alwaysLoad': true },
     },
@@ -111,7 +114,10 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         if (args.limit !== undefined) search.limit = Math.min(args.limit, LIMIT_MAX[args.depth ?? 'deep'])
         if (args.receiptId !== undefined) search.receiptId = args.receiptId
         const outcome = await app.search(search, rctx)
-        return { content: text(renderSearchText(outcome).text), structuredContent: searchStructured(outcome) }
+        return {
+          content: text(renderSearchText(outcome).text),
+          ...(structured ? { structuredContent: searchStructured(outcome) } : {}),
+        }
       } catch (err) {
         return toolErrorFrom(err, deps.log, 'search')
       }
@@ -123,7 +129,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
     {
       description: TOOL_DESCRIPTIONS.fetch,
       inputSchema: fetchInput,
-      outputSchema: fetchOutput,
+      ...(structured ? { outputSchema: fetchOutput } : {}),
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async (args, ctx) => {
@@ -138,7 +144,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         if (outcome.kind === 'refused') return toolError(refusalText(outcome))
         return {
           content: text(renderFetchText(outcome, args.maxTokens)),
-          structuredContent: fetchStructured(outcome),
+          ...(structured ? { structuredContent: fetchStructured(outcome) } : {}),
         }
       } catch (err) {
         return toolErrorFrom(err, deps.log, 'fetch')
@@ -151,7 +157,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
     {
       description: TOOL_DESCRIPTIONS.receipt,
       inputSchema: receiptInput,
-      outputSchema: receiptOutput,
+      ...(structured ? { outputSchema: receiptOutput } : {}),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     async (args, ctx) => {
@@ -166,7 +172,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         }
         return {
           content: text(renderReceiptText(receipts, args.format ?? 'summary')),
-          structuredContent: receiptStructured(receipts),
+          ...(structured ? { structuredContent: receiptStructured(receipts) } : {}),
         }
       } catch (err) {
         return toolErrorFrom(err, deps.log, 'receipt')
@@ -179,7 +185,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
     {
       description: TOOL_DESCRIPTIONS.suggest_rule,
       inputSchema: suggestRuleInput,
-      outputSchema: suggestRuleOutput,
+      ...(structured ? { outputSchema: suggestRuleOutput } : {}),
       annotations: {
         readOnlyHint: false,
         openWorldHint: false,
@@ -199,7 +205,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         const result = await app.suggestRule(input, rctx)
         return {
           content: text(renderSuggestionText(result)),
-          structuredContent: suggestionStructured(result),
+          ...(structured ? { structuredContent: suggestionStructured(result) } : {}),
         }
       } catch (err) {
         return toolErrorFrom(err, deps.log, 'suggest_rule')

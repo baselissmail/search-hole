@@ -46,7 +46,8 @@ describe.each(ERAS)('tools/list (%s era)', (era) => {
     }
     for (const t of tools) {
       expect(t.inputSchema.type).toBe('object')
-      if (t.name !== 'hook') expect(t.outputSchema?.type).toBe('object')
+      // Claude Code profile: text only (it would hand structuredContent to the model).
+      expect(t.outputSchema, t.name).toBeUndefined()
       expect(t.annotations?.readOnlyHint).toBeTypeOf('boolean')
       expect(t.annotations?.openWorldHint).toBeTypeOf('boolean')
       expect(t.description?.length ?? 0).toBeGreaterThan(20)
@@ -108,5 +109,13 @@ describe('modern-era cache hints', () => {
     const { client } = track(await connect(h.gateway, 'modern'))
     const list = (await client.listTools()) as Record<string, unknown>
     expect(list.ttlMs).toBe(0)
+  })
+
+  test.each(ERAS)('%s era: other hosts get object-rooted output schemas', async (era) => {
+    const h = harness({ host: 'generic' })
+    const { client } = track(await connect(h.gateway, era))
+    const { tools } = await client.listTools()
+    expect(tools.map((t) => t.name)).toEqual(['search', 'fetch', 'receipt', 'suggest_rule'])
+    for (const t of tools) expect(t.outputSchema?.type, t.name).toBe('object')
   })
 })
