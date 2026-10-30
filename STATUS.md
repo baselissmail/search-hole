@@ -59,9 +59,24 @@ Checklist per MASTER_PLAN.md §11. Decisions taken without asking Basel are note
 Scope, cut from P1–P3 for a first hands-on test (the rest follows in later releases):
 - [x] P1 modules (wave 1, 2026-10-30): rules engine + YAML, URL/merge/freshness/source types, SearXNG/Brave/Tavily adapters + health + fan-out + mock engine, SQLite store + migrations, safe fetcher + page dates + engine transport, paths/settings/keys/logging/query hygiene. 1,484 tests pass; typecheck, layers and lint are clean.
   - Known for later: a 20k-regex `RE2Set` costs 130–250 ms per URL, so the P6 list matcher needs a host prefilter. AMP-cache URLs of a blocked domain aren't matched yet. Brave/Tavily fixtures are hand-written from docs and not yet checked live.
-- [ ] Pipeline wiring + CLI: `search --explain`, `block|allow|pin|raise|lower|normal|unrule`, `rules`, `log`, `explain <url>`, `doctor`, `searxng up|down|status`, `keys set|status`, `mcp`
-- [ ] MCP gateway (SDK v2, both protocol eras): `search`, `fetch`, `receipt`, `suggest_rule`, plus the app-only `hook`; Claude Code `auto` / `builtin` / `engines` modes (ADR-0018)
-- [ ] Claude Code plugin: manifest, local marketplace, `.mcp.json`, `mcp_tool` hooks (UserPromptSubmit, PreToolUse WebSearch/WebFetch/Bash/Edit/Write, PostToolUse WebSearch/WebFetch, Stop), node preflight, skills (slash commands), research skill
-- [ ] End-to-end check with a real Claude Code session; install instructions in README
+- [x] Pipeline wiring + CLI: `search --explain`, `block|allow|pin|raise|lower|normal|unrule`, `rules`, `log`, `explain <url>`, `doctor`, `searxng up|down|status`, `keys set|status`, `mcp`
+- [x] MCP gateway (SDK v2, both protocol eras): `search`, `fetch`, `receipt`, `suggest_rule`, plus the app-only `hook`; Claude Code `auto` / `builtin` / `engines` modes (ADR-0018)
+- [x] Claude Code plugin: manifest, local marketplace, `.mcp.json`, `mcp_tool` hooks (UserPromptSubmit, PreToolUse WebSearch/WebFetch/Bash/Edit/Write, PostToolUse WebSearch/WebFetch, Stop), node preflight, skills (slash commands), research skill
+- [x] End-to-end check with a real Claude Code session; install instructions in README
+
+**v0.1 verified 2026-10-30** (2,018 tests; `claude plugin validate --strict` passes; live sessions with Claude Code 2.1.312 and the built plugin from an isolated copy):
+- built-in mode: blocked domains injected into WebSearch (no auto-approval), the model told the rules ran, pins first, search logged, Stop receipt line;
+- engines mode (SearXNG via `searchhole searxng up`): WebSearch denied and steered to `search`, compact text (not JSON) reaches the model, `fetch` with receipt grouping, "opened 1" in the receipt;
+- slash commands `/search-hole:block` and `/search-hole:log` run the CLI through skill injection;
+- the guard refused a model Bash call to `searchhole block`; ordinary Bash and Write pass with 2–7 ms hook overhead.
+
+Fixes from the live runs:
+- Claude Code hands `structuredContent` to the model, so its profile is text-only;
+- the PostToolUse note is always sent;
+- the no-engine guidance points to the filtered built-in search;
+- `suggest_rule` approval text has no runnable command;
+- lean hook inputs for Bash and file tools.
+
+Next for v0.1.x: a bundled `official-docs` list (better source typing and `prefer`); an adversarial review of the app and gateway code; `docs/rules.md`; the per-session loop guard; duplicate-copy detection; storing fetch URLs (migration 0002).
 
 Deferred past v0.1: dashboard (P4), MCP App panel and `.mcpb` (P5), list subscriptions and importers (P6), Cursor/Codex manifests (P7), release engineering (P8).
