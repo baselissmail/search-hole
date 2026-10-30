@@ -242,7 +242,7 @@ describe.each(ERAS)('hook tool (%s era)', (era) => {
       const spec = out.hookSpecificOutput as Record<string, unknown>
       expect(spec.hookEventName).toBe('PostToolUse')
       expect(spec.additionalContext).toBe(
-        'search-hole hid 2 results by your rules · receipt rcpt_BBBBBBBBBBBBBBBBBBBBBB',
+        "search-hole applied the user's source rules to this search: hid 2 results · receipt rcpt_BBBBBBBBBBBBBBBBBBBBBB",
       )
       const rebuilt = spec.updatedToolOutput as typeof FIXTURE.tool_response
       expect(Object.keys(rebuilt).sort()).toEqual(['durationSeconds', 'query', 'results', 'searchCount'])
@@ -269,14 +269,16 @@ describe.each(ERAS)('hook tool (%s era)', (era) => {
       const rebuilt = spec.updatedToolOutput as typeof FIXTURE.tool_response
       expect(rebuilt.results[1]).toBe(SUMMARY_WITHHELD)
       expect(spec.additionalContext).toBe(
-        'search-hole hid 1 result by your rules · receipt rcpt_BBBBBBBBBBBBBBBBBBBBBB',
+        "search-hole applied the user's source rules to this search: hid 1 result · receipt rcpt_BBBBBBBBBBBBBBBBBBBBBB",
       )
     })
 
-    test('pins come first; nothing hidden means no additionalContext', async () => {
+    test('pins come first; the note says what was pinned', async () => {
       const { out } = await run({ pinnedDomains: ['nextjs.org'] })()
       const spec = out.hookSpecificOutput as Record<string, unknown>
-      expect(spec.additionalContext).toBeUndefined()
+      expect(spec.additionalContext).toMatch(
+        /^search-hole applied the user's source rules to this search: pinned \d+ results? · receipt rcpt_/,
+      )
       const rebuilt = spec.updatedToolOutput as typeof FIXTURE.tool_response
       const block = rebuilt.results[0] as { content: { url: string }[] }
       expect(block.content[0]?.url).toBe(
@@ -285,9 +287,23 @@ describe.each(ERAS)('hook tool (%s era)', (era) => {
       expect(block.content.length).toBe(9)
     })
 
-    test('nothing to change answers {}', async () => {
+    test('nothing to change keeps the output and still tells the model the rules ran', async () => {
       const { out } = await run({})()
-      expect(out).toEqual({})
+      expect(out).toEqual({
+        hookSpecificOutput: {
+          hookEventName: 'PostToolUse',
+          additionalContext:
+            "search-hole applied the user's source rules to this search: checked every result (none matched a rule) · receipt rcpt_BBBBBBBBBBBBBBBBBBBBBB",
+        },
+      })
+    })
+
+    test('the note counts sites excluded upstream from the rewritten tool_input', async () => {
+      const input = { ...FIXTURE.tool_input, blocked_domains: ['logrocket.com', 'debugbear.com'] }
+      const { hook } = await setup(era, {})
+      const out = await hook(post('WebSearch', input, FIXTURE.tool_response))
+      const spec = out.hookSpecificOutput as Record<string, unknown>
+      expect(spec.additionalContext).toMatch(/excluded 2 blocked sites before the search/)
     })
 
     test('an unrecognised tool_response fails open with a warning', async () => {

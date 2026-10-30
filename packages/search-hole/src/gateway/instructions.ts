@@ -12,7 +12,7 @@ export const MAX_INSTRUCTIONS_CHARS = 2_000
 /** The server instructions, in ADR-0012 order. */
 export const SERVER_INSTRUCTIONS = [
   "search-hole is the user's own search gateway: their engines, their source rules, a receipt for every search.",
-  "1. Prefer search and fetch over built-in web search and web fetch: they apply the user's rules (blocked, pinned and preferred sites, freshness). site: and -site: work in queries.",
+  "1. Prefer search and fetch over built-in web search and web fetch: they apply the user's rules (blocked, pinned and preferred sites, freshness). site: and -site: work in queries. If search says no engine is set up, use the built-in web search for the rest of the session: search-hole filters it with the same rules.",
   '2. depth: quick for one fact, standard (default) for most questions, deep for research and comparisons.',
   '3. Pass the previous receiptId to group related searches and fetches.',
   '4. Read the ⚠ lines: stale results, missing dates, no official source, engine failures.',

@@ -42,7 +42,7 @@ engines:
   brave:      { enabled: true, plan: free-credit, caps: { day: 300, month: 900 }, pushdown: blocks, storageRights: false }
   tavily:     { enabled: true, caps: { day: 300, month: 900 } }   # no-Docker default (ADR-0017)
 fallback: [searxng, tavily, brave, exa]
-profiles_default: standard
+profiles_default: default
 retention: { days: 90 }                                # per-table defaults below
 ui: { port: 7341, idleMinutes: 30 }
 hooks: { mode: steer, guard: true, receiptLine: true } # ADR-0014
@@ -57,7 +57,7 @@ describe('defaults', () => {
   it('match ADR-0015 and ADR-0017', () => {
     expect(settings.version).toBe(1)
     expect(settings.fallback).toEqual(['searxng', 'tavily', 'brave', 'exa'])
-    expect(settings.profiles_default).toBe('standard')
+    expect(settings.profiles_default).toBe('default')
     expect(settings.retention).toMatchObject({
       days: 90,
       dailyStatsDays: 400,

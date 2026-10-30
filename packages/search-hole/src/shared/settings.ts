@@ -211,7 +211,7 @@ export const settingsSchema = z.strictObject({
     .array(engineIdSchema)
     .refine((ids) => new Set(ids).size === ids.length, 'engine ids must be unique')
     .default((): EngineId[] => ['searxng', 'tavily', 'brave', 'exa']),
-  profiles_default: z.string().min(1).max(64).default('standard'),
+  profiles_default: z.string().min(1).max(64).default('default'),
   retention: z
     .strictObject({
       days: retentionDays.default(90),

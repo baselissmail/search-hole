@@ -245,6 +245,24 @@ async function preWebSearch(input: HookInput, ctx: RequestCtx, deps: HookDeps): 
   return plan.kind === 'rewrite' || notes.length > 0 ? { hookSpecificOutput: out } : {}
 }
 
+const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`
+
+/** One line for the model: what search-hole did to a built-in WebSearch. */
+export function builtinNote(
+  excludedSites: number,
+  hidden: number,
+  pinned: number,
+  receiptId: string,
+): string {
+  const parts = [
+    excludedSites > 0 ? `excluded ${plural(excludedSites, 'blocked site')} before the search` : '',
+    hidden > 0 ? `hid ${plural(hidden, 'result')}` : '',
+    pinned > 0 ? `pinned ${plural(pinned, 'result')}` : '',
+  ].filter(Boolean)
+  const did = parts.length > 0 ? parts.join(', ') : 'checked every result (none matched a rule)'
+  return `search-hole applied the user's source rules to this search: ${did} · receipt ${receiptId}`
+}
+
 async function postWebSearch(input: HookInput, ctx: RequestCtx, deps: HookDeps): Promise<HookOutput> {
   const resp = parseWebSearchResponse(input.toolResponse)
   if (resp === null) {
@@ -256,12 +274,15 @@ async function postWebSearch(input: HookInput, ctx: RequestCtx, deps: HookDeps):
   const app = await deps.getApp()
   const filter = await app.filterBuiltinResults(query, collectResults(resp), ctx)
   const rebuilt = rebuildWebSearchResponse(resp, filter)
-  if (rebuilt === null) return {}
-  const out: Record<string, unknown> = { hookEventName: 'PostToolUse', updatedToolOutput: rebuilt }
-  const hidden = filter.hidden.length
-  if (hidden > 0) {
-    out.additionalContext = `search-hole hid ${hidden} result${hidden === 1 ? '' : 's'} by your rules · receipt ${filter.receiptId}`
-  }
+  const out: Record<string, unknown> = { hookEventName: 'PostToolUse' }
+  if (rebuilt !== null) out.updatedToolOutput = rebuilt
+  // Always say what happened, so the model never concludes the user's rules were skipped (E2E 2026-10-30).
+  out.additionalContext = builtinNote(
+    toolInput?.blocked_domains?.length ?? 0,
+    filter.hidden.length,
+    filter.pinned,
+    filter.receiptId,
+  )
   return { hookSpecificOutput: out }
 }
 

@@ -45,7 +45,7 @@ engines:
   brave:      { enabled: true, plan: free-credit, caps: { day: 300, month: 900 }, pushdown: blocks, storageRights: false }
   tavily:     { enabled: true, caps: { day: 300, month: 900 } }   # no-Docker default (ADR-0017)
 fallback: [searxng, tavily, brave, exa]
-profiles_default: standard
+profiles_default: default        # the profile used when none matches
 retention: { days: 90 }                                # per-table defaults below
 ui: { port: 7341, idleMinutes: 30 }
 hooks: { mode: steer, guard: true, receiptLine: true } # ADR-0014
