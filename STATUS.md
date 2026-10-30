@@ -57,7 +57,8 @@ Checklist per MASTER_PLAN.md §11. Decisions taken without asking Basel are note
 ## v0.1 test build (target: Basel can install it in Claude Code and use it)
 
 Scope, cut from P1–P3 for a first hands-on test (the rest follows in later releases):
-- [ ] P1 modules: rules engine + YAML, URL/merge/freshness/source types, SearXNG/Brave/Tavily adapters + health + fan-out + mock engine, SQLite store + migrations, safe fetcher + page dates + engine transport, paths/settings/keys/logging/query hygiene (wave 1, in progress)
+- [x] P1 modules (wave 1, 2026-10-30): rules engine + YAML, URL/merge/freshness/source types, SearXNG/Brave/Tavily adapters + health + fan-out + mock engine, SQLite store + migrations, safe fetcher + page dates + engine transport, paths/settings/keys/logging/query hygiene. 1,484 tests pass; typecheck, layers and lint are clean.
+  - Known for later: a 20k-regex `RE2Set` costs 130–250 ms per URL, so the P6 list matcher needs a host prefilter. AMP-cache URLs of a blocked domain aren't matched yet. Brave/Tavily fixtures are hand-written from docs and not yet checked live.
 - [ ] Pipeline wiring + CLI: `search --explain`, `block|allow|pin|raise|lower|normal|unrule`, `rules`, `log`, `explain <url>`, `doctor`, `searxng up|down|status`, `keys set|status`, `mcp`
 - [ ] MCP gateway (SDK v2, both protocol eras): `search`, `fetch`, `receipt`, `suggest_rule`, plus the app-only `hook`; Claude Code `auto` / `builtin` / `engines` modes (ADR-0018)
 - [ ] Claude Code plugin: manifest, local marketplace, `.mcp.json`, `mcp_tool` hooks (UserPromptSubmit, PreToolUse WebSearch/WebFetch/Bash/Edit/Write, PostToolUse WebSearch/WebFetch, Stop), node preflight, skills (slash commands), research skill
