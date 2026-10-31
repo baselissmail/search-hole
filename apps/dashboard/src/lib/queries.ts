@@ -13,6 +13,8 @@ export const keys = {
   engines: ['engines'] as const,
   doctor: ['doctor'] as const,
   settings: ['settings'] as const,
+  lists: ['lists'] as const,
+  listCatalog: ['lists', 'catalog'] as const,
 }
 
 /** Client errors and auth failures don't get better by retrying. */
@@ -66,4 +68,18 @@ export function useDoctor() {
 
 export function useSettings() {
   return useQuery({ queryKey: keys.settings, queryFn: ({ signal }) => api.settings(signal) })
+}
+
+/** Every list with its state and 7-day contribution. */
+export function useLists() {
+  return useQuery({ queryKey: keys.lists, queryFn: ({ signal }) => api.lists(signal) })
+}
+
+/** The list catalog, fetched when the catalog opens. */
+export function useListCatalog(enabled = true) {
+  return useQuery({
+    queryKey: keys.listCatalog,
+    queryFn: ({ signal }) => api.listCatalog(signal),
+    enabled,
+  })
 }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // P4 acceptance against the real server: sign-in, hostile text, axe on every page in both themes,
-// the keyboard path, the live tail, and no CSP violations.
+// the keyboard path, the live tail, and no CSP violations. P6: the Lists view, offline.
 import { spawnSync } from 'node:child_process'
 import { join } from 'node:path'
 import AxeBuilder from '@axe-core/playwright'
@@ -67,6 +67,17 @@ test('hostile web text renders as text: no script runs, javascript: URLs are not
   expect(seen.csp).toEqual([])
 })
 
+async function expectNoSeriousAxeIssues(page: Page, label: string): Promise<void> {
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+    .analyze()
+  const bad = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
+  expect(
+    bad.map((v) => `${v.id}: ${v.nodes.length} × ${v.nodes[0]?.target.join(' ')}`),
+    label,
+  ).toEqual([])
+}
+
 for (const theme of ['light', 'dark'] as const) {
   test(`axe finds no serious or critical issue on any page (${theme})`, async ({ page }) => {
     const seen = await watch(page)
@@ -83,16 +94,36 @@ for (const theme of ['light', 'dark'] as const) {
       await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: link }).click()
       await expect(ready).toBeVisible()
       await page.waitForTimeout(250) // let queries settle (the live stream keeps the network busy)
-      const results = await new AxeBuilder({ page })
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
-        .analyze()
-      const bad = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
-      expect(
-        bad.map((v) => `${v.id}: ${v.nodes.length} × ${v.nodes[0]?.target.join(' ')}`),
-        `${name} ${theme}`,
-      ).toEqual([])
+      await expectNoSeriousAxeIssues(page, `${name} ${theme}`)
       await page.screenshot({ path: join(SCREENS, `${name}-${theme}.png`) })
     }
+
+    // Lists: the view (one row expanded, the error row showing), then the catalog dialog.
+    await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Rules & lists' }).click()
+    await page
+      .getByRole('navigation', { name: 'Rules and lists' })
+      .getByRole('link', { name: 'Lists' })
+      .click()
+    const lists = page.getByRole('table', { name: 'Your lists' })
+    await expect(lists).toBeVisible()
+    await lists.getByRole('button', { name: 'uBlacklist Stack Overflow Translation', exact: true }).click()
+    await expect(lists.getByText('Rules in force')).toBeVisible()
+    await page.waitForTimeout(250)
+    await expectNoSeriousAxeIssues(page, `lists ${theme}`)
+    // Tall enough for every row: the import, the refused subscription and its error.
+    await page.setViewportSize({ width: 1360, height: 1900 })
+    await page.screenshot({ path: join(SCREENS, `lists-${theme}.png`) })
+    await page.setViewportSize({ width: 1360, height: 860 })
+    await page.getByRole('button', { name: 'Browse catalog' }).click()
+    const catalog = page.getByRole('dialog', { name: 'List catalog' })
+    await expect(catalog.getByRole('list', { name: 'Catalog lists' })).toBeVisible()
+    await expect(page).toHaveURL(/catalog=/)
+    await page.waitForTimeout(250)
+    await expectNoSeriousAxeIssues(page, `list catalog ${theme}`)
+    await page.screenshot({ path: join(SCREENS, `lists-catalog-${theme}.png`) })
+    await page.keyboard.press('Escape')
+    await expect(catalog).toHaveCount(0)
+
     expect(seen.csp).toEqual([])
     expect(seen.errors).toEqual([])
   })
@@ -132,6 +163,8 @@ test('keyboard: move, expand, block a site with Undo, palette, shortcuts', async
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(/\/rules/)
   await expect(page.getByRole('table', { name: 'Your rules' })).toBeVisible()
+  // `?` is ignored while a dialog is open, and the menu takes 150 ms to close.
+  await expect(page.getByRole('dialog')).toHaveCount(0)
   await page.locator('body').click({ position: { x: 5, y: 5 } })
   await page.keyboard.press('Shift+?')
   await expect(page.getByRole('dialog')).toBeVisible()
@@ -167,6 +200,109 @@ test('live tail: a new search appears without a reload', async ({ page }) => {
   )
   expect(seed.status, seed.stderr).toBe(0)
   await expect(page.getByRole('button', { name: 'streamed in live' })).toBeVisible({ timeout: 5_000 })
+})
+
+interface ListRow {
+  id: string
+  name: string
+  mode: string
+  source: string
+  copy: string
+  lastError: { code: string } | null
+  contribution: { hidden7d: number; wouldHide7d: number }
+}
+
+async function listsNow(page: Page): Promise<ListRow[]> {
+  return (await (await page.request.get('/api/lists', { headers: await auth(page) })).json()) as ListRow[]
+}
+
+const PINTEREST = 'ublacklist-pinterest (basic)'
+const HUGE_AI = 'uBlockOrigin & uBlacklist Huge AI Blocklist (uBlacklist format)'
+
+test('lists: the starter lists work offline, each with its mode, source and week', async ({ page }) => {
+  const seen = await watch(page)
+  await signIn(page, '/rules/lists')
+  const table = page.getByRole('table', { name: 'Your lists' })
+  await expect(table).toBeVisible()
+  const pressed = (name: string) =>
+    table.getByRole('group', { name: `Mode of ${name}` }).locator('[aria-pressed="true"]')
+
+  // The ADR-0017 starter set, from the shipped copies: four enforced, the AI list in audit.
+  for (const name of [
+    'uBlock-Origin-dev-filter (dev: Stack Overflow, GitHub, npm copycats)',
+    'uBlacklist Stack Overflow Translation',
+    'uBlacklist GitHub Translation',
+    PINTEREST,
+  ]) {
+    await expect(pressed(name)).toHaveText('Enforce')
+  }
+  await expect(pressed(HUGE_AI)).toHaveText('Audit')
+  const row = (name: string) =>
+    table.locator('tbody').filter({ has: page.getByRole('button', { name, exact: true }) })
+  await expect(row(PINTEREST).getByText('Starter', { exact: true })).toBeVisible()
+  await expect(row(PINTEREST).getByText(/^Shipped copy,/)).toBeVisible()
+  await expect(row('search-hole github-clones').getByText('Built-in', { exact: true })).toBeVisible()
+
+  // The seeded searches: what a list hid, and what the audit list would have hidden.
+  await expect(row('uBlacklist Stack Overflow Translation').getByText('Hid 1 result this week')).toBeVisible()
+  await expect(row(HUGE_AI).getByText('Would hide 1 result this week')).toBeVisible()
+
+  // The import (one skipped line) and the refused subscription with its error and fix.
+  await expect(row('team-blocklist').getByText('Imported', { exact: true })).toBeVisible()
+  await expect(row('team-blocklist').getByText('1 skipped')).toBeVisible()
+  const refused = row('private-address')
+  await expect(refused.getByText('Blocked address')).toBeVisible()
+  await expect(refused.getByText(/private or local network/)).toBeVisible()
+  await expect(refused.getByText('Not downloaded yet')).toBeVisible()
+  await expect(page.getByText('1 list needs attention:')).toBeVisible()
+
+  // Every row explains itself: the details say where the list comes from.
+  await row(PINTEREST).getByRole('button', { name: PINTEREST, exact: true }).click()
+  await expect(row(PINTEREST).getByText(/ships with search-hole so it works offline/)).toBeVisible()
+  expect(seen.csp).toEqual([])
+  expect(seen.errors).toEqual([])
+})
+
+test('lists: switch a list to Audit from the keyboard, then Undo', async ({ page }) => {
+  await signIn(page, '/rules/lists')
+  const group = page.getByRole('group', { name: `Mode of ${PINTEREST}` })
+  const mode = async () => (await listsNow(page)).find((l) => l.id === 'rjaus-pinterest')?.mode
+  expect(await mode()).toBe('enforce')
+
+  await group.getByRole('button', { name: 'Enforce' }).focus()
+  await page.keyboard.press('ArrowRight')
+  await expect(group.getByRole('button', { name: 'Audit' })).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(group.getByRole('button', { name: 'Audit' })).toHaveAttribute('aria-pressed', 'true')
+  await expect.poll(mode).toBe('audit')
+
+  await page.getByRole('button', { name: 'Undo' }).click()
+  await expect.poll(mode).toBe('enforce')
+  await expect(group.getByRole('button', { name: 'Enforce' })).toHaveAttribute('aria-pressed', 'true')
+})
+
+test('lists: removing an import waits for its Undo window, and Undo keeps it', async ({ page }) => {
+  await signIn(page, '/rules/lists')
+  const table = page.getByRole('table', { name: 'Your lists' })
+  await table.getByRole('button', { name: 'Remove team-blocklist' }).click()
+  const name = table.getByRole('button', { name: 'team-blocklist', exact: true })
+  await expect(name).toHaveCount(0)
+  expect((await listsNow(page)).some((l) => l.id === 'team-blocklist')).toBe(true)
+  await page.getByRole('button', { name: 'Undo' }).click()
+  await expect(name).toBeVisible()
+  await page.waitForTimeout(500)
+  expect((await listsNow(page)).some((l) => l.id === 'team-blocklist')).toBe(true)
+})
+
+test('command menu: Browse list catalog opens it from anywhere', async ({ page }) => {
+  await signIn(page)
+  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+k' : 'Control+k')
+  await page.keyboard.type('list catalog')
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/\/rules\/lists\?catalog=/)
+  const catalog = page.getByRole('dialog', { name: 'List catalog' })
+  await expect(catalog.getByRole('heading', { name: 'Super SEO Spam Suppressor' })).toBeVisible()
+  await expect(catalog.getByText(/Adding one downloads it from its address/)).toBeVisible()
 })
 
 async function auth(page: Page): Promise<Record<string, string>> {

@@ -131,7 +131,11 @@ function Sidebar({
         <ul className="flex gap-1 overflow-x-auto md:flex-col md:overflow-visible">
           {PAGES.map((page) => (
             <li key={page.to}>
-              <Link to={page.to} activeOptions={{ exact: true, includeSearch: false }} className={navItem}>
+              <Link
+                to={page.to}
+                activeOptions={{ exact: page.to === '/', includeSearch: false }}
+                className={navItem}
+              >
                 <page.icon aria-hidden="true" className="hidden size-4 shrink-0 sm:block" />
                 <span className="flex-1">{page.label}</span>
                 <span className="hidden md:inline-flex" aria-hidden="true">

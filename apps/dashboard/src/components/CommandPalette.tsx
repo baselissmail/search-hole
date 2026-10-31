@@ -3,7 +3,19 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { Command } from 'cmdk'
-import { Check, EyeOff, Keyboard, Monitor, Moon, Plus, RefreshCw, Sun } from 'lucide-react'
+import {
+  Check,
+  CloudDownload,
+  EyeOff,
+  Keyboard,
+  Library,
+  ListChecks,
+  Monitor,
+  Moon,
+  Plus,
+  RefreshCw,
+  Sun,
+} from 'lucide-react'
 import { type ReactNode, useRef } from 'react'
 import { probeEngines } from '../lib/ruleActions.ts'
 import { setTheme, THEME_LABELS, type ThemePreference, useTheme } from '../lib/theme.ts'
@@ -82,6 +94,14 @@ export function CommandPalette({
                 <Keys keys={['G', page.key]} />
               </Item>
             ))}
+            <Item
+              value="go lists"
+              keywords={['subscriptions', 'blocklists', 'filters', 'audit']}
+              onSelect={() => run(() => void navigate({ to: '/rules/lists' }))}
+            >
+              <ListChecks aria-hidden="true" className="size-4 text-fg-muted" />
+              <span className="flex-1">Lists</span>
+            </Item>
           </Command.Group>
           <Command.Group heading="Actions" className={groupClass}>
             <Item
@@ -99,6 +119,25 @@ export function CommandPalette({
             >
               <RefreshCw aria-hidden="true" className="size-4 text-fg-muted" />
               <span className="flex-1">Check engines</span>
+            </Item>
+            <Item
+              value="update all lists"
+              keywords={['refresh', 'download', 'subscriptions', 'blocklists']}
+              onSelect={() =>
+                // Loaded on demand: the list actions ship with the Lists view, not the initial bundle.
+                run(() => void import('../lib/listActions.ts').then((m) => m.updateAllLists(queryClient)))
+              }
+            >
+              <CloudDownload aria-hidden="true" className="size-4 text-fg-muted" />
+              <span className="flex-1">Update all lists</span>
+            </Item>
+            <Item
+              value="browse list catalog"
+              keywords={['add list', 'subscribe', 'blocklists', 'catalogue']}
+              onSelect={() => run(() => void navigate({ to: '/rules/lists', search: { catalog: true } }))}
+            >
+              <Library aria-hidden="true" className="size-4 text-fg-muted" />
+              <span className="flex-1">Browse list catalog</span>
             </Item>
             <Item
               value="searches that hid results"

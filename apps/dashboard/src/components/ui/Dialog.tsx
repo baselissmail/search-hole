@@ -34,6 +34,7 @@ export function AppDialog({
   description,
   hideTitle = false,
   initialFocus,
+  size = 'md',
   className,
   children,
 }: {
@@ -44,6 +45,8 @@ export function AppDialog({
   /** Keep the title for screen readers only (the command menu has its own input). */
   hideTitle?: boolean
   initialFocus?: RefObject<HTMLElement | null>
+  /** `lg` for dialogs that hold a list of things (the list catalog). */
+  size?: 'md' | 'lg'
   className?: string
   children: ReactNode
 }) {
@@ -57,7 +60,8 @@ export function AppDialog({
           ref={popupRef}
           {...(initialFocus ? { initialFocus } : {})}
           className={cx(
-            'fixed inset-x-0 top-[12dvh] z-50 mx-auto flex max-h-[76dvh] w-[min(36rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border border-border-strong bg-surface text-fg shadow-2xl outline-none',
+            'fixed inset-x-0 top-[12dvh] z-50 mx-auto flex max-h-[76dvh] flex-col overflow-hidden rounded-xl border border-border-strong bg-surface text-fg shadow-2xl outline-none',
+            size === 'lg' ? 'w-[min(52rem,calc(100vw-2rem))]' : 'w-[min(36rem,calc(100vw-2rem))]',
             'transition-[opacity,scale] duration-150 data-ending-style:scale-[0.98] data-ending-style:opacity-0 data-starting-style:scale-[0.98] data-starting-style:opacity-0',
             className,
           )}

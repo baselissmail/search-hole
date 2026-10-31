@@ -14,6 +14,7 @@ export function IconButton({
   tabIndex,
   disabled,
   className,
+  iconClassName,
 }: {
   icon: LucideIcon
   label: string
@@ -22,6 +23,8 @@ export function IconButton({
   tabIndex?: number
   disabled?: boolean
   className?: string
+  /** E.g. `animate-spin` on a progress icon. */
+  iconClassName?: string | undefined
 }) {
   return (
     <Tooltip.Root>
@@ -37,7 +40,7 @@ export function IconButton({
           className,
         )}
       >
-        <Icon aria-hidden="true" className="size-3.5" />
+        <Icon aria-hidden="true" className={cx('size-3.5', iconClassName)} />
       </Tooltip.Trigger>
       <Tooltip.Portal>
         <Tooltip.Positioner sideOffset={6}>

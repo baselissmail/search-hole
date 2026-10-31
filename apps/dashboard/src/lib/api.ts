@@ -5,14 +5,22 @@
  * sign-in screen.
  */
 import {
+  type AddListInput,
   type AddRuleInput,
   type ApiError,
   type DoctorReport,
   type EngineStatus,
   type ExplainRequest,
   type ExplainResponse,
+  type ListCatalogEntry,
+  type ListMode,
+  type ListModeRequest,
+  type ListStatus,
+  type ListUpdateRequest,
+  type ListUpdateResult,
   type LogDetail,
   type Overview,
+  type RemoveListRequest,
   type RemoveRuleRequest,
   ROUTES,
   type RuleListing,
@@ -100,6 +108,8 @@ interface RequestOptions {
   /** POST body; every POST sends JSON (`{}` when there is nothing to say). */
   body?: unknown
   signal?: AbortSignal | undefined
+  /** Let the request outlive the page (a change committed while the tab closes). */
+  keepalive?: boolean | undefined
 }
 
 async function request<T>(method: 'GET' | 'POST', path: string, opts: RequestOptions = {}): Promise<T> {
@@ -110,6 +120,7 @@ async function request<T>(method: 'GET' | 'POST', path: string, opts: RequestOpt
     init.body = JSON.stringify(opts.body ?? {})
   }
   if (opts.signal) init.signal = opts.signal
+  if (opts.keepalive) init.keepalive = true
   let res: Response
   try {
     res = await fetch(withQuery(path, opts.query), init)
@@ -128,7 +139,8 @@ async function request<T>(method: 'GET' | 'POST', path: string, opts: RequestOpt
 
 const get = <T>(path: string, query?: Query, signal?: AbortSignal) =>
   request<T>('GET', path, { query, signal })
-const post = <T>(path: string, body?: unknown) => request<T>('POST', path, { body })
+const post = <T>(path: string, body?: unknown, keepalive?: boolean) =>
+  request<T>('POST', path, { body, keepalive })
 
 export interface SearchesQuery {
   before?: number | undefined
@@ -160,6 +172,21 @@ export const api = {
   settings: (signal?: AbortSignal) => get<SettingsView>(ROUTES.settings, undefined, signal),
   patchSettings: (patch: SettingsPatch) => post<SettingsView>(ROUTES.settings, patch),
   doctor: (signal?: AbortSignal) => get<DoctorReport>(ROUTES.doctor, undefined, signal),
+
+  lists: (signal?: AbortSignal) => get<ListStatus[]>(ROUTES.lists, undefined, signal),
+  listCatalog: (signal?: AbortSignal) => get<ListCatalogEntry[]>(ROUTES.listCatalog, undefined, signal),
+  /** Subscribes and downloads; a failed download comes back in `lastError`, not as an error. */
+  addList: (input: AddListInput) => post<ListStatus>(ROUTES.lists, input),
+  setListMode: (id: string, mode: ListMode) =>
+    post<ListStatus>(ROUTES.listMode(id), { mode } satisfies ListModeRequest),
+  /** One list; can take up to a minute. `force` accepts a copy the shrink guard refused. */
+  updateList: (id: string, force = false) =>
+    post<ListUpdateResult[]>(ROUTES.updateList(id), (force ? { force } : {}) satisfies ListUpdateRequest),
+  /** Every enabled list with an address. */
+  updateLists: () => post<ListUpdateResult[]>(ROUTES.updateLists, {} satisfies ListUpdateRequest),
+  /** Returns the list as it was (for Undo). Built-in lists answer 400: turn them off instead. */
+  removeList: (id: string, opts?: { keepalive?: boolean }) =>
+    post<ListStatus>(ROUTES.removeList, { id } satisfies RemoveListRequest, opts?.keepalive),
 
   /**
    * Open the live stream (ADR-0004 point 5). `fetch()` rather than EventSource, because

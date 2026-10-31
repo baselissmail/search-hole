@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Code-based routes (no router codegen). The URL is the state (MASTER_PLAN §8.4 point 4). */
-import { createRootRoute, createRoute, createRouter } from '@tanstack/react-router'
+import { createRootRoute, createRoute, createRouter, lazyRouteComponent } from '@tanstack/react-router'
 import { NotFound } from '../components/NotFound.tsx'
 import { Root } from '../components/Root.tsx'
+import { parseListsSearch } from '../lib/listsSearch.ts'
 import { parseLogSearch } from '../lib/logSearch.ts'
 import { EnginesPage } from '../pages/engines/EnginesPage.tsx'
 import { LiveLogPage } from '../pages/log/LiveLogPage.tsx'
@@ -19,6 +20,13 @@ const logRoute = createRoute({
 })
 
 const rulesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/rules', component: RulesPage })
+// Lists load as their own chunk on first visit: the initial bundle stays within budget (§12.3).
+const listsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/rules/lists',
+  validateSearch: parseListsSearch,
+  component: lazyRouteComponent(() => import('../pages/lists/ListsPage.tsx'), 'ListsPage'),
+})
 const enginesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/engines',
@@ -30,7 +38,7 @@ const settingsRoute = createRoute({
   component: SettingsPage,
 })
 
-const routeTree = rootRoute.addChildren([logRoute, rulesRoute, enginesRoute, settingsRoute])
+const routeTree = rootRoute.addChildren([logRoute, rulesRoute, listsRoute, enginesRoute, settingsRoute])
 
 export const router = createRouter({ routeTree, defaultPreload: false, scrollRestoration: false })
 

@@ -398,6 +398,33 @@ function SettingsForm({ view }: { view: SettingsView }) {
         </Card>
       </div>
 
+      <Card
+        id="lists"
+        title="Lists"
+        description="Starter lists and your subscriptions, refreshed from their addresses."
+      >
+        <div className="p-4">
+          <Toggle
+            label="Update lists in the background"
+            hint={
+              <>
+                After a search, lists that are due are downloaded again, each on its own schedule. Off keeps
+                search-hole from downloading lists; <span className="font-medium">Update all</span> on the
+                Lists page still works.
+              </>
+            }
+            checked={view.lists?.autoUpdate ?? true}
+            locked={isLocked(view, 'lists.autoUpdate')}
+            onChange={(value) =>
+              void save(
+                { path: 'lists.autoUpdate', value },
+                `Background list updates ${value ? 'on' : 'off'}`,
+              )
+            }
+          />
+        </div>
+      </Card>
+
       <Card id="files" title="Files" description="Everything else is edited in settings.yaml.">
         <dl className="grid gap-x-6 gap-y-2 p-4 text-xs sm:grid-cols-2">
           {(

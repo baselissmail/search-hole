@@ -7,6 +7,8 @@
  *   ?mock=100k       100,000 searches (scrolling performance)
  *   ?mock=empty      no searches (empty states)
  *   ?mock&stream=broken   the stream always fails, so the client falls back to polling
+ *   ?mock then /rules/lists  every list state: built-in, starter, subscribed, imported, a
+ *                            shrink-guard refusal and a network failure (mockLists.ts)
  *   ?mock=off        back to the real server
  *
  * In the console, `searchHoleMock.expireSession()` makes the next API call answer 401.
@@ -32,14 +34,17 @@ import {
   type SourceType,
   type SuggestionItem,
 } from '../lib/contract.ts'
+import { MockLists } from './mockLists.ts'
 
 const CONFIG_KEY = 'search-hole.mock'
 const TOKEN = 'mock-session-token'
 const LOGIN_CODE = 'mock-login-code'
 
-interface MockConfig {
+export interface MockConfig {
   size: number
   brokenStream: boolean
+  /** No simulated latency (unit tests). */
+  instant?: boolean
 }
 
 function readConfig(): MockConfig | null {
@@ -271,8 +276,9 @@ const fail = (status: number, code: string, message: string, fix?: string) =>
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-class MockServer {
+export class MockServer {
   readonly #config: MockConfig
+  readonly #lists: MockLists
   /** Newest first. */
   #searches: LogEntry[] = []
   #nextId: number
@@ -380,6 +386,7 @@ class MockServer {
     limits: { searchesPerTurn: 40, searchesPerHour: 120, repeatQuery: 3 },
     retention: { days: 90 },
     hooks: { receiptLine: true, guard: true },
+    lists: { autoUpdate: true },
     locked: ['queryHygiene.hosts'],
     paths: { config: '~/.searchhole/settings.yaml', data: '~/Library/Application Support/search-hole' },
   }
@@ -392,6 +399,7 @@ class MockServer {
 
   constructor(config: MockConfig) {
     this.#config = config
+    this.#lists = new MockLists(config.instant === true)
     const rand = prng(20261031)
     let at = Date.now() - 20_000
     for (let id = config.size; id >= 1; id--) {
@@ -424,7 +432,9 @@ class MockServer {
     }
     const path = url.pathname
     // Realistic latency, except for the 100k dataset, which is for scrolling tests.
-    if (path !== ROUTES.stream) await sleep(this.#config.size > 10_000 ? 0 : 80 + Math.random() * 220)
+    if (path !== ROUTES.stream && !this.#config.instant) {
+      await sleep(this.#config.size > 10_000 ? 0 : 80 + Math.random() * 220)
+    }
 
     if (path === ROUTES.health) return json({ nonce: 'mock', version: '0.1.1-mock' })
     if (path === ROUTES.session && method === 'POST') {
@@ -491,6 +501,8 @@ class MockServer {
     if (path === ROUTES.settings && method === 'GET') return json(this.#settings)
     if (path === ROUTES.settings && method === 'POST') return this.#patch(body as SettingsPatch)
     if (path === ROUTES.doctor) return json(this.#doctor())
+    const lists = this.#lists.handle(method, path, body)
+    if (lists) return lists
     return fail(404, 'not_found', `No route ${method} ${path} in the mock.`)
   }
 
@@ -678,6 +690,9 @@ class MockServer {
         break
       case 'hooks.receiptLine':
         s.hooks.receiptLine = patch.value
+        break
+      case 'lists.autoUpdate':
+        s.lists.autoUpdate = patch.value
         break
     }
     this.#settings = s
