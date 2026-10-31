@@ -26,7 +26,7 @@
  */
 import { homedir } from 'node:os'
 import type { App, RequestCtx } from '../app/types.ts'
-import { describeFindings, type Finding, type FindingClass } from '../core/hygiene.ts'
+import { describeClasses } from '../core/hygiene.ts'
 import type { Logger } from '../shared/log.ts'
 import {
   collectResults,
@@ -81,24 +81,7 @@ const FILE_TOOLS = new Set(Object.keys(FILE_WRITE_TOOLS))
 /** Built-in tools whose use after a Stop reopens the turn (ADR-0014 point 1). */
 const SEARCH_TOOLS: ReadonlySet<string> = new Set(['WebSearch', 'WebFetch'])
 
-const KNOWN_CLASSES: ReadonlySet<string> = new Set<FindingClass>([
-  'api_key',
-  'jwt',
-  'private_key',
-  'connection_string',
-  'secret_assignment',
-  'high_entropy',
-  'internal_host',
-  'private_ip',
-])
-
-/** "an API key or access token and a private network address" from hygiene class codes. */
-export function describeClasses(classes: readonly string[]): string {
-  const findings: Finding[] = classes
-    .filter((c): c is FindingClass => KNOWN_CLASSES.has(c))
-    .map((c) => ({ class: c, detector: c, start: 0, end: 0 }))
-  return describeFindings(findings)
-}
+export { describeClasses }
 
 const deny = (reason: string): HookOutput => ({
   hookSpecificOutput: {

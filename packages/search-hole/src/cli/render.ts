@@ -12,6 +12,7 @@ import type {
   SearchMode,
   SuggestRuleInput,
 } from '../app/types.ts'
+import { describeClasses } from '../core/hygiene.ts'
 import type {
   EngineRun,
   HiddenReason,
@@ -144,6 +145,8 @@ export function describeWarning(w: Warning): string {
       return `This search was not logged: ${w.detail}`
     case 'list_compiling':
       return `List ${w.listId} is still compiling, so its rules were not applied yet.`
+    case 'query_redacted':
+      return `Removed ${describeClasses(w.classes)} from the query before sending it.`
   }
 }
 

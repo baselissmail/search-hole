@@ -12,6 +12,7 @@
  * bidi and zero-width characters removed), so page text can never fake our own lines.
  */
 import type { FetchOutcome, Receipt, SuggestRuleResult } from '../app/types.ts'
+import { describeClasses } from '../core/hygiene.ts'
 import { estimateTokens, takeChunk } from '../fetch/tokens.ts'
 import type {
   Depth,
@@ -126,6 +127,8 @@ export function warningText(w: Warning): string {
       return 'this search could not be logged'
     case 'list_compiling':
       return `list ${w.listId} is still compiling and was not applied`
+    case 'query_redacted':
+      return `search-hole removed ${describeClasses(w.classes)} from the query before sending it`
   }
 }
 

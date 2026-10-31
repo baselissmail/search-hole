@@ -176,9 +176,13 @@ describe('search mode (ADR-0018)', () => {
     const cli = await h.reopen({ host: 'cli' })
     await cli.settings.setMode('builtin')
     expect((await h.app.searchMode()).configured).toBe('builtin')
-    expect(h.app.checkQuery('192.168.1.1 router').action).toBe('block')
-    writeFileSync(join(h.home, 'settings.yaml'), 'version: 1\nqueryHygiene: { mode: "off" }\n')
-    expect(h.app.checkQuery('192.168.1.1 router').action).toBe('ok')
+    expect(h.app.checkQuery('192.168.1.1 router admin page')).toMatchObject({
+      action: 'redact',
+      query: 'router admin page',
+      classes: ['private_ip'],
+    })
+    writeFileSync(join(h.home, 'settings.yaml'), 'version: 1\nqueryHygiene: { hosts: block }\n')
+    expect(h.app.checkQuery('192.168.1.1 router admin page').action).toBe('block')
   })
 
   it('SEARCHHOLE_MODE overrides settings; setMode writes hosts.claude-code.mode keeping comments', async () => {

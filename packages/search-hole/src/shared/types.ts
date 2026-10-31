@@ -361,6 +361,8 @@ export type Warning =
   | { code: 'spend_cap_local'; engine: EngineId }
   | { code: 'logging_unavailable'; detail: string }
   | { code: 'list_compiling'; listId: string }
+  /** Query hygiene removed something before the query was sent (ADR-0015 point 4). */
+  | { code: 'query_redacted'; classes: string[] }
 
 export interface FallbackHop {
   from: EngineId

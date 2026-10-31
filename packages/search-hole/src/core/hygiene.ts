@@ -54,7 +54,13 @@ export interface Finding {
 }
 
 export interface HygieneOptions {
+  /** For secrets (and for every class when `hosts` is not given). */
   mode: HygieneMode
+  /**
+   * For internal hostnames and private addresses. Default: `mode`. Removed matches are cut out
+   * of the query (no `[redacted]` placeholder for an engine to search for).
+   */
+  hosts?: HygieneMode
   /** RE2 patterns; a finding whose matched text is fully matched by one is allowed. */
   allow?: readonly string[]
   /** Extra internal host suffixes, e.g. 'corp.example.com' (matches itself and subdomains). */
@@ -71,6 +77,9 @@ export interface HygieneResult {
 }
 
 export const REDACTED = '[redacted]'
+
+/** Address classes: low risk, and the common false positive ("192.168.1.1 router admin page"). */
+const HOST_CLASSES: ReadonlySet<FindingClass> = new Set<FindingClass>(['internal_host', 'private_ip'])
 
 // ── Detector data ────────────────────────────────────────────────────────
 
@@ -754,36 +763,51 @@ function dropAllowed(findings: Finding[], text: string, allow: readonly string[]
   })
 }
 
-/** Replaces each finding's range with `[redacted]`. Findings must be sorted and non-overlapping. */
-function applyRedaction(text: string, findings: readonly Finding[]): string {
+/**
+ * Replaces each finding's range with `[redacted]`, or with nothing for the classes in
+ * `remove`. Findings must be sorted and non-overlapping.
+ */
+function applyRedaction(
+  text: string,
+  findings: readonly Finding[],
+  remove: ReadonlySet<FindingClass> = new Set(),
+): string {
   let out = ''
   let pos = 0
   for (const f of findings) {
-    out += text.slice(pos, f.start) + REDACTED
+    out += text.slice(pos, f.start) + (remove.has(f.class) ? '' : REDACTED)
     pos = f.end
   }
-  return out + text.slice(pos)
+  out += text.slice(pos)
+  return remove.size === 0 ? out : out.replace(/\s{2,}/g, ' ').trim()
 }
 
 // ── Public API ───────────────────────────────────────────────────────────
 
 /**
- * Scans a query per ADR-0015 point 4. `block` leaves the query untouched and lists the
- * findings; `redact` returns the query with each match replaced by `[redacted]`; `off`
- * skips scanning. Never throws and never copies a match into the result.
+ * Scans a query per ADR-0015 point 4. Each class follows its mode (`hosts` for addresses,
+ * `mode` for secrets): any `block` finding blocks, leaving the query untouched; otherwise
+ * `redact` findings are replaced by `[redacted]` (secrets) or cut out (addresses); `off`
+ * skips the class, and `mode: off` skips scanning. A query that cutting leaves empty is blocked.
+ * Never throws and never copies a match into the result.
  */
 export function checkQuery(query: string, options: HygieneOptions): HygieneResult {
   if (options.mode === 'off') return { action: 'ok', query, findings: [] }
+  const hostMode = options.hosts ?? options.mode
   const found = scan(query, {
     secrets: true,
-    hosts: true,
+    hosts: hostMode !== 'off',
     flagLoopback: options.flagLoopback === true,
     extraHosts: options.internalHosts ?? [],
   })
   const findings = dropAllowed(found, query, options.allow ?? [])
   if (findings.length === 0) return { action: 'ok', query, findings }
-  if (options.mode === 'redact') return { action: 'redact', query: applyRedaction(query, findings), findings }
-  return { action: 'block', query, findings }
+  const modeOf = (f: Finding): HygieneMode => (HOST_CLASSES.has(f.class) ? hostMode : options.mode)
+  if (findings.some((f) => modeOf(f) === 'block')) return { action: 'block', query, findings }
+  const remove = options.hosts === undefined ? new Set<FindingClass>() : HOST_CLASSES
+  const redacted = applyRedaction(query, findings, remove)
+  if (redacted.trim() === '') return { action: 'block', query, findings }
+  return { action: 'redact', query: redacted, findings }
 }
 
 /**
@@ -813,6 +837,25 @@ export function describeFindings(findings: readonly Finding[]): string {
   const labels = classes.map((c) => CLASS_LABEL[c])
   if (labels.length <= 1) return labels[0] ?? 'sensitive text'
   return `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`
+}
+
+const KNOWN_CLASSES: ReadonlySet<string> = new Set<FindingClass>([
+  'api_key',
+  'jwt',
+  'private_key',
+  'connection_string',
+  'secret_assignment',
+  'high_entropy',
+  'internal_host',
+  'private_ip',
+])
+
+/** "an API key or access token and a private network address" from stored class codes. */
+export function describeClasses(classes: readonly string[]): string {
+  const findings: Finding[] = classes
+    .filter((c): c is FindingClass => KNOWN_CLASSES.has(c))
+    .map((c) => ({ class: c, detector: c, start: 0, end: 0 }))
+  return describeFindings(findings)
 }
 
 /** Hint for the user-facing surfaces (CLI, dashboard, doctor); not for model-facing errors. */

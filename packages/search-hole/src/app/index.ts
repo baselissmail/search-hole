@@ -127,6 +127,7 @@ export const createApp: CreateApp = async (opts: AppOptions): Promise<App> => {
       const h = ctx.settings.settings.queryHygiene
       const r = scanQuery(query, {
         mode: h.mode,
+        hosts: h.hosts,
         allow: h.allow,
         internalHosts: h.internalHosts,
         flagLoopback: h.flagLoopback,

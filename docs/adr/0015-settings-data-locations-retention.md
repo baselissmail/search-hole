@@ -126,3 +126,14 @@ searxng: { managed: true, port: 8888 }                 # point 5
 - Path-resolution unit tests per OS, including stripped environments.
 - The retention job on a 100k-search DB: deletes in under 2 s per 10k batch, no SSE gaps after `reset`, and the epoch is bumped.
 - The query-hygiene detector corpus: true positives for each class and false-positive checks on normal developer queries (error strings, package names, version numbers).
+
+## Amendment (2026-10-31, v0.1.1): addresses are cut out of queries, secrets still block
+
+Point 4 blocked every finding by default. Dogfooding showed the address classes (`private_ip`, `internal_host`) are the common false positive: "192.168.1.1 router admin page" and "what is 10.0.0.0/8" are ordinary questions. They are also low risk, because an address without a credential reveals little. Basel asked for the setting best suited to everyday and public use.
+
+- **New setting `queryHygiene.hosts`** (`block | redact | off`, default **`redact`**; env `SEARCHHOLE_QUERY_HYGIENE_HOSTS`). It covers the address classes only. `queryHygiene.mode` (default `block`) still governs secrets: API keys, tokens, private keys, connection strings, secret assignments, high-entropy strings.
+- **Redacted addresses are cut out**, not replaced with `[redacted]`, so the engine doesn't search for that placeholder. Whitespace is collapsed. Secrets in `mode: redact` keep the placeholder.
+- **Still refused:** any secret (with the default `mode`), and a query that cutting leaves empty, such as a bare "192.168.1.1".
+- **The model is told:** `search` returns a `query_redacted` warning naming the classes. The built-in WebSearch hook already adds "search-hole removed … from the query before searching".
+- `queryHygiene.mode: off` still disables everything. `hosts: block` restores the old behaviour.
+

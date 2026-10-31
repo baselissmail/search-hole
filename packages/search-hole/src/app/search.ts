@@ -237,6 +237,7 @@ export async function runSearch(d: SearchDeps, input: SearchArgs, rctx: RequestC
   // 1. Query hygiene (ADR-0015 point 4): before anything else sees the query.
   const hygiene = checkQuery(args.query, {
     mode: settings.queryHygiene.mode,
+    hosts: settings.queryHygiene.hosts,
     allow: settings.queryHygiene.allow,
     internalHosts: settings.queryHygiene.internalHosts,
     flagLoopback: settings.queryHygiene.flagLoopback,
@@ -388,6 +389,9 @@ export async function runSearch(d: SearchDeps, input: SearchArgs, rctx: RequestC
   const hidden = withHits(merged.hidden, fan.raw)
 
   const warnings: Warning[] = [...assigned.warnings, ...fan.warnings, ...merged.warnings]
+  if (hygiene.action === 'redact') {
+    warnings.unshift({ code: 'query_redacted', classes: [...new Set(hygiene.findings.map((f) => f.class))] })
+  }
   const tookMs = Math.max(0, Math.round(performance.now() - started))
   const outcome: SearchOutcome = {
     receiptId: assigned.receiptId,

@@ -92,7 +92,20 @@ describe('defaults', () => {
   })
 
   it('feed straight into the query hygiene check', () => {
-    expect(checkQuery('ssh admin@10.1.2.3', DEFAULT_SETTINGS.queryHygiene).action).toBe('block')
+    // Defaults: an address is cut out of the query, a secret blocks it, and so does an empty result.
+    expect(checkQuery('ssh admin@10.1.2.3 permission denied', DEFAULT_SETTINGS.queryHygiene)).toMatchObject({
+      action: 'redact',
+      query: 'ssh admin@ permission denied',
+    })
+    expect(checkQuery('192.168.1.1', DEFAULT_SETTINGS.queryHygiene).action).toBe('block')
+    expect(
+      checkQuery(
+        'why does ghp_A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8 fail on 10.0.0.2',
+        DEFAULT_SETTINGS.queryHygiene,
+      ).action,
+    ).toBe('block')
+    const strict = loadSettings('queryHygiene: { hosts: block }\n').settings
+    expect(checkQuery('ssh admin@10.1.2.3', strict.queryHygiene).action).toBe('block')
     const lenient = loadSettings(
       'queryHygiene: { mode: redact, allow: ["10\\\\.1\\\\.2\\\\.3"], flagLoopback: true }\n',
     ).settings

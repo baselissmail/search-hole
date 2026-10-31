@@ -247,6 +247,8 @@ export const settingsSchema = z.strictObject({
   queryHygiene: z
     .strictObject({
       mode: z.enum(['block', 'redact', 'off']).default('block'),
+      /** Private addresses and internal hostnames: cut out of the query by default (ADR-0015 amendment). */
+      hosts: z.enum(['block', 'redact', 'off']).default('redact'),
       allow: z
         .array(
           z.string().min(1).max(500).refine(isValidAllowPattern, 'must be a valid RE2 regular expression'),
@@ -416,6 +418,12 @@ function buildEnvBindings(): EnvBinding[] {
     'SEARCHHOLE_QUERY_HYGIENE_MODE',
     'queryHygiene.mode',
     'Query hygiene: block, redact or off',
+    parseEnum(['block', 'redact', 'off']),
+  )
+  add(
+    'SEARCHHOLE_QUERY_HYGIENE_HOSTS',
+    'queryHygiene.hosts',
+    'Private addresses and internal hostnames in queries: block, redact or off',
     parseEnum(['block', 'redact', 'off']),
   )
   add('SEARCHHOLE_PRIVACY_WAYBACK', 'privacy.wayback', 'Allow Wayback date lookups', parseBool)

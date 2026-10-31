@@ -188,6 +188,16 @@ profiles:
     expect(out.query).toBe('[redacted] rejected')
     const sx = mock.requests.filter((r) => r.engine === 'searxng').at(-1)
     expect(sx?.query.q).toBe('[redacted] rejected')
+    expect(out.warnings).toContainEqual({ code: 'query_redacted', classes: ['api_key'] })
+  })
+
+  it('by default a private address is cut out of the query, and the model is told', async () => {
+    const h = await setup({ settings: settings(), env })
+    const out = await h.app.search({ query: '192.168.1.1 router admin page', depth: 'quick' }, {})
+    expect(out.query).toBe('router admin page')
+    const sx = mock.requests.filter((r) => r.engine === 'searxng').at(-1)
+    expect(sx?.query.q).toBe('router admin page')
+    expect(out.warnings[0]).toEqual({ code: 'query_redacted', classes: ['private_ip'] })
   })
 
   it('throws no_healthy_engine naming every engine when nothing can answer', async () => {
