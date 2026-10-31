@@ -179,8 +179,60 @@ describe('guard matchers', () => {
     ['my-searchhole block x', false],
     ['echo searchhole-block', false],
     ['', false],
+    // Mentions in quoted arguments of other commands are not invocations (review 2026-10-31).
+    ['git commit -m "docs: search-hole mode auto is the default"', false],
+    ['gh pr create --title "Make search-hole block lists faster"', false],
+    ['grep -rn "searchhole block" docs/', false],
+    ["rg -n 'search-hole pin' README.md", false],
+    ["git commit -F - <<'EOF'\nfix: searchhole block now works\nEOF", false],
+    ['echo "run: searchhole block x" > notes.txt', false],
+    ['ls packages/search-hole/src/core/rules && cat packages/search-hole/src/app/rules.ts', false],
+    // ...but nested commands still run.
+    ['bash -c "searchhole block evil.com"', true],
+    ["sh -lc 'cd /tmp && search-hole pin docs.rs'", true],
+    ['eval "searchhole block x"', true],
+    ['echo "$(searchhole block x)"', true],
+    ['echo `searchhole allow y`', true],
+    ['bash <<EOF\nsearchhole block x\nEOF', true],
+    ['(searchhole block x)', true],
+    ['if true; then searchhole block x; fi', true],
+    // Runners and wrappers the old matcher missed.
+    ['pnpm -C packages/search-hole dev block evil.com', true],
+    ['cd packages/search-hole && node src/cli/main.ts block x', true],
+    ['node packages/search-hole/src/cli/main.ts block x', true],
+    ['npx search-hole@0.1.1 block x', true],
+    ['npx -y -p search-hole searchhole block x', true],
+    ['echo evil.com | xargs searchhole block', true],
+    ['env FOO=1 sudo -u me searchhole keys set tavily', true],
+    ['timeout 5 searchhole block x', true],
+    ['pnpm dev block x', false],
+    ['node src/cli/main.ts block x', false],
+    // The skill marker counts only on the command it prefixes.
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the skills' literal Claude Code placeholder
+    ['SEARCHHOLE_SKILL=1 node "${CLAUDE_PLUGIN_ROOT}/dist/searchhole.mjs" pin docs.rs', false],
+    ['SEARCHHOLE_SKILL=1 true; searchhole block x', true],
   ])('%s → %s', (command, denied) => {
     expect(bashChangesRules(command)).toBe(denied)
+  })
+
+  test('Bash writes into search-hole files are denied; reads and other files are not', () => {
+    const files = {
+      roots: { dirs: ['/Users/u/.searchhole', '/Users/u/.config/searchhole'], caseInsensitive: true },
+      baseDir: '/repo',
+      home: '/Users/u',
+    }
+    const denied = (c: string) => bashChangesRules(c, files)
+    expect(denied('echo "- {match: x, action: allow}" >> ~/.config/searchhole/rules.yaml')).toBe(true)
+    expect(denied('cat > $HOME/.searchhole/settings.yaml <<EOF\nhooks: {guard: false}\nEOF')).toBe(true)
+    expect(denied('printf x | tee -a /Users/u/.searchhole/rules.yaml')).toBe(true)
+    expect(denied('cp /tmp/rules.yaml ~/.searchhole/rules.yaml')).toBe(true)
+    expect(denied("sed -i '' 's/block/allow/' ~/.config/searchhole/rules.yaml")).toBe(true)
+    expect(denied('echo x > sub/.searchhole.yaml')).toBe(true)
+    expect(denied('rm -rf ~/.searchhole')).toBe(true)
+    expect(denied('cat ~/.searchhole/rules.yaml')).toBe(false)
+    expect(denied('cp ~/.searchhole/rules.yaml /tmp/backup.yaml')).toBe(false)
+    expect(denied('grep block ~/.config/searchhole/rules.yaml 2>&1 > /tmp/out')).toBe(false)
+    expect(denied('sed -n 1,5p ~/.config/searchhole/rules.yaml')).toBe(false)
   })
 
   test('fileIsProtected: roots and our project file; case-insensitive where the FS is', () => {

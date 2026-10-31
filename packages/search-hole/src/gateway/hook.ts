@@ -24,6 +24,7 @@
  * permission flow. We therefore omit `permissionDecision` and never auto-allow WebSearch on
  * the user's behalf; the plugin end-to-end check must confirm `blocked_domains` arrives.
  */
+import { homedir } from 'node:os'
 import type { App, RequestCtx } from '../app/types.ts'
 import { describeFindings, type Finding, type FindingClass } from '../core/hygiene.ts'
 import type { Logger } from '../shared/log.ts'
@@ -201,7 +202,7 @@ async function preToolUse(input: HookInput, ctx: RequestCtx, deps: HookDeps): Pr
   const tool = input.toolName ?? ''
   if (tool === 'WebSearch') return preWebSearch(input, ctx, deps)
   if (tool === 'WebFetch') return preWebFetch(input, ctx, deps)
-  if (tool === 'Bash') return guardBash(input, deps)
+  if (tool === 'Bash') return guardBash(input, ctx, deps)
   if (FILE_TOOLS.has(tool)) return guardFile(tool, input, ctx, deps)
   return {}
 }
@@ -322,9 +323,12 @@ async function guardEnabled(deps: HookDeps): Promise<boolean> {
   }
 }
 
-async function guardBash(input: HookInput, deps: HookDeps): Promise<HookOutput> {
+async function guardBash(input: HookInput, ctx: RequestCtx, deps: HookDeps): Promise<HookOutput> {
   const command = nonEmpty(toolInputOf(input).command)
-  if (command === undefined || !bashChangesRules(command)) return {}
+  if (command === undefined) return {}
+  const roots = deps.protectedRoots()
+  const files = { roots, baseDir: ctx.projectDir ?? deps.cwd, home: roots.home ?? homedir() }
+  if (!bashChangesRules(command, files)) return {}
   if (!(await guardEnabled(deps))) return {}
   deps.log.warn({ agentType: input.agentType }, 'guard: denied a Bash call to a rule-changing command')
   return deny(GUARD_DENY_REASON)

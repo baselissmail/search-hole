@@ -185,6 +185,7 @@ export class Gateway {
     this.roots = {
       dirs: [...new Set(dirs)],
       caseInsensitive: this.platform === 'darwin' || this.platform === 'win32',
+      home,
     }
     return this.roots
   }
