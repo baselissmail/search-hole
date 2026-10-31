@@ -194,6 +194,19 @@ async function beginTurn(
   if (decision.rekeyed) {
     deps.log.info({ event, source: input.source, previousKey: decision.previousKey }, 'hook session re-keyed')
   }
+  const source = input.source
+  if (
+    event === 'SessionStart' &&
+    decision.previousKey !== undefined &&
+    (source === 'resume' || source === 'compact' || source === 'clear')
+  ) {
+    // ADR-0005: resume and compact carry the session's rules over; clear drops them.
+    await app
+      .rekeySession?.(decision.previousKey, withSession(ctx, decision.key), source)
+      .catch((err: unknown) => {
+        deps.log.warn({ err }, 'moving session rules to the new session failed')
+      })
+  }
   await app.openTurn(withSession(ctx, decision.key))
   return {}
 }

@@ -95,6 +95,16 @@ describe.each(ERAS)('hook tool (%s era)', (era) => {
       expect(h.app()?.callsTo('openTurn').at(-1)?.ctx?.session?.key).toBe('s2')
     })
 
+    test('SessionStart re-keys pass the source to the App (resume/compact carry session rules, clear drops them)', async () => {
+      const { h, hook } = await setup(era)
+      await hook({ event: 'UserPromptSubmit', sessionId: 's1' })
+      await hook({ event: 'Stop', sessionId: 's1' })
+      await hook({ event: 'SessionStart', sessionId: 's2', source: 'clear' })
+      await hook({ event: 'SessionStart', sessionId: 's2', source: 'compact' })
+      const calls = h.app()?.callsTo('rekeySession') ?? []
+      expect(calls.map((c) => [c.args, c.ctx?.session?.key])).toEqual([[['s1', 'clear'], 's2']])
+    })
+
     test('tool hooks act for their own session id', async () => {
       const { h, hook } = await setup(era)
       await hook({ event: 'UserPromptSubmit', sessionId: 's1' })

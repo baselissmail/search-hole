@@ -275,6 +275,15 @@ export class FakeApp implements App {
     return []
   }
 
+  async rekeySession(
+    previousKey: string,
+    ctx: RequestCtx,
+    source: 'startup' | 'resume' | 'clear' | 'compact',
+  ): Promise<{ movedRules: number }> {
+    this.record('rekeySession', [previousKey, source], ctx)
+    return { movedRules: 0 }
+  }
+
   async openTurn(ctx: RequestCtx): Promise<{ receiptId: string }> {
     this.record('openTurn', [], ctx)
     this.turnSearches = 0
