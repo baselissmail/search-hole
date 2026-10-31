@@ -9,7 +9,7 @@ import type { HostProfile, ListFormat, ListKind, ListMode, SearchMode } from '..
 import { parseDuration, ttlToUntil, untilToMs } from '../core/rules/time.ts'
 import { SearchHoleError } from '../shared/errors.ts'
 import { type Depth, ENGINE_ID_LIST, type EngineId, type RuleAction } from '../shared/types.ts'
-import { isSetupClient, SETUP_CLIENT_IDS, type SetupClient } from './setup.ts'
+import { isSetupClient, SETUP_CLIENT_IDS, type SetupClient } from './setup-clients.ts'
 
 export type ScopeFlag = 'global' | 'project' | 'session'
 export type SearxngSub = 'up' | 'down' | 'status' | 'apply'

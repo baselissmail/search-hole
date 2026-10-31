@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Help text for `searchhole help` and `searchhole <command> --help`. */
-import { describeSetup } from './setup.ts'
 import { VERSION } from './version.ts'
 
 const MAIN = `searchhole ${VERSION}: a local search gateway for AI assistants
@@ -153,7 +152,6 @@ already running. It prints a one-time sign-in link (valid 60 s); --open opens it
   --detach  run it in the background and return (what /search-hole:dashboard does)
   --stay    don't exit after ui.idleMinutes (default 30) with no open tab
   --port    use another port for this run`,
-  setup: describeSetup(),
   uninstall: `Usage: searchhole uninstall [--purge] [--yes] [--json]
 
 Without --purge: lists what would be deleted (nothing is touched).
@@ -177,5 +175,8 @@ export function usageText(topic?: string): string {
 
 /** True when `topic` has its own help page. */
 export function hasHelp(topic: string): boolean {
-  return topic in HELP
+  return topic in HELP || LAZY_HELP.has(topic)
 }
+
+/** Help pages built by their command's own module, loaded only when asked for. */
+export const LAZY_HELP: ReadonlySet<string> = new Set(['setup'])

@@ -8,7 +8,9 @@
  * Budgets, gzipped (zlib default level), 1 kB = 1,000 bytes as Vite reports it:
  *   - dashboard initial JS: the scripts and modulepreloads that apps/dashboard/dist/index.html loads  ≤ 250 kB
  *   - receipt panel: apps/receipt-app/dist/receipt.html, one self-contained file                     ≤ 80 kB
- *   - CLI entry: packages/search-hole/dist/searchhole.mjs, parsed on every CLI and gateway start      ≤ 27 kB
+ *   - CLI startup: what every CLI and gateway start loads — the entry (dist/searchhole.mjs), the
+ *     chunks it imports (statically, or dynamically from main()), and their static imports       ≤ 115 kB
+ *     (0.3.0: the entry became a stub that loads the CLI from main(); the measure follows it)
  *   - CLI bundle: every .mjs in packages/search-hole/dist (no source maps, ui/ or panel/)             ≤ 1,330 kB
  * The CLI limits are about 15% over the v0.2.0 build (22.9 kB and 1,153 kB). They catch an accidental
  * new dependency or a chunk that stopped being lazy. Raise them in the same change that says why.
@@ -31,11 +33,40 @@ const KB = 1000
 export const BUDGETS = {
   dashboardInitialJs: 250 * KB,
   receiptPanel: 80 * KB,
-  cliEntry: 27 * KB,
+  cliStartup: 115 * KB,
   cliBundle: 1330 * KB,
 }
 
 const gz = (buf) => gzipSync(buf).length
+
+const STATIC_IMPORT =
+  /(?:^|[;\n])\s*(?:import|export)\s[^;]*?from\s*["'](\.\/[^"']+\.mjs)["']|(?:^|[;\n])\s*import\s*["'](\.\/[^"']+\.mjs)["']/g
+const DYNAMIC_IMPORT = /import\(\s*["'](\.\/[^"']+\.mjs)["']\s*\)/g
+
+/**
+ * The files a plain start loads: the entry, every chunk it imports (its dynamic imports run in
+ * main() on every start), and their static imports, transitively.
+ */
+export function startupFiles(entry) {
+  const dir = dirname(entry)
+  const seen = new Set([entry])
+  const queue = []
+  const add = (spec) => {
+    const file = join(dir, spec)
+    if (!seen.has(file) && existsSync(file)) {
+      seen.add(file)
+      queue.push(file)
+    }
+  }
+  const entryText = readFileSync(entry, 'utf8')
+  for (const m of entryText.matchAll(STATIC_IMPORT)) add(m[1] ?? m[2])
+  for (const m of entryText.matchAll(DYNAMIC_IMPORT)) add(m[1])
+  while (queue.length > 0) {
+    const file = queue.shift()
+    for (const m of readFileSync(file, 'utf8').matchAll(STATIC_IMPORT)) add(m[1] ?? m[2])
+  }
+  return [...seen]
+}
 
 /** Raw and gzipped byte counts for a list of files. */
 function measure(files) {
@@ -113,7 +144,12 @@ export function collect(repo = REPO) {
   const dist = join(repo, 'packages', 'search-hole', 'dist')
   const entry = join(dist, 'searchhole.mjs')
   if (existsSync(entry)) {
-    rows.push({ name: 'CLI entry (searchhole.mjs)', ...measure([entry]), limit: BUDGETS.cliEntry })
+    const startup = startupFiles(entry)
+    rows.push({
+      name: `CLI startup (${startup.length} files)`,
+      ...measure(startup),
+      limit: BUDGETS.cliStartup,
+    })
     const chunks = readdirSync(dist)
       .filter((n) => n.endsWith('.mjs'))
       .map((n) => join(dist, n))
@@ -124,7 +160,7 @@ export function collect(repo = REPO) {
     })
     rows.push({ name: 'npm dist/ incl. maps (info)', ...measure(walk(dist)) })
   } else {
-    missing('CLI entry (searchhole.mjs)', entry, BUDGETS.cliEntry)
+    missing('CLI startup', entry, BUDGETS.cliStartup)
     missing('CLI bundle', dist, BUDGETS.cliBundle)
   }
 

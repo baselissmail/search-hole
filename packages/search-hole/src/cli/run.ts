@@ -694,7 +694,7 @@ async function execute(
           fix: 'Run `searchhole help` for the list of commands.',
         })
       }
-      line(io, usageText(cmd.topic))
+      line(io, cmd.topic === 'setup' ? (await import('./setup.ts')).describeSetup() : usageText(cmd.topic))
       return 0
     case 'version':
       if (cmd.json) json(io, { version: VERSION, node: process.version })

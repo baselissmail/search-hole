@@ -40,18 +40,11 @@ import type { HostProfile } from '../app/types.ts'
 import { detectSecrets } from '../core/hygiene.ts'
 import { SearchHoleError } from '../shared/errors.ts'
 import { atomicWriteFile, ensureDir } from '../shared/paths.ts'
+import { isSetupClient, SETUP_CLIENT_IDS, type SetupClient } from './setup-clients.ts'
 
 // ── The client table ──────────────────────────────────────────────────────
 
-export type SetupClient =
-  | 'vscode'
-  | 'cursor'
-  | 'windsurf'
-  | 'zed'
-  | 'goose'
-  | 'codex'
-  | 'claude-desktop'
-  | 'generic'
+export type { SetupClient }
 export type SetupScope = 'user' | 'project'
 export type SetupFormat = 'json' | 'jsonc' | 'toml' | 'yaml' | 'snippet'
 
@@ -174,12 +167,8 @@ export const SETUP_CLIENTS: readonly SetupClientInfo[] = [
   },
 ]
 
-/** Client ids, in table order. */
-export const SETUP_CLIENT_IDS: readonly SetupClient[] = SETUP_CLIENTS.map((c) => c.id)
-
-export function isSetupClient(value: string): value is SetupClient {
-  return (SETUP_CLIENT_IDS as readonly string[]).includes(value)
-}
+// Client ids live in setup-clients.ts (loaded on every CLI start); the table must match it.
+export { isSetupClient, SETUP_CLIENT_IDS }
 
 /** The table row for a client. */
 export function setupClientInfo(client: SetupClient): SetupClientInfo {

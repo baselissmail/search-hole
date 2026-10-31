@@ -953,3 +953,10 @@ describe('backupName', () => {
     expect(backupName(file, NOW)).toBe(`${file}.bak-20261031T185703Z-2`)
   })
 })
+
+describe('setup client ids', () => {
+  it('the tiny id list (loaded on every CLI start) matches the full table, in order', async () => {
+    const { SETUP_CLIENT_IDS: ids } = await import('../../src/cli/setup-clients.ts')
+    expect(SETUP_CLIENTS.map((c) => c.id)).toEqual([...ids])
+  })
+})
