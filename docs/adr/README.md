@@ -7,7 +7,7 @@ Status values: **Proposed**, **Accepted**, **Superseded by ADR-NNNN**. To change
 | # | Decision | Status |
 |---|---|---|
 | [0001](0001-monorepo-shape.md) | Three-package pnpm workspace: one published package with internal layers, plus two UI apps | Accepted |
-| [0002](0002-runtime-and-packaging.md) | Require Node ≥ 22.13 and ship one dependency-free bundle; Desktop uses its bundled Node via `.mcpb`; standalone binaries deferred | Accepted |
+| [0002](0002-runtime-and-packaging.md) | Require Node ≥ 22.19 and ship one dependency-free bundle; Desktop uses its bundled Node via `.mcpb`; standalone binaries deferred | Accepted |
 | [0003](0003-sqlite-driver-and-access-layer.md) | `node:sqlite` behind a small driver port, with plain SQL and typed query functions | Accepted |
 | [0004](0004-dashboard-process-model.md) | No daemon: gateways write SQLite directly; `searchhole ui` runs on demand as a single instance and pushes a rowid tail over SSE | Accepted |
 | [0005](0005-session-definition.md) | Session = best host conversation key per request; receipt = server-minted handle | Accepted |

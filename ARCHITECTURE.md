@@ -25,7 +25,7 @@ This page is the map. The reasons behind each choice live in the [ADRs](docs/adr
 
 - **No daemon.** Every gateway writes SQLite directly, and SQLite is the only shared medium. The dashboard is a separate, single-instance process that the user starts. It tails new rows and pushes them to the browser. → [ADR-0004](docs/adr/0004-dashboard-process-model.md)
 - **Many gateways at once is normal.** A host may run several copies plus a probe. Startup has no side effects until the first real tool call. → [ADR-0006](docs/adr/0006-upgrades-migrations-multi-install.md), [ADR-0013](docs/adr/0013-dual-protocol-support.md)
-- **One artifact.** `packages/search-hole/dist/` (a Node ≥ 22.13 bundle with no `node_modules` and no native modules) is the CLI, the stdio gateway (`searchhole mcp --host <profile>`) and the dashboard server. → [ADR-0002](docs/adr/0002-runtime-and-packaging.md)
+- **One artifact.** `packages/search-hole/dist/` (a Node ≥ 22.19 bundle with no `node_modules` and no native modules) is the CLI, the stdio gateway (`searchhole mcp --host <profile>`) and the dashboard server. → [ADR-0002](docs/adr/0002-runtime-and-packaging.md)
 
 ## Code layout
 

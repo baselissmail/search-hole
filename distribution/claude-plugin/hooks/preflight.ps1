@@ -15,13 +15,13 @@ echo --% >/dev/null;: ' | Out-Null
 #
 # It needs no network and uses only shell builtins (the PATH may be nearly empty, and the point is
 # to cope with a missing node). Prints {"systemMessage": "..."} only when Node.js is missing or
-# older than 22.13; otherwise prints nothing. It always exits 0, so it can never block a session.
+# older than 22.19; otherwise prints nothing. It always exits 0, so it can never block a session.
 # Keep the message free of double quotes and backslashes except the JSON arrow escape (backslash, u, 2192).
 
 search_hole_preflight() {
   msg=''
   if ! command -v node >/dev/null 2>&1; then
-    msg='search-hole needs Node.js 22.13 or newer, but node was not found on PATH. Install it (macOS: brew install node; Windows: winget install OpenJS.NodeJS.LTS; Linux: your package manager or https://nodejs.org), then restart Claude Code or run /mcp \u2192 reconnect search-hole.'
+    msg='search-hole needs Node.js 22.19 or newer, but node was not found on PATH. Install it (macOS: brew install node; Windows: winget install OpenJS.NodeJS.LTS; Linux: your package manager or https://nodejs.org), then restart Claude Code or run /mcp \u2192 reconnect search-hole.'
   else
     v=$(node --version 2>/dev/null) || v=''
     v=${v#v}
@@ -31,8 +31,8 @@ search_hole_preflight() {
     minor=${rest%%.*}
     case $major in '' | *[!0-9]*) return 0 ;; esac
     case $minor in '' | *[!0-9]*) return 0 ;; esac
-    if [ "$major" -lt 22 ] || { [ "$major" -eq 22 ] && [ "$minor" -lt 13 ]; }; then
-      msg="search-hole needs Node.js 22.13 or newer, but found v$v. Upgrade Node.js (https://nodejs.org), then restart Claude Code or run /mcp \\u2192 reconnect search-hole."
+    if [ "$major" -lt 22 ] || { [ "$major" -eq 22 ] && [ "$minor" -lt 19 ]; }; then
+      msg="search-hole needs Node.js 22.19 or newer, but found v$v. Upgrade Node.js (https://nodejs.org), then restart Claude Code or run /mcp \\u2192 reconnect search-hole."
     fi
   fi
   if [ -n "$msg" ]; then

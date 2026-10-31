@@ -66,3 +66,8 @@ The gateway is a stdio MCP server that each host spawns. §4 lists three options
 - **P0/P1 spike:** on a machine with no Node, point a test plugin's `mcpServers` at a `.mcpb` and see whether Claude Code starts it (settles option c).
 - **P3:** install the plugin from the `archive` source on a machine with no Node and confirm the preflight message, then install Node, reconnect, and confirm it works.
 - **P3:** confirm Claude Code honours `onFailure` on the preflight hook (needs v2.1.295 or later; the dev machine runs 2.1.97 and must be updated).
+
+## Amendment (2026-10-31, v0.2.0): the floor is Node 22.19
+
+The release-engineering pass ran the bundle on the stated floor and found that it doesn't load on Node 22.13–22.18. The bundled undici 8 uses `zlib.createZstdDecompress`, which arrived in 22.19, so every command crashed at import. Several tests also spawn `.ts` files with type stripping, which is unflagged only from 22.18. The floor is now **`>=22.19`** everywhere it is stated: `engines.node`, the tsdown target, the preflight hooks, the doctor check, the Desktop manifest and the docs. CI's `node-floor` job reads `engines.node`, so it tests exactly this version. We chose this over pinning undici 7: 22.19 is over a year old, Claude Desktop ships Node 24, and the undici 8 line keeps getting security fixes. The plan to raise the floor to 24.15 after Node 22's end of life (2027-04-30) is unchanged.
+

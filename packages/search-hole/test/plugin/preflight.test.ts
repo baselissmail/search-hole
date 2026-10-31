@@ -87,7 +87,7 @@ describe('preflight.ps1 as a file', () => {
   it('has a Windows half that prints the same message shape and always exits 0', () => {
     const win = readText(PLUGIN_DIR, 'hooks', 'preflight-windows.ps1')
     expect(win).toContain('systemMessage')
-    expect(win).toContain('22.13')
+    expect(win).toContain('22.19')
     expect(win).toContain('exit 0')
     expect(win).not.toMatch(/exit [1-9]/)
   })
@@ -108,14 +108,14 @@ describe.skipIf(!posix)('preflight.ps1 under sh', () => {
         expect(run.status).toBe(0)
         const msg = message(run)
         expect(msg).toBeDefined()
-        expect(msg).toContain('Node.js 22.13')
+        expect(msg).toContain('Node.js 22.19')
         expect(msg).toContain('not found')
         expect(msg).toContain('/mcp → reconnect search-hole')
         expect(run.stderr).toBe('')
       })
 
-      it('prints an upgrade message for Node older than 22.13', () => {
-        for (const version of ['v20.11.0', 'v18.19.1', 'v22.12.9', 'v22.0.0']) {
+      it('prints an upgrade message for Node older than 22.19', () => {
+        for (const version of ['v20.11.0', 'v18.19.1', 'v22.12.9', 'v22.0.0', 'v22.13.0', 'v22.18.9']) {
           const run = runHook(shell, PLUGIN_DIR, fakePath(version))
           expect(run.status, version).toBe(0)
           expect(message(run), version).toContain(`found ${version}`)
@@ -123,8 +123,8 @@ describe.skipIf(!posix)('preflight.ps1 under sh', () => {
         }
       })
 
-      it('prints nothing for Node 22.13 or newer', () => {
-        for (const version of ['v22.13.0', 'v22.13.1', 'v22.20.0', 'v24.14.1', 'v26.13.0', 'v100.0.0']) {
+      it('prints nothing for Node 22.19 or newer', () => {
+        for (const version of ['v22.19.0', 'v22.19.1', 'v22.20.0', 'v24.14.1', 'v26.13.0', 'v100.0.0']) {
           const run = runHook(shell, PLUGIN_DIR, fakePath(version))
           expect(run.status, version).toBe(0)
           expect(run.stdout, version).toBe('')
@@ -148,7 +148,7 @@ describe.skipIf(!posix)('preflight.ps1 under sh', () => {
     cpSync(join(PLUGIN_DIR, 'hooks'), join(root, 'hooks'), { recursive: true })
     const run = runHook('/bin/sh', root, fakePath())
     expect(run.status).toBe(0)
-    expect(message(run)).toContain('Node.js 22.13')
+    expect(message(run)).toContain('Node.js 22.19')
   })
 
   it('prints exactly one JSON line', () => {

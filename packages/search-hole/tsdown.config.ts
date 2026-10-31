@@ -6,7 +6,7 @@ export default defineConfig({
   entry: { searchhole: 'src/cli/main.ts' },
   format: 'esm',
   platform: 'node',
-  target: 'node22.13',
+  target: 'node22.19',
   outDir: 'dist',
   outExtensions: () => ({ js: '.mjs' }),
   noExternal: [/.*/],

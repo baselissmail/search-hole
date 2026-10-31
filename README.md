@@ -7,7 +7,7 @@ A local search gateway for AI assistants. You choose the engines and sites your 
 ## Requirements
 
 - Claude Code 2.1.296 or newer.
-- Node.js 22.13 or newer on your PATH. Without it the plugin shows a message at session start and the MCP server cannot run.
+- Node.js 22.19 or newer on your PATH. Without it the plugin shows a message at session start and the MCP server cannot run.
 - Optional, for better results: Docker (a private SearXNG engine) or a free Tavily key. See [Optional engines](#optional-engines).
 
 ## Quickstart in Claude Code
@@ -123,7 +123,7 @@ Recommended: SearXNG plus a free Tavily key, so SearXNG's upstream rate limits d
 
 ## Troubleshooting
 
-- *Node message at session start:* install Node 22.13+, then run `/mcp` and reconnect `search-hole`.
+- *Node message at session start:* install Node 22.19+, then run `/mcp` and reconnect `search-hole`.
 - *A slash command says a shell command permission check failed:* add `Bash(SEARCHHOLE_SKILL=1 node *)` to your allowed tools, or approve it when asked.
 - *Nothing is filtered:* run `/mcp` and check that `plugin:search-hole:search-hole` is connected. If it is not, the hooks do nothing.
 
