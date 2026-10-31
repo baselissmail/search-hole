@@ -170,6 +170,96 @@ ADR-0021.
 
 Fixed along the way: Vite's CSS target polyfilled `light-dark()` from the OS preference, so the panel ignored the host theme and the dashboard ignored a theme chosen in Settings. Both now use native `light-dark()`, with a regression test each.
 
-Next: P6, the lists ecosystem (subscriptions, importers for uBlacklist/AdGuard/hosts/Goggles, and the list matcher's host prefilter). Your dogfooding of the dashboard, panel and Desktop extension may reorder it.
+## P6 lists ecosystem (2026-11-01, v0.3.0)
 
-Deferred past v0.1: dashboard (P4), MCP App panel and `.mcpb` (P5), list subscriptions and importers (P6), Cursor/Codex manifests (P7), release engineering (P8).
+ADR-0017 (starter set), ADR-0008 (import mapping), ADR-0022 (lists implementation).
+- **Importers:** uBlacklist, Adblock Plus and AdGuard (domain rules only), hosts files, plain domain lists, Brave Goggles. Lines that can't be expressed are counted and reported, never guessed. Golden tests (10 fixtures plus hand-written scenarios) and a fuzz test.
+- **Matcher:** host and n-gram prefilter buckets in front of the rule regexes (the P1 note: a 20k-regex set cost 130–250 ms per URL). A benchmark test runs at CI size; `SEARCHHOLE_BENCH=full` runs the full size against p95 < 1 ms.
+- **First-party lists** (CC0, each entry with evidence): `official-docs` (96), `official-health` (111), `github-clones` (172), `ai-content-farms` (21, audit).
+- **Catalog** of third-party lists with verified licences. Copyleft and unlicensed lists are link-only, Brave Goggles too.
+- **Starter set**, vendored with sha256 and listed in THIRD_PARTY_NOTICES: `quenhus-dev-filter` (625), `arosh-stackoverflow-translation` (139), `arosh-github-translation` (35), `rjaus-pinterest` (50), `laylavish-huge-ai` (1,659, audit).
+- **Subscriptions:** `searchhole lists add|remove|import|update`, `lists enforce|audit|disable`, `lists catalog`.
+  - ETag/304, the private-address guard, an optional sha256 pin, and a shrink guard that keeps the old copy below half the rules.
+  - Compiled artifacts, and a background refresh under a lease (`lists.autoUpdate`, on by default).
+  - `doctor` reports list health.
+- **Audit mode** records what a list would hide and never changes visible results.
+- **Dashboard Lists page:** modes with Undo, each list's contribution over 7 days, errors with their fixes, the catalog, and subscribe.
+
+**Acceptance (MASTER_PLAN §11 P6):**
+- [x] Every seed list imports: the bundle test loads each vendored list from the built package with no network, and each has rules (counts above).
+- [x] The dashboard shows each list's contribution (Lists page; e2e covers modes, Undo and the catalog).
+
+Open, for Basel's review:
+- **Starter breadth (ADR-0017 point 7):** `quenhus-dev-filter` blocks csdn.net and segmentfault.com. Those are copy-heavy, but they're also large Chinese developer sites. Keep it enforced, switch it to audit, or drop it from the starter set.
+- **API gaps found while building the Lists page:**
+  - The server has no re-import, so the page waits out the Undo window before it removes an import.
+  - The page doesn't show when your own list shadows a starter list.
+  - Fix strings are worded for the CLI.
+
+## P7 more clients (2026-11-01, v0.3.0)
+
+ADR-0023.
+- **Codex plugin:** Agent Plugins 1.0, hookless, so it can go in the OpenAI directory, plus a local marketplace.
+- **Cursor plugin:** `.cursor-plugin`, no hooks; it gets `apply_rule` because Cursor renders the panel.
+- Both are built with `node scripts/build-plugin.mjs --target codex|cursor|all` into `distribution/out/`.
+- **`searchhole setup <client>`** for vscode, cursor, windsurf, zed, goose, codex, claude-desktop and generic:
+  - shows the change and asks first;
+  - merges into the client's MCP config;
+  - keeps a `.bak` copy.
+- **`searchhole uninstall [--purge]`:**
+  - Deletes keys, then known files by name, then empty roots.
+  - Refuses `/`, a drive root and the home folder.
+  - Names what other apps hold.
+- Guides in `docs/clients/` for Claude Code, Claude Desktop, Codex, Cursor, VS Code, Windsurf, Zed, Goose and generic MCP clients.
+
+**Acceptance (MASTER_PLAN §11 P7):**
+- [x] Validators pass where the platform has one: `claude plugin validate --strict`, and the mcpb toolchain for the `.mcpb`. Codex and Cursor have no local validator, so tests check their manifests against the documented shapes (zod).
+- [ ] **Needs Basel's machines:** on each client, a fresh install by the docs alone, one search, and that search in the dashboard. Nothing outside Claude Code has run on a real host yet.
+
+## P8 release engineering (2026-11-01, v0.3.0)
+
+ADR-0024.
+- **CI** on Linux, macOS and Windows:
+  - Biome, typecheck, layers, SPDX, unit tests, builds;
+  - bundle-size budgets and the tool-description token budget;
+  - Playwright e2e with axe;
+  - `claude plugin validate --strict`, the `.mcpb` pack, and a bundle smoke test on the Node floor (22.19), Node 24 and Bun (Bun reports only).
+  - A DCO check on pull requests.
+- **Release (tag-driven):**
+  - a signed-tag check, npm publish with provenance, a CycloneDX SBOM;
+  - the plugin zip and `.mcpb` as assets, SHA-256 checksums, and build attestations.
+- **Security:** CodeQL, OpenSSF Scorecard, and Renovate with a 14-day minimum release age. Actions are pinned by SHA.
+- **Release tooling:** `pnpm release:bump <version>` updates every version source, including the Codex and Cursor manifests, and dates the changelog. `pnpm check:release v<version>` checks them.
+- **Node floor 22.19**, because the bundled undici 8 needs zlib's zstd. Raised in `engines`, the plugin preflight, `doctor` and CI.
+- LICENSE and THIRD_PARTY_NOTICES ship in the npm package, both plugins and the `.mcpb`.
+- CONTRIBUTING, SECURITY, CODE_OF_CONDUCT, `docs/release.md`, `docs/dogfood.md`, issue and PR templates.
+- Launch drafts are in `docs/launch/`: Show HN, three Reddit posts, directories, and a write-up outline.
+- **Fix:** the CLI entry had a top-level await that deadlocked lazily loaded chunks (`searchhole help setup` hung). The entry now loads the CLI from `main()`.
+
+**Checked locally for v0.3.0 (2026-11-01):**
+- Biome, typecheck, layers and SPDX clean.
+- Tests: package 2,510 passed (2 skipped), dashboard 99, receipt panel 3.
+- e2e: dashboard 12, panel 4.
+- Bundle budgets all within limits; the largest are dashboard 94% and CLI 92%.
+- `claude plugin validate --strict` passes. All three plugins and `search-hole-0.3.0.mcpb` are rebuilt. The smoke test and `check:release v0.3.0` pass.
+
+**Acceptance (MASTER_PLAN §11 P8), open:**
+- [ ] CI has never run: there's no remote. The Windows job is untested, and so is Windows hardware.
+- [ ] Plugin evals (`claude plugin eval`) don't exist yet and need an API key (docs/release.md, "Not automated yet").
+- [ ] README hero GIF (needs a recording). Per-client quickstarts are in `docs/clients/`.
+- [ ] Dogfood gate: two weeks of daily use with no open P0/P1 in `docs/dogfood.md`.
+- [ ] A tagged release that installs cleanly from the marketplace, npm and the `.mcpb` on all three OSes. `uninstall --purge` removes a root it emptied (unit tests on macOS). It hasn't run against a real install.
+- [ ] `.mcpb` signing waits for a certificate.
+- [ ] pnpm's `minimumReleaseAge` can only be turned on from 2026-11-13, once the lockfile has aged (docs/release.md).
+- [ ] Launch posts are Basel's.
+
+## Waiting on Basel (for v0.3.0)
+
+1. **Test on real apps:**
+   - Claude Desktop: install `distribution/out/search-hole-0.3.0.mcpb`.
+   - Codex, Cursor, VS Code, Windsurf, Zed and Goose: follow `docs/clients/`.
+   - Claude Code: rebuild and reinstall the local plugin.
+   - Windows, if you have a machine.
+2. **Starter-set breadth** (quenhus and csdn.net/segmentfault.com): see P6.
+3. **One-time GitHub and npm setup** before the first release: `docs/release.md` step 0 (remote, signing key, npm trusted publishing, environments).
+4. Publishing, release tags and launch posts are yours.
