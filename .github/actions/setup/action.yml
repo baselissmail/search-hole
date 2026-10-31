@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Set up search-hole toolchain
+description: >
+  Node and pnpm exactly as pinned in .mise.toml (through mise), a cached pnpm store, and a
+  frozen-lockfile install. Used by every workflow job that builds or tests.
+inputs:
+  install:
+    description: Run pnpm install --frozen-lockfile ('false' sets up the toolchain only).
+    default: 'true'
+runs:
+  using: composite
+  steps:
+    - name: Install mise, then Node and pnpm from .mise.toml
+      uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+      with:
+        version: '2026.10.8' # renovate: datasource=github-releases depName=jdx/mise extractVersion=^v(?<version>.+)$
+        install: true
+        cache: true
+
+    - name: Locate the pnpm store
+      id: store
+      shell: bash
+      run: echo "path=$(pnpm store path | tail -n 1)" >> "$GITHUB_OUTPUT"
+
+    - name: Cache the pnpm store
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.store.outputs.path }}
+        key: pnpm-store-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: pnpm-store-${{ runner.os }}-${{ runner.arch }}-
+
+    - name: Install dependencies (frozen lockfile)
+      if: inputs.install == 'true'
+      shell: bash
+      run: pnpm install --frozen-lockfile

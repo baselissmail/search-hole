@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+# CodeQL for the TypeScript and JavaScript sources. Build output, recorded test fixtures (hostile
+# HTML on purpose) and the research notes are not product code.
+name: search-hole CodeQL config
+queries:
+  - uses: security-extended
+paths-ignore:
+  - '**/dist/**'
+  - '**/node_modules/**'
+  - '**/test/fixtures/**'
+  - research/**
+  - distribution/marketplace/**
+  - distribution/out/**

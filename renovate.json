@@ -1,0 +1,89 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "search-hole dependency updates: exact pins, two-week minimum release age (MASTER_PLAN §14 versions rule), nothing automerged.",
+  "extends": [
+    "config:recommended",
+    ":pinAllExceptPeerDependencies",
+    "helpers:pinGitHubActionDigests",
+    ":semanticCommits",
+    ":maintainLockFilesMonthly"
+  ],
+  "rangeStrategy": "pin",
+  "minimumReleaseAge": "14 days",
+  "internalChecksFilter": "strict",
+  "automerge": false,
+  "platformAutomerge": false,
+  "dependencyDashboard": true,
+  "labels": ["dependencies"],
+  "schedule": ["before 6am on monday"],
+  "prConcurrentLimit": 6,
+  "prHourlyLimit": 3,
+  "postUpdateOptions": ["pnpmDedupe"],
+  "ignorePaths": ["**/node_modules/**", "research/**", "distribution/marketplace/**", "distribution/out/**"],
+  "vulnerabilityAlerts": {
+    "description": "Security fixes skip the queue but still wait 3 days (the npm unpublish window) and are never automerged.",
+    "labels": ["dependencies", "security"],
+    "minimumReleaseAge": "3 days",
+    "automerge": false
+  },
+  "packageRules": [
+    {
+      "description": "Group dev-only minor and patch updates across the workspace into one PR.",
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "groupName": "devDependencies (non-major)",
+      "groupSlug": "dev-dependencies"
+    },
+    {
+      "description": "UI runtime libraries (bundled into the dashboard and panel) get their own group.",
+      "matchFileNames": ["apps/**"],
+      "matchDepTypes": ["dependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "UI dependencies (non-major)",
+      "groupSlug": "ui-dependencies"
+    },
+    {
+      "description": "GitHub Actions: pinned to commit SHAs with the version in a comment; grouped.",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions",
+      "groupSlug": "github-actions"
+    },
+    {
+      "description": "Toolchain (.mise.toml, packageManager, the mise version CI installs): one PR, reviewed by hand.",
+      "matchPackageNames": ["node", "pnpm", "jdx/mise"],
+      "groupName": "toolchain",
+      "groupSlug": "toolchain"
+    },
+    {
+      "description": "Node majors change the development runtime (ADR-0002); propose them separately.",
+      "matchPackageNames": ["node"],
+      "matchUpdateTypes": ["major"],
+      "groupName": null
+    },
+    {
+      "description": "engines.node is the support floor decided in ADR-0002, not a dependency to bump.",
+      "matchDepTypes": ["engines"],
+      "enabled": false
+    },
+    {
+      "description": "The npm name placeholders are published once by hand and never updated.",
+      "matchFileNames": ["distribution/npm-reserve/**"],
+      "enabled": false
+    },
+    {
+      "description": "Major updates wait for approval on the dependency dashboard.",
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    }
+  ],
+  "customManagers": [
+    {
+      "description": "Versions pinned in workflow YAML with a trailing '# renovate:' comment (mise, Claude Code).",
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.github/.+\\.ya?ml$/"],
+      "matchStrings": [
+        "'(?<currentValue>[^'\\s]+)'\\s*# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+)(?: extractVersion=(?<extractVersion>\\S+))?"
+      ]
+    }
+  ]
+}

@@ -13,6 +13,12 @@
     "lint": "biome check .",
     "format": "biome format --write .",
     "check:layers": "node scripts/check-layers.mjs",
+    "check:size": "node scripts/check-bundle-size.mjs",
+    "check:spdx": "node .github/scripts/check-spdx.mjs",
+    "check:release": "node .github/scripts/check-release.mjs",
+    "release:bump": "node .github/scripts/bump-version.mjs",
+    "build:sbom": "node scripts/sbom.mjs",
+    "smoke": "node .github/scripts/smoke-bundle.mjs",
     "check": "pnpm lint && pnpm typecheck && pnpm check:layers && pnpm test"
   },
   "devDependencies": {

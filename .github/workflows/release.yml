@@ -1,0 +1,404 @@
+# SPDX-License-Identifier: Apache-2.0
+# Release (MASTER_PLAN §11 P8, ADR-0002 point 5; checklist in docs/release.md).
+#
+#   verify         the tag is annotated, signed and verified by GitHub, on main, and every version
+#                  string and the changelog match it
+#   build          build, test, budgets, plugin validate; pack the npm tarball, the plugin zip
+#                  (the marketplace `archive` source) and the .mcpb; CycloneDX SBOM
+#   sign-mcpb      optional: sign the .mcpb (repository variable MCPB_SIGNING = 'true')
+#   publish-npm    npm publish --provenance (environment `npm`, OIDC trusted publishing)
+#   github-release attestations, SHA256SUMS, and a GitHub release with every asset
+#
+# Manual runs default to dry_run, which stops after build and keeps the assets as an artifact.
+# A dry run with no tag rehearses from the selected branch (version from package.json, no signature
+# check), so the whole build can be tried before tagging. Never runs outside
+# baselissmail/search-hole. Nothing has write access until the publish jobs.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Signed tag to release, already pushed (for example v0.3.0). Leave empty for a dry-run rehearsal of the selected branch.
+        required: false
+        type: string
+        default: ''
+      dry_run:
+        description: Build, test and package only; no npm publish and no GitHub release
+        required: true
+        type: boolean
+        default: true
+
+permissions: {}
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  CLAUDE_CODE_VERSION: '2.1.302' # renovate: datasource=npm depName=@anthropic-ai/claude-code
+  DISABLE_AUTOUPDATER: '1'
+  DISABLE_TELEMETRY: '1'
+  CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
+  DO_NOT_TRACK: '1'
+
+jobs:
+  verify:
+    name: Verify the tag
+    if: github.repository == 'baselissmail/search-hole'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      rehearsal: ${{ steps.tag.outputs.rehearsal }}
+      version: ${{ steps.meta.outputs.version }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+      npm_tag: ${{ steps.meta.outputs.npm_tag }}
+      sha: ${{ steps.tag.outputs.sha }}
+      epoch: ${{ steps.tag.outputs.epoch }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # A tag push checks out the tag; a manual run checks out its tag, or the branch it was started on.
+          ref: ${{ inputs.tag != '' && format('refs/tags/{0}', inputs.tag) || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: The tag is annotated, signed, and verified by GitHub
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$EVENT" = workflow_dispatch ] && [ -z "$INPUT_TAG" ]; then
+            if [ "$DRY_RUN" != true ]; then echo "::error::A real release needs a signed tag; leave the tag empty only with dry_run."; exit 1; fi
+            tag="v$(node -p "require('./packages/search-hole/package.json').version")"
+            sha=$(git rev-parse HEAD)
+            echo "::notice::Rehearsal of ${REF_NAME} as ${tag}: no tag or signature check, nothing is published."
+            { echo "tag=$tag"; echo "rehearsal=true"; echo "sha=$sha"; echo "epoch=$(git log -1 --format=%ct "$sha")"; } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          tag=${INPUT_TAG:-$REF_NAME}
+          if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::'$tag' is not vMAJOR.MINOR.PATCH[-prerelease]"; exit 1
+          fi
+          ref=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}")
+          if [ "$(jq -r .object.type <<<"$ref")" != tag ]; then
+            echo "::error::$tag is a lightweight tag. Delete it and create a signed one: git tag -s $tag -m 'search-hole ${tag#v}'"
+            exit 1
+          fi
+          obj=$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/$(jq -r .object.sha <<<"$ref")")
+          if [ "$(jq -r .verification.verified <<<"$obj")" != true ]; then
+            echo "::error::GitHub could not verify the signature on $tag ($(jq -r .verification.reason <<<"$obj")). Sign with a GPG or SSH key added to your GitHub account as a signing key."
+            exit 1
+          fi
+          sha=$(git rev-list -n 1 "$tag")
+          if [ "$(git rev-parse HEAD)" != "$sha" ]; then echo "::error::the checkout is not $tag"; exit 1; fi
+          git merge-base --is-ancestor "$sha" origin/main || {
+            echo "::error::$tag does not point at a commit on main. Tag a commit that passed CI on main."; exit 1; }
+          { echo "tag=$tag"; echo "rehearsal=false"; echo "sha=$sha"; echo "epoch=$(git log -1 --format=%ct "$sha")"; } >> "$GITHUB_OUTPUT"
+          echo "$tag → $sha on main, signed by $(jq -r '.tagger.name + " <" + .tagger.email + ">"' <<<"$obj")"
+
+      - name: Versions and changelog match the tag
+        id: meta
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: node .github/scripts/check-release.mjs "$TAG" --notes release-notes.md
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-notes
+          path: release-notes.md
+          retention-days: 30
+          if-no-files-found: error
+
+  build:
+    name: Build, test and package
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    env:
+      TAG: ${{ needs.verify.outputs.tag }}
+      VERSION: ${{ needs.verify.outputs.version }}
+      TAG_SHA: ${{ needs.verify.outputs.sha }}
+      SOURCE_DATE_EPOCH: ${{ needs.verify.outputs.epoch }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+          persist-credentials: false
+      - name: The checkout is the verified commit
+        run: test "$(git rev-parse HEAD)" = "$TAG_SHA"
+      - uses: ./.github/actions/setup
+
+      - name: Build the dashboard, the receipt panel and the package
+        run: |
+          pnpm -C apps/dashboard build
+          pnpm -C apps/receipt-app build
+          pnpm -C packages/search-hole build
+      - name: Unit tests (all workspaces)
+        run: pnpm -r test
+      - name: Smoke-test the bundle
+        run: node .github/scripts/smoke-bundle.mjs
+      - name: Bundle-size budgets
+        run: node scripts/check-bundle-size.mjs
+
+      - name: Assemble the Claude Code plugin
+        run: node scripts/build-plugin.mjs --skip-build
+      - name: Zip the plugin (marketplace archive source; fixed timestamps and order)
+        run: |
+          mkdir -p distribution/out
+          out="$PWD/distribution/out/search-hole-plugin-${VERSION}.zip"
+          rm -f "$out"
+          cd distribution/marketplace/search-hole
+          find . -exec touch -h -d "@${SOURCE_DATE_EPOCH}" {} +
+          find . -type f -print | LC_ALL=C sort | zip -X -q -@ "$out"
+          unzip -l "$out" | tail -n 1
+      - name: Install Claude Code ${{ env.CLAUDE_CODE_VERSION }}
+        run: npm install --prefix "$RUNNER_TEMP/claude" --no-fund --no-audit "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+      - name: claude plugin validate --strict on the zipped plugin
+        run: |
+          check="$RUNNER_TEMP/plugin-from-zip"
+          rm -rf "$check" && mkdir -p "$check"
+          unzip -q "distribution/out/search-hole-plugin-${VERSION}.zip" -d "$check"
+          "$RUNNER_TEMP/claude/node_modules/.bin/claude" plugin validate "$check" --strict < /dev/null
+      - name: Marketplace entry for the zip (archive source, validated)
+        run: |
+          zip="search-hole-plugin-${VERSION}.zip"
+          sha=$(sha256sum "distribution/out/$zip" | cut -d' ' -f1)
+          url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${zip}"
+          # No "version" here: plugin.json carries it, and a second copy makes validate --strict warn.
+          jq -n --arg url "$url" --arg sha "$sha" '{
+            name: "search-hole",
+            description: "A local search gateway for AI assistants: choose the engines and sites your AI searches, see every search, get source receipts.",
+            category: "search",
+            source: { source: "archive", url: $url, sha256: $sha }
+          }' > distribution/out/marketplace-entry.json
+          mp="$RUNNER_TEMP/marketplace-check"
+          rm -rf "$mp" && mkdir -p "$mp/.claude-plugin"
+          jq -n --slurpfile entry distribution/out/marketplace-entry.json '{
+            name: "search-hole",
+            owner: { name: "Basel Issmail" },
+            description: "search-hole, a local search gateway for AI assistants.",
+            plugins: $entry
+          }' > "$mp/.claude-plugin/marketplace.json"
+          "$RUNNER_TEMP/claude/node_modules/.bin/claude" plugin validate "$mp" --strict < /dev/null
+          cat distribution/out/marketplace-entry.json
+
+      - name: Pack the Claude Desktop extension (.mcpb)
+        run: |
+          pnpm -C packages/search-hole build:mcpb
+          mcpb="$PWD/distribution/out/search-hole-${VERSION}.mcpb"
+          unpacked="$RUNNER_TEMP/mcpb-unpacked"
+          rm -rf "$unpacked"
+          pnpm -C packages/search-hole exec mcpb unpack "$mcpb" "$unpacked"
+          pnpm -C packages/search-hole exec mcpb validate "$unpacked/manifest.json"
+          test "$(jq -r .version "$unpacked/manifest.json")" = "$VERSION"
+
+      - name: Pack the npm tarball
+        run: |
+          cp README.md LICENSE packages/search-hole/
+          npm pack ./packages/search-hole --ignore-scripts --pack-destination distribution/out
+          tarball="distribution/out/search-hole-${VERSION}.tgz"
+          tar -tzf "$tarball" > "$RUNNER_TEMP/tarball.txt"
+          for f in package/package.json package/LICENSE package/README.md package/dist/searchhole.mjs \
+                   package/dist/ui/index.html package/dist/panel/receipt.html; do
+            grep -qx "$f" "$RUNNER_TEMP/tarball.txt" || { echo "::error::$f is missing from the npm tarball"; exit 1; }
+          done
+          if grep -q '^package/src/' "$RUNNER_TEMP/tarball.txt"; then echo "::error::the tarball contains src/"; exit 1; fi
+          ls -l "$tarball"
+
+      - name: CycloneDX SBOM of what the npm package ships
+        run: node scripts/sbom.mjs --out "distribution/out/search-hole-${VERSION}.cdx.json"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-assets
+          path: |
+            distribution/out/search-hole-${{ needs.verify.outputs.version }}.tgz
+            distribution/out/search-hole-plugin-${{ needs.verify.outputs.version }}.zip
+            distribution/out/search-hole-${{ needs.verify.outputs.version }}.mcpb
+            distribution/out/search-hole-${{ needs.verify.outputs.version }}.cdx.json
+            distribution/out/marketplace-entry.json
+          retention-days: 30
+          if-no-files-found: error
+
+  sign-mcpb:
+    name: Sign the .mcpb
+    needs: [verify, build]
+    if: vars.MCPB_SIGNING == 'true' && !inputs.dry_run && needs.verify.outputs.rehearsal != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          install: 'false'
+      - name: Install the mcpb toolchain only (frozen lockfile)
+        run: pnpm install --frozen-lockfile --filter search-hole
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-assets
+          path: assets
+      - name: Sign and verify
+        env:
+          MCPB_SIGNING_CERT: ${{ secrets.MCPB_SIGNING_CERT }}
+          MCPB_SIGNING_KEY: ${{ secrets.MCPB_SIGNING_KEY }}
+          MCPB_SIGNING_INTERMEDIATE: ${{ secrets.MCPB_SIGNING_INTERMEDIATE }}
+        run: |
+          umask 077
+          keys="$RUNNER_TEMP/mcpb-keys"
+          mkdir -p "$keys"
+          trap 'rm -rf "$keys"' EXIT
+          printf '%s\n' "$MCPB_SIGNING_CERT" > "$keys/cert.pem"
+          printf '%s\n' "$MCPB_SIGNING_KEY" > "$keys/key.pem"
+          extra=()
+          if [ -n "$MCPB_SIGNING_INTERMEDIATE" ]; then
+            printf '%s\n' "$MCPB_SIGNING_INTERMEDIATE" > "$keys/intermediate.pem"
+            extra=(--intermediate "$keys/intermediate.pem")
+          fi
+          mkdir -p signed
+          cp "assets/search-hole-${VERSION}.mcpb" signed/
+          pnpm -C packages/search-hole exec mcpb sign "$PWD/signed/search-hole-${VERSION}.mcpb" \
+            --cert "$keys/cert.pem" --key "$keys/key.pem" "${extra[@]}"
+          pnpm -C packages/search-hole exec mcpb verify "$PWD/signed/search-hole-${VERSION}.mcpb"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-mcpb-signed
+          path: signed/search-hole-${{ needs.verify.outputs.version }}.mcpb
+          retention-days: 30
+          if-no-files-found: error
+
+  publish-npm:
+    name: Publish to npm with provenance
+    needs: [verify, build]
+    if: github.repository == 'baselissmail/search-hole' && !inputs.dry_run && needs.verify.outputs.rehearsal != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/search-hole/v/${{ needs.verify.outputs.version }}
+    permissions:
+      contents: read
+      id-token: write # npm provenance and trusted publishing (OIDC)
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+      NPM_TAG: ${{ needs.verify.outputs.npm_tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+          persist-credentials: false
+          # Cone mode always includes root files, so .mise.toml comes along.
+          sparse-checkout: .github
+      - uses: ./.github/actions/setup
+        with:
+          install: 'false'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-assets
+          path: assets
+      - name: npm publish --provenance
+        env:
+          # Optional fallback. Preferred: an npm trusted publisher for this workflow and the
+          # `npm` environment, which needs no token at all.
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm --version
+          if [ -n "$(npm view "search-hole@${VERSION}" version 2>/dev/null)" ]; then
+            echo "search-hole@${VERSION} is already on npm; nothing to publish."; exit 0
+          fi
+          if [ -n "$NPM_TOKEN" ]; then
+            printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > "$RUNNER_TEMP/.npmrc"
+            export NPM_CONFIG_USERCONFIG="$RUNNER_TEMP/.npmrc"
+          fi
+          npm publish "assets/search-hole-${VERSION}.tgz" --provenance --access public --tag "$NPM_TAG"
+
+  github-release:
+    name: GitHub release
+    needs: [verify, build, sign-mcpb, publish-npm]
+    if: >-
+      ${{ !cancelled() && github.repository == 'baselissmail/search-hole' && !inputs.dry_run &&
+      needs.verify.outputs.rehearsal != 'true' &&
+      needs.build.result == 'success' && needs.publish-npm.result == 'success' &&
+      (needs.sign-mcpb.result == 'success' || needs.sign-mcpb.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # create the release and upload assets
+      id-token: write # sign the build attestations
+      attestations: write
+    env:
+      TAG: ${{ needs.verify.outputs.tag }}
+      VERSION: ${{ needs.verify.outputs.version }}
+      PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-assets
+          path: assets
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: needs.sign-mcpb.result == 'success'
+        with:
+          name: release-mcpb-signed
+          path: assets
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-notes
+          path: notes
+
+      - name: Checksums
+        run: |
+          cd assets
+          sha256sum -- * | grep -v ' SHA256SUMS.txt$' > SHA256SUMS.txt
+          {
+            echo "### search-hole ${VERSION}"
+            echo
+            echo '```text'
+            cat SHA256SUMS.txt
+            echo '```'
+            echo
+            echo 'Marketplace entry for `.claude-plugin/marketplace.json` (commit it after the release, see docs/release.md):'
+            echo
+            echo '```json'
+            cat marketplace-entry.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Attest build provenance for every asset
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            assets/search-hole-${{ needs.verify.outputs.version }}.tgz
+            assets/search-hole-plugin-${{ needs.verify.outputs.version }}.zip
+            assets/search-hole-${{ needs.verify.outputs.version }}.mcpb
+            assets/search-hole-${{ needs.verify.outputs.version }}.cdx.json
+
+      - name: Create the release (or update its assets on a re-run)
+        run: |
+          pre=()
+          if [ "$PRERELEASE" = true ]; then pre=(--prerelease); fi
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" assets/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$TAG" assets/* --repo "$GITHUB_REPOSITORY" --verify-tag \
+              --title "search-hole ${VERSION}" --notes-file notes/release-notes.md "${pre[@]}"
+          fi

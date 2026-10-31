@@ -1,0 +1,5 @@
+# Keep LF everywhere: the shell half of the plugin's preflight.ps1 polyglot breaks on CRLF.
+* text=auto eol=lf
+*.png binary
+*.woff2 binary
+*.mcpb binary

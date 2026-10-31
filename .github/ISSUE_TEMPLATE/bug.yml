@@ -1,0 +1,57 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Bug report
+description: Something in search-hole does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please remove API keys, private hostnames and anything personal from
+        logs and queries before you paste them. `searchhole doctor` output is usually the most useful
+        thing to include.
+  - type: input
+    id: version
+    attributes:
+      label: search-hole version
+      description: The output of `searchhole version`, or the plugin / extension version.
+      placeholder: 0.2.0
+    validations:
+      required: true
+  - type: dropdown
+    id: client
+    attributes:
+      label: Where you use it
+      options:
+        - Claude Code plugin
+        - Claude Desktop extension (.mcpb)
+        - CLI (npx search-hole / searchhole)
+        - Dashboard (searchhole ui)
+        - Another MCP client
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS and Node.js version
+      placeholder: macOS 26.1, Node 24.22.0
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. searchhole block example.com
+        2. searchhole search "…" --explain
+        3. …
+  - type: textarea
+    id: doctor
+    attributes:
+      label: searchhole doctor output (redacted)
+      render: text

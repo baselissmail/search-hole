@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { defineConfig } from 'tsdown'
 
 // One self-contained ESM bundle with no runtime node_modules (ADR-0002).

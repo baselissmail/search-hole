@@ -4,6 +4,15 @@
   "description": "A local, open-source search gateway for AI assistants: choose the engines and sites your AI searches, see every search, get source receipts.",
   "license": "Apache-2.0",
   "author": "Basel Issmail <basel.issmail@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/baselissmail/search-hole.git",
+    "directory": "packages/search-hole"
+  },
+  "homepage": "https://github.com/baselissmail/search-hole#readme",
+  "bugs": {
+    "url": "https://github.com/baselissmail/search-hole/issues"
+  },
   "type": "module",
   "engines": {
     "node": ">=22.13"

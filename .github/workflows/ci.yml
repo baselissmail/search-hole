@@ -1,0 +1,264 @@
+# SPDX-License-Identifier: Apache-2.0
+# CI for search-hole (MASTER_PLAN §11 P8, §12): lint, types, layers, licence headers, unit tests on
+# Linux/macOS/Windows, builds, bundle budgets, e2e with axe, plugin and .mcpb validation, the
+# runtime floor, and DCO on pull requests. Actions are pinned to full commit SHAs (Renovate
+# updates them); every job gets a read-only token.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Claude Code for `claude plugin validate --strict` (2.1.296+ needed; versions at least two weeks old).
+  CLAUDE_CODE_VERSION: '2.1.302' # renovate: datasource=npm depName=@anthropic-ai/claude-code
+  DISABLE_AUTOUPDATER: '1'
+  DISABLE_TELEMETRY: '1'
+  CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
+  DO_NOT_TRACK: '1'
+
+jobs:
+  checks:
+    name: Lint, types, layers, licence headers
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Biome
+        run: pnpm exec biome ci .
+      - name: SPDX licence headers (ADR-0016)
+        run: node .github/scripts/check-spdx.mjs
+      - name: Typecheck (all workspaces)
+        run: pnpm -r typecheck
+      - name: Layer check (ADR-0001)
+        run: pnpm check:layers
+      - name: Token budget for tool descriptions (ADR-0012, ≤ ~1.5k tokens)
+        run: pnpm -C packages/search-hole exec vitest run test/gateway/budget.test.ts
+
+  test:
+    name: Test and build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      # Keep LF endings on Windows: the sh/PowerShell polyglot preflight and the golden fixtures need them.
+      - name: Keep LF line endings
+        if: runner.os == 'Windows'
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+
+      - name: Build the dashboard
+        run: pnpm -C apps/dashboard build
+      - name: Build the receipt panel
+        run: pnpm -C apps/receipt-app build
+      - name: Build the package (CLI, gateway, dashboard server)
+        run: pnpm -C packages/search-hole build
+
+      - name: Unit tests (all workspaces)
+        run: pnpm -r test
+
+      - name: Smoke-test the bundle (CLI, rules, SQLite, MCP stdio; temp home with spaces)
+        run: node .github/scripts/smoke-bundle.mjs
+
+      - name: Assemble the Claude Code plugin
+        run: node scripts/build-plugin.mjs --skip-build
+      - name: Preflight hook under PowerShell and Git Bash, with and without node (ADR-0014)
+        if: runner.os == 'Windows'
+        run: node .github/scripts/check-preflight-windows.mjs
+
+      - name: Bundle-size budgets
+        if: runner.os == 'Linux'
+        run: node scripts/check-bundle-size.mjs
+
+      - name: Pack and check the Claude Desktop extension (.mcpb)
+        shell: bash
+        run: |
+          pnpm -C packages/search-hole build:mcpb
+          version=$(node -p "require('./packages/search-hole/package.json').version")
+          # Forward-slash native paths, so Git Bash and Node agree on Windows.
+          root=$(node -p "process.cwd().replace(/\\\\/g, '/')")
+          tmp=$(node -p "process.env.RUNNER_TEMP.replace(/\\\\/g, '/')")
+          mcpb="$root/distribution/out/search-hole-${version}.mcpb"
+          unpacked="$tmp/mcpb unpacked"
+          rm -rf "$unpacked"
+          pnpm -C packages/search-hole exec mcpb info "$mcpb"
+          pnpm -C packages/search-hole exec mcpb unpack "$mcpb" "$unpacked"
+          pnpm -C packages/search-hole exec mcpb validate "$unpacked/manifest.json"
+          test -f "$unpacked/dist/searchhole.mjs"
+          test -f "$unpacked/dist/panel/receipt.html"
+          test -f "$unpacked/dist/ui/index.html"
+
+      - name: Install Claude Code ${{ env.CLAUDE_CODE_VERSION }}
+        if: runner.os == 'Linux'
+        run: npm install --prefix "$RUNNER_TEMP/claude" --no-fund --no-audit "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+      - name: claude plugin validate --strict (plugin and local marketplace)
+        if: runner.os == 'Linux'
+        run: |
+          claude="$RUNNER_TEMP/claude/node_modules/.bin/claude"
+          "$claude" --version
+          "$claude" plugin validate distribution/marketplace/search-hole --strict < /dev/null
+          "$claude" plugin validate distribution/marketplace --strict < /dev/null
+
+      - name: Upload the plugin and the .mcpb for inspection
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: search-hole-build-${{ github.sha }}
+          path: |
+            distribution/marketplace/search-hole/
+            distribution/out/*.mcpb
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+
+  e2e:
+    name: E2E and accessibility (Playwright, axe)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Playwright's bundled Chromium in CI; local runs keep using installed Google Chrome.
+      E2E_CHANNEL: chromium
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Build the dashboard, the receipt panel and the package
+        run: |
+          pnpm -C apps/dashboard build
+          pnpm -C apps/receipt-app build
+          pnpm -C packages/search-hole build
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Install Chromium and its system libraries
+        run: pnpm -C apps/dashboard exec playwright install --with-deps chromium
+      - name: Dashboard e2e (sign-in, hostile text, axe light/dark, keyboard, live tail)
+        run: pnpm -C apps/dashboard test:e2e
+      - name: Receipt panel e2e (AppBridge host, tokens, axe light/dark, fallback)
+        run: pnpm -C apps/receipt-app test:e2e
+      - name: Upload screenshots and traces
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-results-${{ github.sha }}
+          path: |
+            apps/dashboard/test-results/
+            apps/receipt-app/test-results/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  runtimes:
+    name: Runtime ${{ matrix.runtime }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # Bun support is deferred, not promised (ADR-0002 point 6): report, don't block.
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The engines.node floor of packages/search-hole/package.json (ADR-0002: >= 22.13).
+          - runtime: node-floor
+            tests: true
+            experimental: false
+          - runtime: node@24
+            tests: true
+            experimental: false
+          - runtime: bun@1.4.3
+            tests: false
+            experimental: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      # Built with the dev toolchain (tsdown needs Node 22.18+); only the run uses the other runtime.
+      - name: Build the package
+        run: pnpm -C packages/search-hole build
+      - name: Resolve the runtime
+        id: rt
+        env:
+          RUNTIME: ${{ matrix.runtime }}
+        run: |
+          if [ "$RUNTIME" = node-floor ]; then
+            floor=$(node -p "(require('./packages/search-hole/package.json').engines.node.match(/>=\s*(\d+(?:\.\d+){0,2})/) || [])[1] || ''")
+            if [ -z "$floor" ]; then echo "engines.node has no '>=' floor" >&2; exit 1; fi
+            while [ "$(echo "$floor" | tr -cd . | wc -c)" -lt 2 ]; do floor="$floor.0"; done
+            RUNTIME="node@$floor"
+          fi
+          echo "tool=$RUNTIME" >> "$GITHUB_OUTPUT"
+          echo "Runtime: $RUNTIME"
+      - name: Package unit tests on ${{ steps.rt.outputs.tool }}
+        if: matrix.tests
+        env:
+          TOOL: ${{ steps.rt.outputs.tool }}
+        run: mise exec "$TOOL" -- pnpm -C packages/search-hole test
+      - name: Smoke-test the bundle on ${{ steps.rt.outputs.tool }}
+        env:
+          TOOL: ${{ steps.rt.outputs.tool }}
+        run: |
+          case "$TOOL" in
+            bun@*) mise exec "$TOOL" -- bun .github/scripts/smoke-bundle.mjs ;;
+            *) mise exec "$TOOL" -- node .github/scripts/smoke-bundle.mjs ;;
+          esac
+
+  dco:
+    name: DCO sign-off
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Every commit has a Signed-off-by matching its author
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node .github/scripts/check-dco.mjs "${BASE_SHA}..${HEAD_SHA}"
+
+  ci-ok:
+    # The one check to require in branch protection: green only when every job above passed
+    # (or was skipped on purpose, like DCO outside pull requests).
+    name: CI result
+    if: always()
+    needs: [checks, test, e2e, runtimes, dco]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: All required jobs passed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS" | node -e '
+            let s = ""; process.stdin.on("data", d => s += d).on("end", () => {
+              const bad = Object.entries(JSON.parse(s)).filter(([, v]) => !["success", "skipped"].includes(v.result))
+              for (const [job, v] of bad) console.error(`${job}: ${v.result}`)
+              process.exit(bad.length ? 1 : 0)
+            })'

@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: Apache-2.0
+name: List contribution
+description: Propose a site for a first-party list (official-docs, official-health, github-clones, ai-content-farms).
+labels: [lists, good first issue]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        First-party lists are CC0-1.0 and need public evidence for every entry (ADR-0016,
+        CONTRIBUTING.md). No private, NDA'd or personal information.
+  - type: dropdown
+    id: list
+    attributes:
+      label: List
+      options:
+        - official-docs (the project's own documentation)
+        - official-health (official health sources)
+        - github-clones (copies of GitHub content)
+        - ai-content-farms (mass-produced AI pages)
+    validations:
+      required: true
+  - type: textarea
+    id: sites
+    attributes:
+      label: Sites
+      description: One domain or URL pattern per line.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: >
+        Public links that show what the site is: for official docs, a link from the project's own
+        repository or homepage; for clones or content farms, an example page next to the original.
+    validations:
+      required: true
+  - type: checkboxes
+    id: licence
+    attributes:
+      label: Licence
+      options:
+        - label: I contribute these entries under CC0-1.0, and the evidence is public.
+          required: true
