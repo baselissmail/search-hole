@@ -27,6 +27,17 @@ export {
 } from './guard.ts'
 export { type AddressVerdict, classifyAddress } from './ip.ts'
 export {
+  createListFetcher,
+  LIST_MAX_BYTES,
+  LIST_MAX_REDIRECTS,
+  LIST_TIMEOUT_MS,
+  type ListFetchErrorCode,
+  type ListFetcher,
+  type ListFetcherConfig,
+  type ListFetchOutcome,
+  type ListFetchRequest,
+} from './list.ts'
+export {
   createRobotsChecker,
   type RobotsChecker,
   type RobotsFetch,

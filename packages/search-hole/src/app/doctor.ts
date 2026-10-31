@@ -190,6 +190,9 @@ export async function runDoctor(d: DoctorDeps, opts: { probe?: boolean } = {}): 
       fix: 'Add one with `searchhole block <domain>`.',
     })
   }
+  // Lists (ADR-0022): failures, stale copies, shrink-guard and pin refusals.
+  checks.push(...d.rules.lists.doctorChecks(g, store))
+
   const dir = d.rules.projectDir()
   if (dir !== undefined) {
     const p = d.rules.project(dir, store)

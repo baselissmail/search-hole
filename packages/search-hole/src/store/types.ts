@@ -341,6 +341,111 @@ export interface JobRow {
   readonly leaseEpoch: number
 }
 
+// ── Lists (ADR-0008, ADR-0022) ───────────────────────────────────────────
+
+/** One row of `lists`: a vendored, subscribed or local list and its refresh state. */
+export interface ListRow {
+  readonly id: string
+  readonly name: string | null
+  /** `bundled` | `vendored` | `subscribed` | `local` (read tolerantly). */
+  readonly source: string | null
+  readonly url: string | null
+  readonly format: string
+  readonly kind: string
+  readonly mode: string
+  readonly license: string | null
+  readonly updateIntervalHours: number | null
+  readonly etag: string | null
+  readonly lastModified: string | null
+  /** SHA-256 of the content in force (the last good copy). */
+  readonly contentSha256: string | null
+  readonly compilerVersion: string | null
+  readonly ruleCount: number | null
+  /** Rule count of the copy before the last accepted one. */
+  readonly previousRuleCount: number | null
+  readonly skippedCount: number | null
+  /** Epoch ms: when the content in force was fetched or imported. */
+  readonly fetchedAt: number | null
+  /** Epoch ms: the last refresh attempt, successful or not. */
+  readonly checkedAt: number | null
+  /** Epoch ms: the last time the source answered with a usable copy (200 or 304). */
+  readonly verifiedAt: number | null
+  /** Epoch ms: when the next background refresh is due. */
+  readonly nextCheckAt: number | null
+  /** Consecutive failed refreshes. */
+  readonly failures: number
+  /** Stable code of the last failure (`shrink_guard`, `sha256_mismatch`, …); null after a success. */
+  readonly lastError: string | null
+  readonly lastErrorDetail: string | null
+  readonly createdAt: number
+  readonly updatedAt: number
+}
+
+/** A list's configuration, written whenever it is refreshed, imported or listed. */
+export interface ListMetaWrite {
+  readonly id: string
+  readonly name: string
+  readonly source: string
+  readonly url: string | null
+  readonly format: string
+  readonly kind: string
+  readonly mode: string
+  readonly license: string | null
+  readonly updateIntervalHours: number | null
+}
+
+/** The outcome of one refresh or import. */
+export type ListOutcomeWrite =
+  | {
+      readonly kind: 'fetched'
+      readonly etag: string | null
+      readonly lastModified: string | null
+      readonly contentSha256: string
+      readonly compilerVersion: string
+      readonly ruleCount: number
+      readonly skippedCount: number
+      readonly license?: string | null
+      readonly nextCheckAt: number | null
+    }
+  /** HTTP 304, or a 200 with the bytes already in force. */
+  | {
+      readonly kind: 'verified'
+      readonly etag?: string | null
+      readonly lastModified?: string | null
+      /** The content in force, when this check is the first to describe it (an adopted shipped copy). */
+      readonly contentSha256?: string
+      readonly ruleCount?: number
+      readonly nextCheckAt: number | null
+    }
+  | {
+      readonly kind: 'failed'
+      readonly error: string
+      readonly detail: string
+      readonly nextCheckAt: number | null
+    }
+
+/** Results a list hid (enforced) and would have hidden (audit) in a period. */
+export interface ListContribution {
+  hidden: number
+  wouldHide: number
+}
+
+export interface ListsApi {
+  get(id: string): ListRow | undefined
+  list(): ListRow[]
+  /** False when the write was skipped (read-only) or the database was busy. */
+  upsertMeta(w: ListMetaWrite): boolean
+  /**
+   * Records a refresh outcome. With `lease`, the write is fenced (ADR-0006 point 7): it aborts
+   * when another process has taken the job over. False when skipped, busy, fenced out or the row
+   * is missing (`upsertMeta` first).
+   */
+  recordOutcome(id: string, w: ListOutcomeWrite, lease?: Lease): boolean
+  remove(id: string): boolean
+  /** Per list id, results hidden and would-hide results since `since` (epoch ms). */
+  contribution(since: number): Map<string, ListContribution>
+}
+
 // ── Retention ────────────────────────────────────────────────────────────
 
 export interface RetentionSettings {
@@ -395,6 +500,8 @@ export interface BuiltinRecordedResult {
   readonly visibility: Visibility
   readonly reason?: HiddenReason
   readonly rule?: RuleRef
+  /** The audit-mode list rule that would have hidden this kept result (ADR-0008 "mode: audit"). */
+  readonly auditRule?: RuleRef
   /** 1-based position after filtering and reordering, for kept results. */
   readonly outRank?: number
   readonly flags: readonly ResultFlag[]
@@ -805,6 +912,7 @@ export interface Store {
   readonly projectTrust: ProjectTrustApi
   readonly rulesLastGood: LastGoodApi
   readonly gateways: GatewaysApi
+  readonly lists: ListsApi
 
   dataEpoch(): number
   /** Bumps `data_epoch` (any process that deletes in bulk). Undefined when skipped. */

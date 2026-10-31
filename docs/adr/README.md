@@ -27,5 +27,6 @@ Status values: **Proposed**, **Accepted**, **Superseded by ADR-NNNN**. To change
 | [0019](0019-loop-guard.md) | Per-session loop guard: searches per turn and per hour, and repeated searches, refused with a clear error; built-in and engine searches count together | Accepted |
 | [0020](0020-dashboard-v1.md) | Dashboard v1: React + TanStack + Tailwind + Base UI app; Hono server bundled in the CLI; contract-typed API; ADR-0004 security | Accepted |
 | [0021](0021-receipt-panel-and-desktop-extension.md) | Receipt panel as a single-file MCP App; app-only, token-gated `apply_rule`; Claude Desktop `.mcpb` with keychain keys | Accepted |
+| [0022](0022-lists-implementation.md) | Lists end to end: four sources in one id space, checksummed artifacts per compiler version, one lease-owned refresh job, HTTPS/SSRF/pin/shrink guards, audit never reaches the model | Accepted |
 
 The ADRs were revised on 2026-10-30 after a three-lens adversarial review (facts, consistency, red team; 90 findings). Where an ADR writes `~/.searchhole/`, read it as the root that ADR-0015 resolves.

@@ -5,7 +5,7 @@
  * what the user typed (a mistyped key must not be echoed back).
  */
 import { parseArgs } from 'node:util'
-import type { HostProfile, SearchMode } from '../app/types.ts'
+import type { HostProfile, ListFormat, ListKind, ListMode, SearchMode } from '../app/types.ts'
 import { parseDuration, ttlToUntil, untilToMs } from '../core/rules/time.ts'
 import { SearchHoleError } from '../shared/errors.ts'
 import { type Depth, ENGINE_ID_LIST, type EngineId, type RuleAction } from '../shared/types.ts'
@@ -43,6 +43,34 @@ export type Command =
     }
   | { name: 'unrule'; target: string; scope?: ScopeFlag; yes: boolean; json: boolean }
   | { name: 'rules'; scope?: ScopeFlag; json: boolean }
+  | { name: 'lists'; json: boolean }
+  | { name: 'lists-catalog'; json: boolean }
+  | {
+      name: 'lists-add'
+      source: string
+      listName?: string
+      format?: ListFormat
+      kind?: ListKind
+      mode?: ListMode
+      update?: string
+      sha256?: string
+      fetch: boolean
+      yes: boolean
+      json: boolean
+    }
+  | { name: 'lists-remove'; id: string; yes: boolean; json: boolean }
+  | { name: 'lists-mode'; id: string; mode: ListMode; yes: boolean; json: boolean }
+  | { name: 'lists-update'; ids: string[]; force: boolean; yes: boolean; json: boolean }
+  | {
+      name: 'lists-import'
+      file: string
+      listName: string
+      kind: ListKind
+      format?: ListFormat
+      mode?: ListMode
+      yes: boolean
+      json: boolean
+    }
   | { name: 'explain'; url: string; profile?: string; json: boolean }
   | { name: 'log'; limit?: number; hidden: boolean; json: boolean }
   | { name: 'log-show'; searchId: number; json: boolean }
@@ -70,6 +98,7 @@ export const COMMAND_NAMES = [
   'normal',
   'unrule',
   'rules',
+  'lists',
   'explain',
   'log',
   'suggestions',
@@ -95,6 +124,31 @@ const RULE_ACTIONS = [
   'normal',
 ] as const satisfies readonly RuleAction[]
 const DEPTHS = ['quick', 'standard', 'deep'] as const satisfies readonly Depth[]
+const LIST_KINDS = [
+  'block',
+  'allow',
+  'official',
+  'content-farm',
+  'clone',
+] as const satisfies readonly ListKind[]
+const LIST_MODES = ['enforce', 'audit', 'disabled'] as const satisfies readonly ListMode[]
+const LIST_FORMATS = [
+  'auto',
+  'ublacklist',
+  'abp',
+  'adguard',
+  'hosts',
+  'domains',
+  'goggles',
+  'searchhole',
+] as const satisfies readonly ListFormat[]
+/** `lists <verb> <id>` words that set a mode. */
+const LIST_MODE_VERBS: Readonly<Record<string, ListMode>> = {
+  enforce: 'enforce',
+  audit: 'audit',
+  disable: 'disabled',
+}
+const LIST_ID_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/
 const MODES = ['auto', 'builtin', 'engines'] as const satisfies readonly SearchMode[]
 const SEARXNG_SUBS = ['up', 'down', 'status', 'apply'] as const satisfies readonly SearxngSub[]
 /** Host profiles `mcp --host` accepts (`cli` is the terminal, not an MCP host). */
@@ -371,6 +425,118 @@ function parseRules(args: readonly string[]): Command {
   return { name: 'rules', json: values.json === true, ...(scope === undefined ? {} : { scope }) }
 }
 
+function listId(raw: string | undefined): string {
+  const id = nonEmpty('lists', 'list id (see `searchhole lists`)', raw)
+  if (!LIST_ID_RE.test(id))
+    throw usageError('lists', 'A list id is lower-case letters, digits, ".", "_" or "-".')
+  return id
+}
+
+function parseLists(args: readonly string[]): Command {
+  const { values, positionals } = guard('lists', () =>
+    parseArgs({
+      args: [...args],
+      allowPositionals: true,
+      options: {
+        ...HELP_OPTION,
+        name: { type: 'string' },
+        format: { type: 'string' },
+        kind: { type: 'string' },
+        mode: { type: 'string' },
+        update: { type: 'string' },
+        sha256: { type: 'string' },
+        'no-fetch': { type: 'boolean' },
+        force: { type: 'boolean' },
+        yes: { type: 'boolean', short: 'y' },
+        json: { type: 'boolean' },
+      },
+    }),
+  )
+  if (values.help === true) return { name: 'help', topic: 'lists' }
+  const [sub, ...rest] = positionals
+  const yes = values.yes === true
+  const json = values.json === true
+  const only = (allowed: readonly string[]): void => {
+    const extra = (['name', 'format', 'kind', 'mode', 'update', 'sha256', 'no-fetch', 'force'] as const).find(
+      (k) => values[k] !== undefined && !allowed.includes(k),
+    )
+    if (extra !== undefined) throw usageError('lists', `--${extra} does not apply to "lists ${sub ?? ''}".`)
+  }
+  const format =
+    values.format === undefined ? undefined : oneOf('lists', '--format', values.format, LIST_FORMATS)
+  const kind = values.kind === undefined ? undefined : oneOf('lists', '--kind', values.kind, LIST_KINDS)
+  const mode = values.mode === undefined ? undefined : oneOf('lists', '--mode', values.mode, LIST_MODES)
+  switch (sub) {
+    case undefined:
+    case 'list':
+      only([])
+      noExtra('lists', rest, 0)
+      return { name: 'lists', json }
+    case 'catalog':
+      only([])
+      noExtra('lists', rest, 0)
+      return { name: 'lists-catalog', json }
+    case 'add': {
+      only(['name', 'format', 'kind', 'mode', 'update', 'sha256', 'no-fetch'])
+      const source = nonEmpty('lists', 'catalog id or https:// URL (see `searchhole lists catalog`)', rest[0])
+      noExtra('lists', rest, 1)
+      if (values.update !== undefined && parseDuration(values.update) === null)
+        throw usageError('lists', '--update takes a duration such as 12h, 1d or 7d.')
+      if (values.sha256 !== undefined && !/^[0-9a-fA-F]{64}$/.test(values.sha256))
+        throw usageError('lists', '--sha256 takes 64 hex characters.')
+      return {
+        name: 'lists-add',
+        source,
+        fetch: values['no-fetch'] !== true,
+        yes,
+        json,
+        ...(values.name === undefined ? {} : { listName: listId(values.name) }),
+        ...(format === undefined ? {} : { format }),
+        ...(kind === undefined ? {} : { kind }),
+        ...(mode === undefined ? {} : { mode }),
+        ...(values.update === undefined ? {} : { update: values.update }),
+        ...(values.sha256 === undefined ? {} : { sha256: values.sha256.toLowerCase() }),
+      }
+    }
+    case 'remove':
+      only([])
+      noExtra('lists', rest, 1)
+      return { name: 'lists-remove', id: listId(rest[0]), yes, json }
+    case 'enforce':
+    case 'audit':
+    case 'disable':
+      only([])
+      noExtra('lists', rest, 1)
+      return { name: 'lists-mode', id: listId(rest[0]), mode: LIST_MODE_VERBS[sub] as ListMode, yes, json }
+    case 'update':
+      only(['force'])
+      return { name: 'lists-update', ids: rest.map(listId), force: values.force === true, yes, json }
+    case 'import': {
+      only(['name', 'format', 'kind', 'mode'])
+      const file = nonEmpty('lists', 'file to import', rest[0])
+      noExtra('lists', rest, 1)
+      if (values.name === undefined) throw usageError('lists', 'Name the list with --name <id>.')
+      if (kind === undefined)
+        throw usageError('lists', `Say what the list holds with --kind (${LIST_KINDS.join(', ')}).`)
+      return {
+        name: 'lists-import',
+        file,
+        listName: listId(values.name),
+        kind,
+        yes,
+        json,
+        ...(format === undefined ? {} : { format }),
+        ...(mode === undefined ? {} : { mode }),
+      }
+    }
+    default:
+      throw usageError(
+        'lists',
+        'Use lists, lists catalog, lists add, lists remove, lists enforce|audit|disable, lists update or lists import.',
+      )
+  }
+}
+
 function parseExplain(args: readonly string[]): Command {
   const { values, positionals } = guard('explain', () =>
     parseArgs({
@@ -626,6 +792,8 @@ export function parseCommand(argv: readonly string[], now: number = Date.now()):
       return parseUnrule(rest)
     case 'rules':
       return parseRules(rest)
+    case 'lists':
+      return parseLists(rest)
     case 'explain':
       return parseExplain(rest)
     case 'log':

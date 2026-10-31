@@ -388,3 +388,28 @@ describe('refusing secrets (ADR-0007 point 6)', () => {
     ).toEqual(['secret', 'token'])
   })
 })
+
+describe('loadRulesYaml: list settings (ADR-0022)', () => {
+  it('reads lists.<id>.mode in the global file, warns about unknown fields, refuses bad modes and ids', () => {
+    const r = loadRulesYaml(
+      'version: 1\nlists:\n  laylavish-huge-ai: { mode: enforce }\n  rjaus-pinterest: { mode: disabled, colour: red }\n  empty:\n',
+      GLOBAL,
+    )
+    expect(r.lists).toEqual({
+      'laylavish-huge-ai': { mode: 'enforce' },
+      'rjaus-pinterest': { mode: 'disabled' },
+    })
+    expect(r.warnings.map((w) => w.path)).toEqual(['lists.rjaus-pinterest.colour'])
+    expect(loadError('version: 1\nlists:\n  x: { mode: loud }\n').why).toContain(
+      'lists.x.mode must be one of',
+    )
+    expect(loadError('version: 1\nlists:\n  Bad_Upper: { mode: audit }\n').why).toContain('lower-case')
+    expect(loadError('version: 1\nlists: [a]\n').why).toContain('lists must be a mapping')
+  })
+
+  it('refuses lists in a project file', () => {
+    expect(loadError('version: 1\nlists:\n  x: { mode: audit }\n', PROJECT).why).toContain(
+      'lists can only be set in the global rules.yaml',
+    )
+  })
+})

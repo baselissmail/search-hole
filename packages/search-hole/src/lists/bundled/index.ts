@@ -55,10 +55,11 @@ export const BUNDLED_LIST_KINDS: ReadonlyMap<string, ListKind> = new Map(
 
 /**
  * The built-in default profile (used when the user defines no profile with the default name):
- * prefer official documentation, the same lift as `raise 3` (ADR-0008, ADR-0010).
+ * prefer official documentation and official health authorities, the same lift as `raise 3`
+ * (ADR-0008, ADR-0010). Both lists only annotate; preferring them reorders, never hides.
  */
 export function builtinDefaultProfile(name: string): Profile {
-  return { name, prefer: { lists: [OFFICIAL_DOCS_ID] } }
+  return { name, prefer: { lists: [OFFICIAL_DOCS_ID, OFFICIAL_HEALTH_ID] } }
 }
 
 export type { EvidencedEntry } from './evidence.ts'

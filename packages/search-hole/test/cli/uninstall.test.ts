@@ -34,7 +34,15 @@ describe('uninstall', () => {
     })
     expect(plan.refused).toEqual([])
     expect(plan.remove.map((p) => p.slice(root.length + 1)).sort()).toEqual(
-      ['lists', 'rules.yaml', 'run', 'run/ui.json', 'searchhole.db', 'searchhole.db-wal', 'settings.yaml'].sort(),
+      [
+        'lists',
+        'rules.yaml',
+        'run',
+        'run/ui.json',
+        'searchhole.db',
+        'searchhole.db-wal',
+        'settings.yaml',
+      ].sort(),
     )
     expect(plan.elsewhere.join('\n')).toContain('claude plugin uninstall')
     const removedKeys: EngineId[] = []

@@ -16,6 +16,7 @@ Search and rules
   normal <match>        Cancel a raise or lower
   unrule <id|match>     Remove a rule
   rules                 List your rules
+  lists                 Your block lists and starter lists; "lists catalog" for more
   explain <url>         Say how your rules treat a URL
   log                   Recent searches; "log show <id>" for one search in full
   suggestions           Rules your assistant proposed, waiting for you
@@ -82,6 +83,28 @@ Put -- before a query that starts with a dash.`,
 
 Removes a rule by its id (from \`searchhole rules\`) or by its match text.`,
   rules: `Usage: searchhole rules [--global|--project|--session] [--json]\n\nLists your rules.`,
+  lists: `Usage: searchhole lists [--json]
+       searchhole lists catalog [--json]
+       searchhole lists add <catalog-id|https-url> [--name <id>] [--kind <kind>] [--format <format>]
+                            [--mode enforce|audit|disabled] [--update 7d] [--sha256 <hex>] [--no-fetch]
+       searchhole lists remove <id>
+       searchhole lists enforce|audit|disable <id>
+       searchhole lists update [<id>...] [--force]
+       searchhole lists import <file> --name <id> --kind <kind> [--format <format>] [--mode <mode>]
+
+Block lists hide sites from results, below your own rules (any rule of yours wins).
+  lists            every list: mode, source, rules, and what it hid in the last 7 days
+  catalog          lists you can add, with their licence; the starter lists are on by default
+  add              subscribe to a catalog list or an https:// list (saved in rules.yaml) and download it
+  enforce          hide what the list matches
+  audit            only record what it would hide (try a list before enforcing it)
+  disable          turn a list off (built-in lists can only be disabled, not removed)
+  update           download new copies now; lists also refresh in the background (default every 7 days).
+                   A copy with under half the rules is refused unless you pass --force
+  import           use a local file as a list (it is copied and never refreshed)
+Kinds: block, allow, official (marks sources, never hides), content-farm, clone.
+Formats: auto (default), ublacklist, abp, adguard, hosts, domains, goggles, searchhole.
+Options: --yes confirms a change when there is no terminal; --json prints JSON.`,
   explain: `Usage: searchhole explain <url> [--profile <name>] [--json]\n\nShows which rules match a URL and what they decide.`,
   log: `Usage: searchhole log [--limit <n>] [--hidden] [--json]
        searchhole log show <searchId> [--json]

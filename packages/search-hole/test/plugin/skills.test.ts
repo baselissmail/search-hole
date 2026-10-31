@@ -42,6 +42,7 @@ const USER_SKILLS: Record<string, string> = {
   lower: 'lower',
   unblock: 'unrule',
   rules: 'rules',
+  lists: 'lists',
   log: 'log',
   explain: 'explain',
   approve: 'approve',
@@ -64,7 +65,7 @@ const dirs = readdirSync(SKILLS_DIR, { withFileTypes: true })
 const skills = dirs.map(loadSkill)
 
 describe('skills inventory', () => {
-  it('has the seventeen user-only commands plus the research skill, nothing else', () => {
+  it('has the eighteen user-only commands plus the research skill, nothing else', () => {
     expect(dirs).toEqual([...Object.keys(USER_SKILLS), 'research'].sort())
   })
 

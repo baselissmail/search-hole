@@ -84,8 +84,13 @@ const FLAG_LABEL: Partial<Record<ResultFlag, string>> = {
   stale: 'stale',
   date_unknown: 'no date',
   coverage: 'coverage',
-  would_hide: 'audit: would hide',
 }
+
+/**
+ * Audit verdicts (ADR-0008 "mode: audit") are for the user's log and dashboard. The model never
+ * sees them, so an audit-mode list cannot change what the model reads or picks.
+ */
+const AUDIT_FLAGS: ReadonlySet<ResultFlag> = new Set<ResultFlag>(['would_hide', 'would_show'])
 
 const REASON_LABEL: Readonly<Record<HiddenReason, string>> = {
   rule: 'rule',
@@ -229,7 +234,7 @@ export function searchStructured(outcome: SearchOutcome): SearchStructured {
         snippet: r.snippet,
         sourceType: r.sourceType,
         engines: [...r.engines],
-        flags: [...r.flags],
+        flags: r.flags.filter((f) => !AUDIT_FLAGS.has(f)),
       }
       if (r.effectiveDate !== undefined) {
         row.date = r.effectiveDate.value

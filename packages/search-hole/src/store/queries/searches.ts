@@ -11,13 +11,29 @@ INSERT INTO searches (receipt_id, session_id, query_redacted, profile, depth, en
 VALUES ($receiptId, $sessionId, $query, $profile, $depth, $engines, $latency,
         $kept, $hidden, $pushed, $toolUseId, $createdAt)`
 
-const INSERT_RESULT = `
-INSERT INTO results (search_id, engine, raw_rank, positions_json, canonical_key, url_hash, registrable_domain,
+const RESULT_COLUMNS = `search_id, engine, raw_rank, positions_json, canonical_key, url_hash, registrable_domain,
                      decision, reason, rule_id, tier, list_id, rule_text, flags_json, source_type, dates_json,
-                     effective_date, effective_kind, effective_confidence, out_rank, fused, adjusted, created_at)
-VALUES ($searchId, $engine, $rawRank, $positions, $canonicalKey, $urlHash, $domain,
+                     effective_date, effective_kind, effective_confidence, out_rank, fused, adjusted, created_at`
+const RESULT_VALUES = `$searchId, $engine, $rawRank, $positions, $canonicalKey, $urlHash, $domain,
         $decision, $reason, $ruleId, $tier, $listId, $ruleText, $flags, $sourceType, $dates,
-        $effDate, $effKind, $effConfidence, $outRank, $fused, $adjusted, $createdAt)`
+        $effDate, $effKind, $effConfidence, $outRank, $fused, $adjusted, $createdAt`
+const INSERT_RESULT = `INSERT INTO results (${RESULT_COLUMNS}) VALUES (${RESULT_VALUES})`
+/** Since migration 0003 (ADR-0022): the audit list behind a "would hide". */
+const INSERT_RESULT_AUDIT = `INSERT INTO results (${RESULT_COLUMNS}, audit_list_id) VALUES (${RESULT_VALUES}, $auditListId)`
+
+/** Connections known to have `results.audit_list_id` (a column never disappears, so only "yes" is cached). */
+const auditColumn = new WeakSet<Db>()
+
+/** True when the schema has migration 0003's `results.audit_list_id`. */
+function hasAuditColumn(db: Db): boolean {
+  if (auditColumn.has(db)) return true
+  const yes = db
+    .prepare<{ name: string }>('SELECT name FROM pragma_table_info(?)')
+    .all(['results'])
+    .some((c) => c.name === 'audit_list_id')
+  if (yes) auditColumn.add(db)
+  return yes
+}
 
 const INSERT_PAYLOAD = `
 INSERT INTO result_payloads (result_id, engine, title, snippet, url, expires_at)
@@ -58,7 +74,8 @@ export function writePlan(db: Db, plan: RecordPlan): number {
     toolUseId: s.toolUseId,
     createdAt: s.createdAt,
   }).lastInsertRowid
-  const insertResult = db.prepare(INSERT_RESULT)
+  const audit = hasAuditColumn(db)
+  const insertResult = db.prepare(audit ? INSERT_RESULT_AUDIT : INSERT_RESULT)
   const insertPayload = db.prepare(INSERT_PAYLOAD)
   for (const r of plan.results) {
     const resultId = insertResult.run({
@@ -85,6 +102,7 @@ export function writePlan(db: Db, plan: RecordPlan): number {
       fused: r.fused,
       adjusted: r.adjusted,
       createdAt: s.createdAt,
+      ...(audit ? { auditListId: r.auditListId } : {}),
     }).lastInsertRowid
     for (const p of r.payloads) {
       insertPayload.run({

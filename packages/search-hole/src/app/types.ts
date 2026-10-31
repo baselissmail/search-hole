@@ -8,6 +8,9 @@
  * Additive changes only: the CLI and gateway are built against this file.
  */
 import type { PageFetcherConfig, PageFetchResult } from '../fetch/fetchPage.ts'
+import type { ListFetcher } from '../fetch/list.ts'
+import type { ListErrorCode, ListSource } from '../lists/registry.ts'
+import type { ListFormat } from '../lists/yaml.ts'
 import type { RunCommand, SecretStore } from '../shared/keys/types.ts'
 import type {
   Depth,
@@ -17,11 +20,15 @@ import type {
   HealthState,
   HiddenReason,
   InactiveReason,
+  ListKind,
+  ListMode,
   RuleAction,
   RuleRef,
   SearchOutcome,
   SourceType,
 } from '../shared/types.ts'
+
+export type { ListErrorCode, ListFormat, ListKind, ListMode, ListSource }
 
 /** Which host launched this process (ADR-0012 host profiles). `cli` = the terminal. */
 export type HostProfile =
@@ -66,6 +73,12 @@ export interface AppSeams {
   homedir?: string
   /** Store busy timeout in ms (default 100 for gateways, 5000 for the CLI, ADR-0003). */
   storeBusyTimeoutMs?: number
+  /** Downloads list subscriptions (default: HTTPS-only, public hosts only; tests reach a local server). */
+  listFetcher?: ListFetcher
+  /** Where the shipped starter lists are looked up (default: next to the bundle, or `lists/vendor/`). */
+  listVendorDirs?: readonly string[]
+  /** Delay before a gateway's background list refresh starts, in ms (default 2000). */
+  listRefreshDelayMs?: number
 }
 
 /** Per-request context resolved by the caller (gateway: from hooks/_meta/env, ADR-0005; CLI: fixed). */
@@ -297,6 +310,134 @@ export interface DashboardApi {
   patchSettings(patch: SettingsPatch): Promise<SettingsView>
 }
 
+// ── Lists (ADR-0008 "Lists", ADR-0022) ─────────────────────────────────────
+
+/** Why a list's last refresh or import failed. */
+export interface ListError {
+  code: ListErrorCode
+  message: string
+  /** ISO 8601. */
+  at: string
+}
+
+/** One list as `searchhole lists` and the dashboard show it. */
+export interface ListStatus {
+  /** Stable id: the catalog id, the subscription name or the import name. */
+  id: string
+  name: string
+  /** bundled: first-party, compiled in; vendored: a starter list shipped as a copy and refreshed from `url`; subscribed: `subscriptions:` in rules.yaml; local: an imported file. */
+  source: ListSource
+  url?: string
+  homepage?: string
+  /** The format it is read as (`auto` detects); see `detectedFormat`. */
+  format: ListFormat
+  /** What `auto` resolved to for the copy in force. */
+  detectedFormat?: string
+  kind: ListKind
+  mode: ListMode
+  /** The mode without the user's choice. */
+  defaultMode: ListMode
+  /** SPDX id from the catalog or the list's own header. */
+  license?: string
+  description?: string
+  /** Rules in force from this list (0 when none is loaded yet). */
+  ruleCount: number
+  /** Lines the permissive importer could not use (counted, never silent). */
+  skipped: number
+  skipReasons: Record<string, number>
+  /** built-in: compiled into search-hole; shipped: the copy that came with search-hole; downloaded; imported; none: nothing loaded yet. */
+  copy: 'built-in' | 'shipped' | 'downloaded' | 'imported' | 'none'
+  /** When the copy in force was fetched, shipped or imported (ISO 8601); null for built-in lists. */
+  lastUpdate: string | null
+  /** The last refresh attempt (ISO 8601). */
+  lastCheck: string | null
+  /** When the next background refresh is due (ISO 8601); null when the list is never refreshed. */
+  nextUpdate: string | null
+  /** The refresh interval as configured (`7d`). */
+  update?: string
+  /** The pinned SHA-256 of the list bytes, when set. */
+  sha256?: string
+  lastError: ListError | null
+  /** Importer notes about the copy in force (caps, approximations). */
+  warnings: string[]
+  /** From the search log: results this list hid, and (audit mode) would have hidden, in the last 7 days. */
+  contribution: { hidden7d: number; wouldHide7d: number }
+}
+
+/** A catalog list with its state here. */
+export interface ListCatalogEntry {
+  id: string
+  name: string
+  url: string
+  homepage: string
+  format: ListFormat
+  kind: ListKind
+  license: string
+  licenseUrl: string | null
+  /** The licence permits shipping a copy. */
+  bundleable: boolean
+  /** ADR-0017 starter set mode, or `off` (offered, never auto-enabled). */
+  recommendedMode: ListMode | 'off'
+  approxRules?: number
+  notes: string
+  /** Shipped with search-hole and enabled by default. */
+  starter: boolean
+  /** Present in your lists (any mode but disabled). */
+  enabled: boolean
+  /** Its mode here, when it is one of your lists. */
+  mode?: ListMode
+}
+
+export interface AddListInput {
+  /** A catalog id (`searchhole lists catalog`) or an https:// URL. */
+  source: string
+  /** The list id for a URL (default: from the file name). */
+  name?: string
+  format?: ListFormat
+  kind?: ListKind
+  /** Default `enforce` (ADR-0008); a starter list keeps its mode unless given. */
+  mode?: ListMode
+  /** Refresh interval, e.g. `1d` (default `7d`). */
+  update?: string
+  /** Pin the list bytes: an update with other bytes is refused. */
+  sha256?: string
+  /** Download it now (default true). */
+  fetch?: boolean
+}
+
+export interface ImportListInput {
+  /** The list id (lower-case letters, digits, `.`, `_`, `-`). */
+  name: string
+  kind: ListKind
+  format?: ListFormat
+  mode?: ListMode
+}
+
+export interface ListUpdateResult {
+  id: string
+  /** updated: a new copy is in force; unchanged: 304 or the same bytes; failed: the copy in force was kept; skipped: not refreshed (see message). */
+  result: 'updated' | 'unchanged' | 'failed' | 'skipped'
+  ruleCount: number
+  previousRuleCount: number | null
+  message: string
+  error?: Omit<ListError, 'at'>
+}
+
+/** List management (CLI, dashboard, slash command; never model-reachable). */
+export interface ListsApi {
+  list(): Promise<ListStatus[]>
+  catalog(): Promise<ListCatalogEntry[]>
+  /** Subscribes (written to rules.yaml) and, unless `fetch: false`, downloads it now. */
+  add(input: AddListInput): Promise<ListStatus>
+  /** Unsubscribes or deletes an import; returns the list as it was. Built-in lists can only be disabled. */
+  remove(id: string): Promise<ListStatus>
+  setMode(id: string, mode: ListMode): Promise<ListStatus>
+  /** Refreshes the named lists (default: every enabled list with a URL). `force` overrides the shrink guard. */
+  update(ids?: string[], opts?: { force?: boolean }): Promise<ListUpdateResult[]>
+  /** Imports a local file as a list (stored under `<data>/lists/local/`, never refreshed). */
+  import(path: string, opts: ImportListInput): Promise<ListStatus>
+}
+
 export interface DoctorCheck {
   id: string
   status: 'ok' | 'warn' | 'fail' | 'info'
@@ -403,6 +544,8 @@ export interface App {
   doctor(opts?: { probe?: boolean }): Promise<DoctorReport>
   /** Optional so that existing fakes stay valid; `createApp` always provides it. */
   dashboard?: DashboardApi
+  /** List subscriptions, starter lists and imports (ADR-0022). Optional for the same reason as `dashboard`. */
+  lists?: ListsApi
   /**
    * The running dashboard's bare URL (no code or token, ADR-0004 point 3), from `ui.json` and
    * a live pid; null when none runs. Optional for the same reason as `dashboard`.

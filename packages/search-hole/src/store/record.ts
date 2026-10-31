@@ -44,6 +44,8 @@ export interface ResultRow {
   readonly tier: string | null
   readonly listId: string | null
   readonly ruleText: string | null
+  /** The audit-mode list that would have hidden this kept result (ADR-0022 contribution). */
+  readonly auditListId: string | null
   readonly flagsJson: string
   readonly sourceType: string
   readonly datesJson: string
@@ -156,6 +158,7 @@ function buildResult(
   }
   const rule = deciding(m)
   const hidden = r.visibility === 'hidden'
+  const audit = m.decision.audit
   const eff = m.effectiveDate
   return {
     engine,
@@ -170,6 +173,7 @@ function buildResult(
     tier: rule?.tier ?? null,
     listId: rule?.listId ?? null,
     ruleText: rule === undefined ? null : clip(rule.text, MAX_RULE_TEXT),
+    auditListId: !hidden && audit?.wouldBe === 'hidden' ? (audit.rule.listId ?? null) : null,
     flagsJson: JSON.stringify(m.flags),
     sourceType: m.sourceType,
     datesJson: JSON.stringify(m.dates),
@@ -269,6 +273,7 @@ export function planBuiltinRecord(input: RecordBuiltinInput, createdAt: number):
       tier: rule?.tier ?? null,
       listId: rule?.listId ?? null,
       ruleText: rule === undefined ? null : clip(rule.text, MAX_RULE_TEXT),
+      auditListId: isHidden ? null : (r.auditRule?.listId ?? null),
       flagsJson: JSON.stringify(r.flags),
       sourceType: r.sourceType,
       datesJson: '[]',

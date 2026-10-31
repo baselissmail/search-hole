@@ -25,4 +25,9 @@ export const MIGRATION_MANIFEST: readonly ManifestEntry[] = [
     name: '0002_fetch_urls',
     sha256: '429e18613dfe550aea649aba304cf53fbdb75a5d1ab9827940c61e4cbfe73914',
   },
+  {
+    id: 3,
+    name: '0003_lists',
+    sha256: 'd600cdfd7ed7878d4ce44743c02b5ea11427abd897e613cd72fbf3743da3a3a1',
+  },
 ]

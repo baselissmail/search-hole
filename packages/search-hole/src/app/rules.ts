@@ -29,8 +29,8 @@ import {
   untilToMs,
 } from '../core/rules/index.ts'
 import { classifySource } from '../core/sourcetype.ts'
-import { BUNDLED_LIST_KINDS, builtinDefaultProfile, bundledLists } from '../lists/bundled/index.ts'
-import { type LoadedRules, loadRulesYaml } from '../lists/yaml.ts'
+import { builtinDefaultProfile } from '../lists/bundled/index.ts'
+import { type ListSetting, type LoadedRules, loadRulesYaml, type Subscription } from '../lists/yaml.ts'
 import { isSearchHoleError, SearchHoleError } from '../shared/errors.ts'
 import type {
   ListKind,
@@ -45,6 +45,7 @@ import type {
 import type { Store } from '../store/index.ts'
 import type { AppContext } from './context.ts'
 import { editRulesFile, readTextIfExists, rulesSeq, sha256Hex } from './fsutil.ts'
+import type { ListsService } from './lists.ts'
 import type { AddRuleInput, RequestCtx, RuleListing } from './types.ts'
 
 /** Bumped when the persisted last-good shape changes. */
@@ -52,6 +53,8 @@ export const RULES_COMPILER_VERSION = '1'
 export const PROJECT_FILE = '.searchhole.yaml'
 
 const ACTIONS: readonly RuleAction[] = ['block', 'allow', 'pin', 'raise', 'lower', 'normal']
+/** Above this many list rules, at most 4 compiled rule sets stay cached. */
+const LARGE_LISTS = 100_000
 const PROFILE_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/
 
 /** ADR-0005: session rules on hosts that do not identify chats are refused. */
@@ -88,6 +91,8 @@ export interface RuleContext {
   global: FileState
   project?: ProjectState
   sessionRules: Rule[]
+  /** Kind of each enabled list (bundled, starter, subscribed, imported), for source typing. */
+  listKinds: ReadonlyMap<string, ListKind>
 }
 
 const sessionRuleSchema = z.object({
@@ -119,6 +124,9 @@ const lastGoodSchema = z.object({
   rules: z.array(lastGoodRule),
   profiles: z.array(z.looseObject({ name: z.string() })),
   defaults: z.looseObject({}),
+  // Since P6 (additive: older copies have neither, older binaries ignore them).
+  subscriptions: z.array(z.looseObject({ name: z.string(), url: z.string() })).optional(),
+  lists: z.record(z.string(), z.looseObject({})).optional(),
 })
 
 /** Rebuilds a `Rule` from validated JSON, omitting absent optional fields. */
@@ -146,10 +154,12 @@ function lastGoodFrom(json: unknown): LoadedRules | null {
   if (!parsed.success) return null
   return {
     rules: parsed.data.rules.map(toRule),
-    // Profiles and defaults were validated by the strict loader before they were saved.
+    // Profiles, defaults, subscriptions and list settings were validated by the strict loader
+    // before they were saved.
     profiles: parsed.data.profiles as unknown as Profile[],
     defaults: parsed.data.defaults as ProfileDefaults,
-    subscriptions: [],
+    subscriptions: (parsed.data.subscriptions ?? []) as unknown as Subscription[],
+    lists: (parsed.data.lists ?? {}) as Record<string, ListSetting>,
     warnings: [],
     noopRules: 0,
   }
@@ -268,26 +278,27 @@ export class RulesService {
   >()
   private readonly compiled = new Map<string, CompiledRuleSet>()
   private readonly savedLastGood = new Set<string>()
-  /**
-   * Kind of each enabled list, for source typing. Empty until list subscriptions ship (P6):
-   * then typed lists (`official`, `content-farm`, `clone`) feed `classifySource` here.
-   */
-  private readonly listKinds = new Map<string, ListKind>(BUNDLED_LIST_KINDS)
 
   private readonly ctx: AppContext
+  /** Bundled, starter, subscribed and imported lists (ADR-0022). */
+  readonly lists: ListsService
 
-  constructor(ctx: AppContext) {
+  constructor(ctx: AppContext, lists: ListsService) {
     this.ctx = ctx
+    this.lists = lists
   }
 
-  /** Source type for a URL: typed-list membership (`listMemberships`), then URL patterns. */
+  /**
+   * Source type for a URL: membership of an enforced typed list (`official`, `content-farm`,
+   * `clone`), then URL patterns. Audit lists never type a source.
+   */
   sourceTypeOf(rc: RuleContext, profile: string, now: number): (url: string) => SourceType {
     return (url) =>
       classifySource(url, {
         typedLists: () =>
           rc.ruleSet
             .listMemberships(url, { profile, now })
-            .map((id) => this.listKinds.get(id))
+            .map((id) => rc.listKinds.get(id))
             .filter((k): k is ListKind => k !== undefined),
       })
   }
@@ -372,7 +383,12 @@ export class RulesService {
         sourcePath: path,
         sha256: sha,
         compilerVersion: RULES_COMPILER_VERSION,
-        compiled: { rules: loaded.rules, profiles: loaded.profiles, defaults: loaded.defaults },
+        compiled: {
+          rules: loaded.rules,
+          profiles: loaded.profiles,
+          defaults: loaded.defaults,
+          ...(path === this.globalPath ? { subscriptions: loaded.subscriptions, lists: loaded.lists } : {}),
+        },
       })
       if (ok) this.savedLastGood.add(key)
     } catch (e) {
@@ -472,11 +488,13 @@ export class RulesService {
       ...(global.loaded ? { globalDefaults: global.loaded.defaults } : {}),
     })
     const userRules = [...session, ...(projectLoaded?.rules ?? []), ...(global.loaded?.rules ?? [])]
+    const lists = this.lists.set(global)
     const key = JSON.stringify([
       global.sha256 ?? '-',
       global.lastGood === true,
       projectLoaded ? (project?.sha256 ?? '-') : '-',
       session.map((r) => `${r.id}:${r.until ?? ''}`),
+      lists.key,
     ])
     let ruleSet = this.compiled.get(key)
     // The built-in default profile prefers official docs unless the user defines their own.
@@ -485,8 +503,9 @@ export class RulesService {
       resolved.profiles.push(builtinDefaultProfile(defaultName))
     }
     if (!ruleSet) {
-      ruleSet = compileRuleSet({ rules: userRules, lists: bundledLists(), profiles: resolved.profiles })
-      if (this.compiled.size > 64) this.compiled.clear()
+      ruleSet = compileRuleSet({ rules: userRules, lists: lists.inputs, profiles: resolved.profiles })
+      // Each compiled set holds every list rule: keep few of them when the lists are large.
+      if (this.compiled.size >= (lists.totalRules > LARGE_LISTS ? 4 : 64)) this.compiled.clear()
       this.compiled.set(key, ruleSet)
     }
     const out: RuleContext = {
@@ -496,6 +515,7 @@ export class RulesService {
       defaults: resolved.defaults,
       global,
       sessionRules: session,
+      listKinds: lists.kinds,
     }
     if (project) out.project = project
     return out

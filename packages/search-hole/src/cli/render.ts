@@ -6,6 +6,9 @@
 import type {
   DoctorReport,
   EngineStatus,
+  ListCatalogEntry,
+  ListStatus,
+  ListUpdateResult,
   LogDetail,
   LogEntry,
   RuleListing,
@@ -588,4 +591,144 @@ export function renderSearxngStatus(s: SearxngStatus, { style }: RenderOpts): st
     )
   else if (s.container !== 'running') lines.push('', '→ Start it with: searchhole searxng up')
   return lines.join('\n')
+}
+
+// ── Lists (ADR-0022) ─────────────────────────────────────────────────────
+
+const num = (n: number): string => n.toLocaleString('en-US')
+
+function modeText(mode: ListStatus['mode'], style: Style): string {
+  if (mode === 'enforce') return style.green('enforce')
+  if (mode === 'audit') return style.yellow('audit')
+  return style.dim('off')
+}
+
+/** What a list did in the last 7 days: hid (enforce) or would hide (audit). */
+function contributionText(s: ListStatus): string {
+  if (s.mode === 'disabled') return '-'
+  const { hidden7d, wouldHide7d } = s.contribution
+  if (s.mode === 'audit') return wouldHide7d > 0 ? `would hide ${num(wouldHide7d)}` : '-'
+  return hidden7d > 0 ? `hid ${num(hidden7d)}` : '-'
+}
+
+function listNote(s: ListStatus, style: Style): string {
+  if (s.lastError !== null) return style.yellow(`⚠ ${s.lastError.code}`)
+  if (s.copy === 'none') return style.yellow('not downloaded yet')
+  if (s.kind === 'official') return style.dim('annotates')
+  return ''
+}
+
+/** `searchhole lists`: one row per list. */
+export function renderLists(lists: readonly ListStatus[], { style, timeZone }: RenderOpts): string {
+  const rows: string[][] = [
+    [
+      style.dim('ID'),
+      style.dim('MODE'),
+      style.dim('SOURCE'),
+      style.dim('KIND'),
+      style.dim('RULES'),
+      style.dim('7 DAYS'),
+      style.dim('UPDATED'),
+      style.dim('NOTES'),
+    ],
+  ]
+  for (const s of lists) {
+    const updated =
+      s.lastUpdate === null
+        ? s.source === 'bundled'
+          ? 'built in'
+          : '-'
+        : formatTime(s.lastUpdate, timeZone).slice(0, 10)
+    rows.push([
+      s.id,
+      modeText(s.mode, style),
+      s.source,
+      s.kind,
+      num(s.ruleCount),
+      contributionText(s),
+      updated,
+      listNote(s, style),
+    ])
+  }
+  const lines = [...renderTable(rows)]
+  const failing = lists.filter((s) => s.lastError !== null && s.mode !== 'disabled')
+  for (const s of failing) lines.push('', `${style.yellow('⚠')} ${s.id}: ${s.lastError?.message ?? ''}`)
+  lines.push(
+    '',
+    style.dim(
+      `${plural(lists.length, 'list')}. Change one: searchhole lists enforce|audit|disable <id> · more: searchhole lists catalog`,
+    ),
+  )
+  return lines.join('\n')
+}
+
+/** `searchhole lists catalog`. */
+export function renderCatalog(entries: readonly ListCatalogEntry[], { style }: RenderOpts): string {
+  const rows: string[][] = [
+    [
+      style.dim('ID'),
+      style.dim('KIND'),
+      style.dim('RULES'),
+      style.dim('LICENSE'),
+      style.dim('HERE'),
+      style.dim('NAME'),
+    ],
+  ]
+  for (const c of entries) {
+    const here =
+      c.mode === undefined ? '' : c.mode === 'disabled' ? style.dim('off') : modeText(c.mode, style)
+    rows.push([
+      c.id,
+      c.kind,
+      c.approxRules === undefined ? '?' : `~${num(c.approxRules)}`,
+      c.license,
+      `${here}${c.starter ? style.dim(' (starter)') : ''}`.trim(),
+      clip(c.name, 60),
+    ])
+  }
+  return [
+    ...renderTable(rows),
+    '',
+    style.dim('Add one: searchhole lists add <id> [--mode audit]   Details: searchhole lists catalog --json'),
+  ].join('\n')
+}
+
+/** One list after add, import or a mode change. */
+export function renderListStatus(s: ListStatus, { style }: RenderOpts): string {
+  const head = `${style.green('✓')} ${s.id}: ${modeText(s.mode, style)} · ${num(s.ruleCount)} rules · ${s.source}`
+  const lines = [head]
+  if (s.skipped > 0) lines.push(style.dim(`  ${num(s.skipped)} lines could not be used (${skipText(s)})`))
+  if (s.lastError !== null) lines.push(`  ${style.yellow('⚠')} ${s.lastError.message}`)
+  if (s.mode === 'audit') lines.push(style.dim('  Audit: it records what it would hide and changes nothing.'))
+  return lines.join('\n')
+}
+
+function skipText(s: ListStatus): string {
+  return Object.entries(s.skipReasons)
+    .slice(0, 3)
+    .map(([reason, n]) => `${num(n)} ${reason}`)
+    .join(', ')
+}
+
+/** `searchhole lists update`. */
+export function renderListUpdates(results: readonly ListUpdateResult[], { style }: RenderOpts): string {
+  if (results.length === 0) return 'No list to refresh (built-in and imported lists are not downloaded).'
+  return results
+    .map((r) => {
+      const mark =
+        r.result === 'updated'
+          ? style.green('✓')
+          : r.result === 'unchanged'
+            ? style.green('=')
+            : r.result === 'failed'
+              ? style.yellow('⚠')
+              : style.dim('-')
+      return `${mark} ${r.id}: ${r.result === 'failed' ? `kept the copy in force. ${r.message}` : r.message}`
+    })
+    .join('\n')
+}
+
+/** `searchhole lists remove`. */
+export function renderListRemoved(s: ListStatus, { style }: RenderOpts): string {
+  return `${style.green('✓')} removed ${s.id} (${s.source}, ${num(s.ruleCount)} rules)`
 }

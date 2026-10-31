@@ -15,7 +15,7 @@ import { extname, join, normalize, resolve, sep } from 'node:path'
 import { type Context, Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { streamSSE } from 'hono/streaming'
-import type { App, DashboardApi } from '../app/types.ts'
+import type { AddListInput, App, DashboardApi, ListMode, ListsApi } from '../app/types.ts'
 import { isSearchHoleError } from '../shared/errors.ts'
 import type { Logger } from '../shared/log.ts'
 import type { ApiError, StreamEvent } from './contract.ts'
@@ -313,6 +313,65 @@ export function createUiServer(o: UiServerOptions): UiServer {
     return c.json({ ok: true })
   })
 
+  // Lists (ADR-0022).
+  const lists = (): ListsApi => {
+    if (app.lists === undefined) throw new NotFound('This build has no list support.')
+    return app.lists
+  }
+  const LIST_ID = /^[a-z0-9][a-z0-9._-]{0,63}$/
+  const listParam = (c: Context): string => {
+    const id = c.req.param('id') ?? ''
+    if (!LIST_ID.test(id)) throw new NotFound('No such list.')
+    return id
+  }
+  h.get('/api/lists', async (c) => c.json(await lists().list()))
+  h.get('/api/lists/catalog', async (c) => c.json(await lists().catalog()))
+  h.post('/api/lists', async (c) => {
+    const body = await json<Partial<AddListInput> | null>(c)
+    if (
+      body === null ||
+      typeof body !== 'object' ||
+      typeof body.source !== 'string' ||
+      body.source.trim() === ''
+    )
+      throw new BadRequest('Give a catalog id or an https:// URL as "source".')
+    const input: AddListInput = { source: body.source }
+    for (const k of ['name', 'format', 'kind', 'mode', 'update', 'sha256'] as const) {
+      const v = body[k]
+      if (v === undefined) continue
+      if (typeof v !== 'string') throw new BadRequest(`"${k}" must be a string.`)
+      ;(input as unknown as Record<string, unknown>)[k] = v
+    }
+    if (body.fetch !== undefined) {
+      if (typeof body.fetch !== 'boolean') throw new BadRequest('"fetch" must be true or false.')
+      input.fetch = body.fetch
+    }
+    return c.json(await lists().add(input))
+  })
+  h.post('/api/lists/update', async (c) => {
+    const body = await json<{ force?: unknown } | null>(c).catch(() => null)
+    return c.json(await lists().update(undefined, body?.force === true ? { force: true } : {}))
+  })
+  h.post('/api/lists/remove', async (c) => {
+    const body = await json<{ id?: unknown } | null>(c)
+    if (typeof body?.id !== 'string' || !LIST_ID.test(body.id))
+      throw new BadRequest('Name the list to remove as "id".')
+    return c.json(await lists().remove(body.id))
+  })
+  h.post('/api/lists/:id/mode', async (c) => {
+    const id = listParam(c)
+    const body = await json<{ mode?: unknown } | null>(c)
+    const mode = body?.mode
+    if (mode !== 'enforce' && mode !== 'audit' && mode !== 'disabled')
+      throw new BadRequest('"mode" must be enforce, audit or disabled.')
+    return c.json(await lists().setMode(id, mode as ListMode))
+  })
+  h.post('/api/lists/:id/update', async (c) => {
+    const id = listParam(c)
+    const body = await json<{ force?: unknown } | null>(c).catch(() => null)
+    return c.json(await lists().update([id], body?.force === true ? { force: true } : {}))
+  })
+
   h.get('/api/engines', async (c) => c.json(await app.engineStatus()))
   h.post('/api/engines/probe', async (c) => c.json(await app.probeEngines(3000)))
   h.get('/api/settings', async (c) => c.json(await dash.settingsView()))
@@ -350,6 +409,7 @@ export function createUiServer(o: UiServerOptions): UiServer {
 
   h.onError((err, c) => {
     if (err instanceof BadRequest) return fail(c, 400, 'bad_request', err.message)
+    if (err instanceof NotFound) return fail(c, 404, 'not_found', err.message)
     if (isSearchHoleError(err)) {
       const status = err.code === 'config_locked' ? 409 : err.code === 'internal' ? 500 : 400
       return fail(c, status, err.code, err.why, err.fix)
@@ -376,3 +436,4 @@ export function createUiServer(o: UiServerOptions): UiServer {
 }
 
 class BadRequest extends Error {}
+class NotFound extends Error {}

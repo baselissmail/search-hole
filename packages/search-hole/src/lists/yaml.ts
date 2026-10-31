@@ -48,6 +48,11 @@ export interface Subscription {
   sha256?: string
 }
 
+/** Settings for a list the user did not subscribe to by URL (`lists:` in the global rules.yaml, ADR-0022). */
+export interface ListSetting {
+  mode?: ListMode
+}
+
 export type RulesWarningCode = 'unknown_field' | 'unknown_action' | 'duplicate_rule' | 'ignored_weight'
 
 export interface RulesWarning {
@@ -73,6 +78,8 @@ export interface LoadedRules {
   defaults: ProfileDefaults
   /** Always empty for project files. */
   subscriptions: Subscription[]
+  /** Modes of bundled, starter and imported lists, by list id. Always empty for project files. */
+  lists: Record<string, ListSetting>
   warnings: RulesWarning[]
   /** Rules skipped because their action needs a newer search-hole. */
   noopRules: number
@@ -108,7 +115,7 @@ const FORMATS = ['auto', 'ublacklist', 'abp', 'adguard', 'hosts', 'domains', 'go
 const KINDS = ['block', 'allow', 'official', 'content-farm', 'clone'] as const
 const MODES = ['enforce', 'audit', 'disabled'] as const
 
-const TOP_KEYS = new Set(['version', '$schema', 'rules', 'profiles', 'defaults', 'subscriptions'])
+const TOP_KEYS = new Set(['version', '$schema', 'rules', 'profiles', 'defaults', 'subscriptions', 'lists'])
 /** Keys that belong in settings.yaml (ADR-0015); an error in any rule file. */
 const SETTINGS_TOP_KEYS = new Set([
   'engines',
@@ -153,6 +160,8 @@ const NESTED_KEYS: Readonly<Record<string, ReadonlySet<string>>> = {
   prefer: new Set(['lists', 'factor']),
 }
 const SUB_KEYS = new Set(['name', 'url', 'format', 'kind', 'update', 'mode', 'sha256'])
+const LIST_SETTING_KEYS = new Set(['mode'])
+const LIST_SETTING_NAME = /^[a-z0-9][a-z0-9._-]{0,63}$/
 
 // ── Schemas ──────────────────────────────────────────────────────────────
 
@@ -369,6 +378,7 @@ export function loadRulesYaml(text: string, opts: LoadRulesOptions): LoadedRules
     profiles: [],
     defaults: {},
     subscriptions: [],
+    lists: {},
     warnings,
     noopRules: 0,
   }
@@ -400,12 +410,15 @@ export function loadRulesYaml(text: string, opts: LoadRulesOptions): LoadedRules
       true,
     )
   }
+  if (scope === 'project' && root.lists !== undefined) {
+    issue('lists can only be set in the global rules.yaml, never in a project file', ['lists'], true)
+  }
   if (root.$schema !== undefined && typeof root.$schema !== 'string')
     issue('$schema must be a string', ['$schema'])
 
   /** Warns about unknown keys; settings-like keys inside profiles and defaults are errors. */
   const checkKeys = (obj: Record<string, unknown>, known: ReadonlySet<string>, path: Path, what: string) => {
-    const profileLike = what !== 'rule' && what !== 'subscription'
+    const profileLike = what !== 'rule' && what !== 'subscription' && what !== 'list'
     for (const k of Object.keys(obj)) {
       if (known.has(k)) {
         const nested = NESTED_KEYS[k]
@@ -520,6 +533,36 @@ export function loadRulesYaml(text: string, opts: LoadRulesOptions): LoadedRules
     }
   }
 
+  // List settings (global only): `lists: { <id>: { mode: enforce|audit|disabled } }`.
+  const lists: Record<string, ListSetting> = {}
+  if (scope === 'global' && root.lists !== undefined && root.lists !== null) {
+    if (!isPlainObject(root.lists)) issue('lists must be a mapping of list id → { mode }', ['lists'])
+    else {
+      for (const [id, raw] of Object.entries(root.lists)) {
+        const path = ['lists', id]
+        if (!LIST_SETTING_NAME.test(id)) {
+          issue(`list id '${id}' must be 1–64 lower-case letters, digits or . _ -`, path, true)
+          continue
+        }
+        if (raw === null) continue
+        if (!isPlainObject(raw)) {
+          issue(`lists.${id} must be a mapping such as { mode: audit }`, path)
+          continue
+        }
+        checkKeys(raw, LIST_SETTING_KEYS, path, 'list')
+        const setting: ListSetting = {}
+        if (raw.mode !== undefined) {
+          if (typeof raw.mode !== 'string' || !(MODES as readonly string[]).includes(raw.mode)) {
+            issue(`lists.${id}.mode must be one of: ${MODES.join(', ')}`, [...path, 'mode'])
+            continue
+          }
+          setting.mode = raw.mode as ListMode
+        }
+        lists[id] = setting
+      }
+    }
+  }
+
   // Rules.
   const drafts: { rule: Rule; identity: RuleIdentity; path: Path; userId?: string }[] = []
   let noopRules = 0
@@ -624,7 +667,7 @@ export function loadRulesYaml(text: string, opts: LoadRulesOptions): LoadedRules
   })
 
   if (issues.length > 0) fail()
-  return { rules: drafts.map((d) => d.rule), profiles, defaults, subscriptions, warnings, noopRules }
+  return { rules: drafts.map((d) => d.rule), profiles, defaults, subscriptions, lists, warnings, noopRules }
 }
 
 type ProfileBody = z.infer<typeof defaultsSchema>

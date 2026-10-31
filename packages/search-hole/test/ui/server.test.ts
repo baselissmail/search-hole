@@ -268,3 +268,88 @@ describe('live stream', () => {
     expect(ahead).toContain('event: reset')
   })
 })
+
+describe('lists API (ADR-0022)', () => {
+  it('lists, catalog, mode, add without download, update and remove; bad input is a 400', async () => {
+    const { signIn, api } = await harness()
+    const token = await signIn()
+    const lists = (await (await api('/api/lists', token)).json()) as Array<{
+      id: string
+      mode: string
+      source: string
+    }>
+    expect(lists.find((l) => l.id === 'rjaus-pinterest')).toMatchObject({
+      mode: 'enforce',
+      source: 'vendored',
+    })
+    const catalog = (await (await api('/api/lists/catalog', token)).json()) as Array<{
+      id: string
+      starter: boolean
+    }>
+    expect(catalog.some((c) => c.id === 'super-seo-spam-suppressor' && !c.starter)).toBe(true)
+
+    const mode = await api('/api/lists/laylavish-huge-ai/mode', token, {
+      method: 'POST',
+      body: JSON.stringify({ mode: 'enforce' }),
+    })
+    expect(mode.status).toBe(200)
+    expect(((await mode.json()) as { mode: string }).mode).toBe('enforce')
+    expect(
+      (
+        await api('/api/lists/laylavish-huge-ai/mode', token, {
+          method: 'POST',
+          body: JSON.stringify({ mode: 'off' }),
+        })
+      ).status,
+    ).toBe(400)
+    expect(
+      (await api('/api/lists/nope/mode', token, { method: 'POST', body: JSON.stringify({ mode: 'audit' }) }))
+        .status,
+    ).toBe(400)
+    expect(
+      (
+        await api('/api/lists/Bad%2Fid/mode', token, {
+          method: 'POST',
+          body: JSON.stringify({ mode: 'audit' }),
+        })
+      ).status,
+    ).toBe(404)
+
+    const added = await api('/api/lists', token, {
+      method: 'POST',
+      body: JSON.stringify({ source: 'super-seo-spam-suppressor', mode: 'audit', fetch: false }),
+    })
+    expect(added.status).toBe(200)
+    expect(await added.json()).toMatchObject({ id: 'super-seo-spam-suppressor', mode: 'audit', copy: 'none' })
+    expect(
+      (
+        await api('/api/lists', token, {
+          method: 'POST',
+          body: JSON.stringify({ source: 'http://x.example/l.txt' }),
+        })
+      ).status,
+    ).toBe(400)
+    expect((await api('/api/lists', token, { method: 'POST', body: JSON.stringify({}) })).status).toBe(400)
+
+    const update = (await (
+      await api('/api/lists/github-clones/update', token, { method: 'POST' })
+    ).json()) as Array<{
+      result: string
+    }>
+    expect(update).toEqual([expect.objectContaining({ id: 'github-clones', result: 'skipped' })])
+
+    const builtin = await api('/api/lists/remove', token, {
+      method: 'POST',
+      body: JSON.stringify({ id: 'github-clones' }),
+    })
+    expect(builtin.status).toBe(400)
+    expect(((await builtin.json()) as { error: { fix: string } }).error.fix).toContain('disable')
+    const removed = await api('/api/lists/remove', token, {
+      method: 'POST',
+      body: JSON.stringify({ id: 'super-seo-spam-suppressor' }),
+    })
+    expect(removed.status).toBe(200)
+    const after = (await (await api('/api/lists', token)).json()) as Array<{ id: string }>
+    expect(after.some((l) => l.id === 'super-seo-spam-suppressor')).toBe(false)
+  })
+})

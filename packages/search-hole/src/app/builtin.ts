@@ -98,6 +98,9 @@ function flagsOf(decision: RuleDecision): ResultFlag[] {
   const factor = decision.weight.factor * decision.preferFactor
   if (factor > 1) flags.push('raised')
   else if (factor < 1) flags.push('lowered')
+  // Audit lists (ADR-0008): recorded for the log and the dashboard, never applied.
+  if (decision.audit?.wouldBe === 'hidden' && decision.visibility === 'kept') flags.push('would_hide')
+  if (decision.audit?.wouldBe === 'kept' && decision.visibility === 'hidden') flags.push('would_show')
   return flags
 }
 
@@ -152,6 +155,7 @@ export async function filterBuiltinResults(
     const pos = outRank.get(x)
     const rule = x.decision.visibilityRule ?? x.decision.pin?.rule ?? x.decision.weight.rule
     const isHidden = x.decision.visibility === 'hidden'
+    const audit = x.decision.audit
     return {
       url: x.url,
       ...(x.result.title ? { title: x.result.title } : {}),
@@ -162,6 +166,7 @@ export async function filterBuiltinResults(
       ...(pos === undefined ? {} : { outRank: pos }),
       ...(isHidden ? { reason: x.decision.hiddenReason ?? 'rule' } : {}),
       ...(rule === undefined ? {} : { rule }),
+      ...(!isHidden && audit?.wouldBe === 'hidden' ? { auditRule: audit.rule } : {}),
     }
   })
   // A duplicate copy filters too (Claude Code may use either copy's output) but logs nothing:

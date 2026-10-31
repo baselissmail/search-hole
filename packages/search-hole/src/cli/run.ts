@@ -5,7 +5,16 @@
  * and fake `CliDeps`. The CLI talks to the app only through `src/app/types.ts`.
  */
 import { resolve } from 'node:path'
-import type { AddRuleInput, App, AppOptions, HostProfile, RequestCtx, SearchArgs } from '../app/types.ts'
+import type {
+  AddListInput,
+  AddRuleInput,
+  App,
+  AppOptions,
+  HostProfile,
+  ListsApi,
+  RequestCtx,
+  SearchArgs,
+} from '../app/types.ts'
 import { SearchHoleError } from '../shared/errors.ts'
 import { envValue } from '../shared/keys/unset.ts'
 import { scrub } from '../shared/keys/validate.ts'
@@ -15,8 +24,13 @@ import { resolveActor, withActorNote } from './gate.ts'
 import type { CliIo } from './io.ts'
 import {
   type RenderOpts,
+  renderCatalog,
   renderDoctor,
   renderKeysStatus,
+  renderListRemoved,
+  renderListStatus,
+  renderLists,
+  renderListUpdates,
   renderLog,
   renderLogDetail,
   renderMode,
@@ -234,6 +248,96 @@ async function runUnrule(
   if (cmd.json) json(io, removed)
   else line(io, renderRulesRemoved(removed, renderOpts(io, deps)))
   return 0
+}
+
+/** The app's list API, or a clear error from a build without it. */
+function listsOf(app: App): ListsApi {
+  if (app.lists === undefined) throw new SearchHoleError('internal', 'This build has no list support.')
+  return app.lists
+}
+
+type ListsCommand = Extract<
+  Command,
+  {
+    name:
+      | 'lists'
+      | 'lists-catalog'
+      | 'lists-add'
+      | 'lists-remove'
+      | 'lists-mode'
+      | 'lists-update'
+      | 'lists-import'
+  }
+>
+
+/** `searchhole lists …` (ADR-0022). Every verb that changes lists goes through the actor gate. */
+async function runLists(cmd: ListsCommand, io: CliIo, deps: CliDeps): Promise<number> {
+  const opts = renderOpts(io, deps)
+  const print = (value: unknown, text: string): void => {
+    if (cmd.json) json(io, value)
+    else line(io, text)
+  }
+  switch (cmd.name) {
+    case 'lists': {
+      const lists = await withApp(io, deps, (app) => listsOf(app).list())
+      print(lists, renderLists(lists, opts))
+      return 0
+    }
+    case 'lists-catalog': {
+      const entries = await withApp(io, deps, (app) => listsOf(app).catalog())
+      print(entries, renderCatalog(entries, opts))
+      return 0
+    }
+    case 'lists-add': {
+      resolveActor(io, cmd.yes, 'your lists')
+      const input: AddListInput = {
+        source: cmd.source,
+        fetch: cmd.fetch,
+        ...(cmd.listName === undefined ? {} : { name: cmd.listName }),
+        ...(cmd.format === undefined ? {} : { format: cmd.format }),
+        ...(cmd.kind === undefined ? {} : { kind: cmd.kind }),
+        ...(cmd.mode === undefined ? {} : { mode: cmd.mode }),
+        ...(cmd.update === undefined ? {} : { update: cmd.update }),
+        ...(cmd.sha256 === undefined ? {} : { sha256: cmd.sha256 }),
+      }
+      const status = await withApp(io, deps, (app) => listsOf(app).add(input))
+      print(status, renderListStatus(status, opts))
+      return 0
+    }
+    case 'lists-remove': {
+      resolveActor(io, cmd.yes, 'your lists')
+      const status = await withApp(io, deps, (app) => listsOf(app).remove(cmd.id))
+      print(status, renderListRemoved(status, opts))
+      return 0
+    }
+    case 'lists-mode': {
+      resolveActor(io, cmd.yes, 'your lists')
+      const status = await withApp(io, deps, (app) => listsOf(app).setMode(cmd.id, cmd.mode))
+      print(status, renderListStatus(status, opts))
+      return 0
+    }
+    case 'lists-update': {
+      resolveActor(io, cmd.yes, 'which lists are in force')
+      const results = await withApp(io, deps, (app) =>
+        listsOf(app).update(cmd.ids.length === 0 ? undefined : cmd.ids, cmd.force ? { force: true } : {}),
+      )
+      print(results, renderListUpdates(results, opts))
+      return 0
+    }
+    case 'lists-import': {
+      resolveActor(io, cmd.yes, 'your lists')
+      const status = await withApp(io, deps, (app) =>
+        listsOf(app).import(resolve(io.cwd, cmd.file), {
+          name: cmd.listName,
+          kind: cmd.kind,
+          ...(cmd.format === undefined ? {} : { format: cmd.format }),
+          ...(cmd.mode === undefined ? {} : { mode: cmd.mode }),
+        }),
+      )
+      print(status, renderListStatus(status, opts))
+      return 0
+    }
+  }
 }
 
 /** Rebuilds an error with `secret` removed from its text, in case a lower layer echoed it. */
@@ -483,6 +587,14 @@ async function execute(
       else line(io, renderRules(rules, opts))
       return 0
     }
+    case 'lists':
+    case 'lists-catalog':
+    case 'lists-add':
+    case 'lists-remove':
+    case 'lists-mode':
+    case 'lists-update':
+    case 'lists-import':
+      return runLists(cmd, io, deps)
     case 'explain': {
       const result = await withApp(io, deps, (app) =>
         app.rules.explain(cmd.url, cmd.profile === undefined ? undefined : { profile: cmd.profile }),

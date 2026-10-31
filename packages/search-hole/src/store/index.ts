@@ -30,6 +30,14 @@ import {
   renewLease,
 } from './queries/jobs.ts'
 import {
+  deleteListRow,
+  getListRow,
+  listContribution,
+  listListRows,
+  upsertListMeta,
+  writeListOutcome,
+} from './queries/lists.ts'
+import {
   getSearchLog,
   hiddenReasonCounts,
   listRecentSearches,
@@ -670,6 +678,26 @@ export async function openStore(opts: OpenStoreOptions): Promise<Store> {
     gateways: {
       heartbeat: (w) => softWrite((d) => upsertGateway(d, w, now())).ok,
       list: (since) => read((d) => listGateways(d, since), []),
+    },
+
+    lists: {
+      get: (id) => read((d) => getListRow(d, id), undefined),
+      list: () => read((d) => listListRows(d), []),
+      upsertMeta: (w) => softWrite((d) => upsertListMeta(d, w, now())).ok,
+      recordOutcome: (id, w, lease) => {
+        const r = write((d) => {
+          if (lease !== undefined && !leaseHolds(d, lease)) throw new LeaseLost()
+          return writeListOutcome(d, id, w, now())
+        })
+        if (r.kind === 'ok') return r.value
+        if (r.kind === 'error' && !(r.error instanceof LeaseLost)) throw r.error
+        return false
+      },
+      remove: (id) => {
+        const r = softWrite((d) => deleteListRow(d, id))
+        return r.ok && r.value
+      },
+      contribution: (since) => read((d) => listContribution(d, since), new Map()),
     },
 
     dataEpoch: () => read((d) => readDataEpoch(d), 0),

@@ -13,10 +13,20 @@
  * untrusted: render them as text, never as HTML.
  */
 import type {
+  AddListInput,
   AddRuleInput,
   DashboardOverview,
   DoctorReport,
   EngineStatus,
+  ListCatalogEntry,
+  ListError,
+  ListErrorCode,
+  ListFormat,
+  ListKind,
+  ListMode,
+  ListSource,
+  ListStatus,
+  ListUpdateResult,
   LogDetail,
   LogEntry,
   LogPage,
@@ -28,9 +38,19 @@ import type {
 } from '../app/types.ts'
 
 export type {
+  AddListInput,
   AddRuleInput,
   DoctorReport,
   EngineStatus,
+  ListCatalogEntry,
+  ListError,
+  ListErrorCode,
+  ListFormat,
+  ListKind,
+  ListMode,
+  ListSource,
+  ListStatus,
+  ListUpdateResult,
   LogDetail,
   LogEntry,
   RuleListing,
@@ -78,6 +98,22 @@ export const ROUTES = {
   settings: '/api/settings',
   /** GET `DoctorReport`. */
   doctor: '/api/doctor',
+  /**
+   * GET `ListStatus[]` (every list: bundled, starter, subscribed, imported, with its 7-day
+   * contribution); POST `AddListInput` → `ListStatus` (subscribes, writes rules.yaml and, unless
+   * `fetch: false`, downloads it; a failed download is in `lastError`, not an HTTP error).
+   */
+  lists: '/api/lists',
+  /** GET `ListCatalogEntry[]`. */
+  listCatalog: '/api/lists/catalog',
+  /** POST `ListModeRequest` → `ListStatus`. */
+  listMode: (id: string) => `/api/lists/${encodeURIComponent(id)}/mode`,
+  /** POST `ListUpdateRequest` → `ListUpdateResult[]` (one list). Can take up to a minute. */
+  updateList: (id: string) => `/api/lists/${encodeURIComponent(id)}/update`,
+  /** POST `ListUpdateRequest` → `ListUpdateResult[]` (every enabled list with a URL). */
+  updateLists: '/api/lists/update',
+  /** POST `RemoveListRequest` → `ListStatus` (the list as it was). Built-in lists answer 400; disable them instead. */
+  removeList: '/api/lists/remove',
 } as const
 
 export interface ApiError {
@@ -127,6 +163,19 @@ export interface ExplainRequest {
 export interface ExplainResponse {
   decision: string
   lines: string[]
+}
+
+export interface ListModeRequest {
+  mode: ListMode
+}
+
+export interface ListUpdateRequest {
+  /** Accept a copy the shrink guard refused (under half the rules in force). */
+  force?: boolean
+}
+
+export interface RemoveListRequest {
+  id: string
 }
 
 export interface SuggestionItem {

@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
-// Copies the built UI apps into dist/ after tsdown (which cleans dist/):
+// Copies the built UI apps and the starter lists into dist/ after tsdown (which cleans dist/):
 //   apps/dashboard/dist          → dist/ui     (served by `searchhole ui`, ADR-0020)
 //   apps/receipt-app/dist/receipt.html → dist/panel/receipt.html (the MCP App, ADR-0021)
-// A missing build warns instead of failing, so the CLI and gateway still build alone.
-import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs'
+//   lists/vendor/*.txt            → dist/lists/ (the shipped starter lists, ADR-0017 point 7, ADR-0022)
+// A missing UI build warns instead of failing, so the CLI and gateway still build alone. Missing
+// starter lists fail the build: without them the default lists would be empty offline.
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -32,3 +34,14 @@ if (existsSync(panel)) {
     'copy-ui-assets: apps/receipt-app is not built; hosts get a "not built" panel (pnpm -C apps/receipt-app build).',
   )
 }
+
+const vendor = join(pkg, '..', '..', 'lists', 'vendor')
+const lists = existsSync(vendor) ? readdirSync(vendor).filter((f) => f.endsWith('.txt')) : []
+if (lists.length === 0) {
+  console.error('copy-ui-assets: lists/vendor/ has no starter lists; the bundle would ship without them.')
+  process.exit(1)
+}
+rmSync(join(pkg, 'dist', 'lists'), { recursive: true, force: true })
+mkdirSync(join(pkg, 'dist', 'lists'), { recursive: true })
+for (const f of lists) cpSync(join(vendor, f), join(pkg, 'dist', 'lists', f))
+console.log(`copy-ui-assets: ${lists.length} starter lists → dist/lists`)

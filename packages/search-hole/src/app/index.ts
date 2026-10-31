@@ -28,6 +28,7 @@ import { createDashboardApi } from './dashboard.ts'
 import { runDoctor } from './doctor.ts'
 import { Engines } from './engines.ts'
 import { lazyFetcher, runFetch } from './fetch.ts'
+import { ListsService } from './lists.ts'
 import { logDetail, recentLog } from './logview.ts'
 import { LoopGuard } from './loopguard.ts'
 import { Receipts } from './receipts.ts'
@@ -52,7 +53,11 @@ export const createApp: CreateApp = async (opts: AppOptions): Promise<App> => {
   const engines = new Engines(ctx)
   if (ctx.host !== 'cli') engines.warmKeys()
   const loop = new LoopGuard(ctx.now)
-  const rules = new RulesService(ctx)
+  const lists = new ListsService(
+    ctx,
+    ctx.seams.listRefreshDelayMs === undefined ? {} : { kickDelayMs: ctx.seams.listRefreshDelayMs },
+  )
+  const rules = new RulesService(ctx, lists)
   const receipts = new Receipts(ctx)
   const fetcher = lazyFetcher(ctx)
   let lastHeartbeat = 0
@@ -89,6 +94,20 @@ export const createApp: CreateApp = async (opts: AppOptions): Promise<App> => {
     freshSettings()
     return { ctx, engines, rules, receipts, loop }
   }
+  /** After a real request: let a gateway refresh due lists in the background (ADR-0022). */
+  const kickLists = (): void => {
+    const store = ctx.store.peek()
+    try {
+      lists.kick(() => rules.global(store), store)
+    } catch (e) {
+      ctx.logger.warn({ err: e }, 'could not schedule the list refresh')
+    }
+  }
+  /** The global rules file and the store, for list writes (the store opens for writing). */
+  const listCtx = async () => {
+    const st = await ctx.store.write()
+    return { global: () => rules.global(st), store: async () => st, st }
+  }
   const freshnessDefaults = async () =>
     rules.context(undefined, await ctx.store.read()).defaults.freshness ?? {}
 
@@ -100,6 +119,7 @@ export const createApp: CreateApp = async (opts: AppOptions): Promise<App> => {
       freshSettings()
       const out = await runSearch({ ctx, engines, rules, receipts, loop }, args, rctx)
       await heartbeat()
+      kickLists()
       return out
     },
 
@@ -107,6 +127,7 @@ export const createApp: CreateApp = async (opts: AppOptions): Promise<App> => {
       freshSettings()
       const out = await runFetch({ ctx, rules, receipts, fetcher: fetcher.get }, args, rctx)
       await heartbeat()
+      kickLists()
       return out
     },
 
@@ -119,7 +140,11 @@ export const createApp: CreateApp = async (opts: AppOptions): Promise<App> => {
 
     searchMode: () => searchMode(builtinDeps()),
     builtinBlockedDomains: (rctx, query) => builtinBlockedDomains(builtinDeps(), rctx, query),
-    filterBuiltinResults: (query, results, rctx) => filterBuiltinResults(builtinDeps(), query, results, rctx),
+    filterBuiltinResults: async (query, results, rctx) => {
+      const out = await filterBuiltinResults(builtinDeps(), query, results, rctx)
+      kickLists()
+      return out
+    },
     checkUrl: (url, rctx) => checkUrl(builtinDeps(), url, rctx),
     recordBuiltinFetch: (url, rctx) => recordBuiltinFetch(builtinDeps(), url, rctx),
     searchBudget: async (query, rctx) => searchBudget(builtinDeps(), query, rctx),
@@ -179,6 +204,36 @@ export const createApp: CreateApp = async (opts: AppOptions): Promise<App> => {
       },
       async trust(projectDir) {
         return rules.trust(projectDir, await ctx.store.write())
+      },
+    },
+
+    lists: {
+      async list() {
+        const st = await ctx.store.read()
+        return lists.statuses(rules.global(st), st)
+      },
+      async catalog() {
+        return lists.catalog(rules.global(await ctx.store.read()))
+      },
+      async add(input) {
+        const l = await listCtx()
+        return lists.add(input, l.global, l.store)
+      },
+      async remove(id) {
+        const l = await listCtx()
+        return lists.remove(id, l.global, l.store)
+      },
+      async setMode(id, mode) {
+        const l = await listCtx()
+        return lists.setMode(id, mode, l.global, l.store)
+      },
+      async update(ids, o) {
+        const l = await listCtx()
+        return lists.update(ids, o ?? {}, l.global, l.store)
+      },
+      async import(path, o) {
+        const l = await listCtx()
+        return lists.importFile(path, o, l.global, l.store)
       },
     },
 
@@ -290,6 +345,7 @@ export const createApp: CreateApp = async (opts: AppOptions): Promise<App> => {
     }),
 
     async close() {
+      await lists.close()
       await fetcher.close()
       await engines.close()
       await ctx.store.close()
