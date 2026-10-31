@@ -55,6 +55,10 @@ export const STEER_REASON = `search-hole is active: use ${PLUGIN_TOOL_PREFIX}sea
 /** Context added when the deny-loop breaker lets WebSearch through. */
 export const LOOP_BREAK_NOTE = `search-hole: built-in WebSearch allowed because ${PLUGIN_TOOL_PREFIX}search was not used, or failed, after the last denial; results are still filtered by the user's rules.`
 
+/** Context added when a WebSearch response has a shape we can't read (fail open, but say so). */
+export const UNREADABLE_NOTE =
+  "search-hole could not read this WebSearch result format, so the user's source rules were not applied to these results."
+
 /** Longest Stop `systemMessage` we send (Claude Code caps hook strings at 10,000 characters). */
 const MAX_SYSTEM_MESSAGE_CHARS = 1_000
 
@@ -103,8 +107,9 @@ const deny = (reason: string): HookOutput => ({
   },
 })
 
+/** A usable string value; "" and a `${...}` placeholder the host did not substitute are not. */
 const nonEmpty = (v: unknown): string | undefined =>
-  typeof v === 'string' && v.trim() !== '' ? v : undefined
+  typeof v === 'string' && v.trim() !== '' && !/^\$\{[^}]*\}$/.test(v.trim()) ? v : undefined
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -279,7 +284,7 @@ async function postWebSearch(input: HookInput, ctx: RequestCtx, deps: HookDeps):
   const resp = parseWebSearchResponse(input.toolResponse)
   if (resp === null) {
     deps.log.warn('PostToolUse WebSearch: unrecognised tool_response shape; results not filtered (fail open)')
-    return {}
+    return { hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: UNREADABLE_NOTE } }
   }
   const toolInput = parseWebSearchInput(toolInputOf(input))
   const query = toolInput?.query ?? resp.query ?? ''

@@ -40,10 +40,12 @@ const RESULTS: BuiltinResult[] = [
 ]
 
 describe('built-in WebSearch mode (ADR-0018)', () => {
-  it('blocked_domains: domain and exact-host blocks, user allows excluded, no patterns', async () => {
+  it('blocked_domains: domain blocks only (the API covers subdomains), user allows excluded, no patterns', async () => {
     const h = await setup({ rules: RULES })
     const domains = await h.app.builtinBlockedDomains(hookSession(), 'react hooks')
-    expect(domains).toEqual(['pinterest.com', 'www.w3schools.com'])
+    // `=www.w3schools.com` is exact-host: pushing it would also drop its subdomains, so it is
+    // applied after the search instead.
+    expect(domains).toEqual(['pinterest.com'])
     expect(BUILTIN_BLOCKED_DOMAINS_CAP).toBe(200)
   })
 

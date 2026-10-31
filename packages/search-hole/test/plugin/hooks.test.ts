@@ -53,7 +53,7 @@ describe('hooks.json structure (ADR-0014)', () => {
 
   it('has one group per event (PreToolUse: one per input shape), matchers only where the ADR has them', () => {
     for (const [event, groups] of Object.entries(file.hooks)) {
-      if (event !== 'PreToolUse') expect(groups, event).toHaveLength(1)
+      if (event !== 'PreToolUse' && event !== 'PostToolUse') expect(groups, event).toHaveLength(1)
     }
     // Web tools get the whole input; Bash and file tools get one lean field, so Write bodies never travel.
     expect(file.hooks.PreToolUse?.map((g) => g.matcher)).toEqual([
@@ -62,7 +62,8 @@ describe('hooks.json structure (ADR-0014)', () => {
       'Edit|Write|MultiEdit',
       'NotebookEdit',
     ])
-    expect(file.hooks.PostToolUse?.[0]?.matcher).toBe('WebSearch|WebFetch')
+    // WebFetch's response is the whole page and unused: only its URL travels.
+    expect(file.hooks.PostToolUse?.map((g) => g.matcher)).toEqual(['WebSearch', 'WebFetch'])
     for (const event of ['SessionStart', 'UserPromptSubmit', 'Stop']) {
       expect(file.hooks[event]?.[0]?.matcher, event).toBeUndefined()
     }
@@ -113,7 +114,7 @@ describe('hooks.json structure (ADR-0014)', () => {
     ])
   })
 
-  it('PostToolUse sends the tool input and the tool response as JSON strings', () => {
+  it('PostToolUse sends WebSearch input and response as JSON strings, WebFetch only its URL', () => {
     expect(mcpHooks('PostToolUse').map((h) => h.input)).toEqual([
       {
         event: 'PostToolUse',
@@ -122,12 +123,18 @@ describe('hooks.json structure (ADR-0014)', () => {
         toolInput: '${tool_input}',
         toolResponse: '${tool_response}',
       },
+      {
+        event: 'PostToolUse',
+        sessionId: '${session_id}',
+        toolName: '${tool_name}',
+        url: '${tool_input.url}',
+      },
     ])
   })
 
   it('every mcp_tool hook calls the gateway hook tool on the plugin-scoped server name', () => {
     const all = Object.keys(file.hooks).flatMap(mcpHooks)
-    expect(all).toHaveLength(8)
+    expect(all).toHaveLength(9)
     for (const hook of all) {
       expect(hook.server).toBe(HOOK_SERVER)
       expect(hook.tool).toBe(HOOK_TOOL)
@@ -150,6 +157,7 @@ describe('hooks.json structure (ADR-0014)', () => {
       'tool_input.command', // verified in spike §1
       'tool_input.file_path', // the docs' own example
       'tool_input.notebook_path', // same mechanism; confirm in the E2E
+      'tool_input.url', // same mechanism; confirm in the E2E (an unsubstituted value is ignored)
       'tool_response',
       'CLAUDE_PLUGIN_ROOT',
     ])

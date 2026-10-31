@@ -227,10 +227,12 @@ export interface BlockHost {
 }
 
 /**
- * Domain and exact-host blocks that are safe to apply outside our own decision (engine
- * pushdown, ADR-0009 point 8; WebSearch `blocked_domains`, ADR-0018): user tiers first;
- * a block whose host scope overlaps any user allow or pin is left out, and any allow or pin
- * that is not a literal host (regex, URL pattern) disables the list entirely.
+ * Domain blocks that are safe to apply outside our own decision (engine pushdown, ADR-0009
+ * point 8; WebSearch `blocked_domains`, ADR-0018): user tiers first; a block whose host scope
+ * overlaps any user allow or pin is left out, and any allow or pin that is not a literal host
+ * (regex, URL pattern) disables the list entirely. Exact-host blocks (`=github.com`) are never
+ * pushed: `blocked_domains` and `-site:` both cover subdomains, so they would also drop
+ * `docs.github.com`, unlogged. Our own decision applies them after the search.
  */
 export function safeBlockHosts(rules: readonly Rule[], profile: string, now: number): BlockHost[] {
   const active = inTierOrder(rules).filter((r) => ruleApplies(r, profile, now))
@@ -246,7 +248,7 @@ export function safeBlockHosts(rules: readonly Rule[], profile: string, now: num
   const out: BlockHost[] = []
   const seen = new Set<string>()
   for (const r of active) {
-    if (r.action !== 'block' || (r.matchKind !== 'domain' && r.matchKind !== 'exact_host')) continue
+    if (r.action !== 'block' || r.matchKind !== 'domain') continue
     const parsed = parseMatch(r.match)
     if (!parsed.ok) continue
     const lit = literalHost(parsed.match)

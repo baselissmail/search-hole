@@ -194,8 +194,9 @@ export const hookInput = z.looseObject({
   source: z.string().max(64).optional(),
   agentType: z.string().max(256).optional(),
   toolName: z.string().max(256).optional(),
-  toolInput: z.string().optional(),
-  toolResponse: z.string().optional(),
+  // JSON strings today; an object is accepted too, so a host change can't switch filtering off.
+  toolInput: z.unknown().optional(),
+  toolResponse: z.unknown().optional(),
   command: z.string().optional(),
   filePath: z.string().optional(),
   url: z.string().optional(),

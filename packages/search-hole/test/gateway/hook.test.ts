@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, test } from 'vitest'
 import { SUMMARY_WITHHELD } from '../../src/gateway/builtin.ts'
 import { GUARD_DENY_REASON } from '../../src/gateway/guard.ts'
-import { LOOP_BREAK_NOTE, STEER_REASON } from '../../src/gateway/hook.ts'
+import { LOOP_BREAK_NOTE, STEER_REASON, UNREADABLE_NOTE } from '../../src/gateway/hook.ts'
 import { SearchHoleError } from '../../src/shared/errors.ts'
 import type { FakeAppOptions } from './fake-app.ts'
 import { type Connected, callHook, connect, ERAS, type Era, harness } from './helpers.ts'
@@ -338,10 +338,13 @@ describe.each(ERAS)('hook tool (%s era)', (era) => {
       expect(spec.additionalContext).toMatch(/excluded 2 blocked sites before the search/)
     })
 
-    test('an unrecognised tool_response fails open with a warning', async () => {
+    test('an unrecognised tool_response fails open with a warning, and says so to the model', async () => {
       const { h, hook } = await setup(era, { blockedDomains: ['logrocket.com'] })
-      expect(await hook(post('WebSearch', { query: 'q' }, { unexpected: true }))).toEqual({})
-      expect(await hook(post('WebSearch', { query: 'q' }, 'not json'))).toEqual({})
+      const said = {
+        hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: UNREADABLE_NOTE },
+      }
+      expect(await hook(post('WebSearch', { query: 'q' }, { unexpected: true }))).toEqual(said)
+      expect(await hook(post('WebSearch', { query: 'q' }, 'not json'))).toEqual(said)
       expect(h.logs().filter((l) => String(l.msg).includes('unrecognised tool_response')).length).toBe(2)
     })
 

@@ -21,11 +21,13 @@ export const SUMMARY_WITHHELD = '(summary withheld by search-hole: it may cite s
  */
 export const MAX_BLOCKED_DOMAINS = 200
 
+// Parsed per entry and per item: one odd item (an empty URL, a null, an error block) must not
+// leave the whole response unfiltered (review 2026-10-31).
 const itemSchema = z.looseObject({ title: z.string().optional(), url: z.string().min(1) })
-const blockSchema = z.looseObject({ tool_use_id: z.string().optional(), content: z.array(itemSchema) })
+const blockSchema = z.looseObject({ tool_use_id: z.string().optional(), content: z.array(z.unknown()) })
 const responseSchema = z.looseObject({
   query: z.string().optional(),
-  results: z.array(z.union([z.string(), blockSchema])),
+  results: z.array(z.unknown()),
   durationSeconds: z.number().optional(),
   searchCount: z.number().optional(),
 })
@@ -65,12 +67,29 @@ export function parseWebSearchInput(raw: unknown): WebSearchInput | null {
   return parsed.success ? parsed.data : null
 }
 
+/** A result block (`{ content: [...] }`), or null for a summary string, an error block or junk. */
+function blockOf(entry: unknown): WebSearchBlock | null {
+  const parsed = blockSchema.safeParse(entry)
+  return parsed.success ? parsed.data : null
+}
+
+/** A block's well-formed items; an item without a URL can't be checked or cited, so it is skipped. */
+function itemsOf(block: WebSearchBlock): WebSearchItem[] {
+  const out: WebSearchItem[] = []
+  for (const raw of block.content) {
+    const parsed = itemSchema.safeParse(raw)
+    if (parsed.success) out.push(parsed.data)
+  }
+  return out
+}
+
 /** Every result in display order (blocks in order, items in order). */
 export function collectResults(resp: WebSearchResponse): BuiltinResult[] {
   const out: BuiltinResult[] = []
   for (const entry of resp.results) {
-    if (typeof entry === 'string') continue
-    for (const item of entry.content) out.push({ title: item.title ?? '', url: item.url })
+    const block = blockOf(entry)
+    if (block === null) continue
+    for (const item of itemsOf(block)) out.push({ title: item.title ?? '', url: item.url })
   }
   return out
 }
@@ -80,10 +99,11 @@ const sameOrder = (a: readonly BuiltinResult[], b: readonly BuiltinResult[]): bo
 
 /**
  * Rebuilds the response with only the kept items, in the App's order (pins first). All kept
- * items go into the first result block (the order is global across blocks); other blocks are
- * dropped. A summary string is replaced only when results were removed after the search
- * (`removedPostSearch`); otherwise it is kept. Returns null when nothing changed, so the hook
- * can leave the original output alone.
+ * items go into the first result block (the order is global across blocks); other result
+ * blocks are dropped, and malformed items with them. Entries that are not result blocks (an
+ * error block) stay in place. A summary string is replaced only when results were removed
+ * after the search (`removedPostSearch`); otherwise it is kept. Returns null when nothing
+ * changed, so the hook can leave the original output alone.
  */
 export function rebuildWebSearchResponse(
   resp: WebSearchResponse,
@@ -93,8 +113,9 @@ export function rebuildWebSearchResponse(
   if (filter.hidden.length === 0 && !filter.removedPostSearch && sameOrder(original, filter.kept)) return null
   const byUrl = new Map<string, WebSearchItem[]>()
   for (const entry of resp.results) {
-    if (typeof entry === 'string') continue
-    for (const item of entry.content) {
+    const block = blockOf(entry)
+    if (block === null) continue
+    for (const item of itemsOf(block)) {
       const queue = byUrl.get(item.url)
       if (queue === undefined) byUrl.set(item.url, [item])
       else queue.push(item)
@@ -108,8 +129,13 @@ export function rebuildWebSearchResponse(
   for (const entry of resp.results) {
     if (typeof entry === 'string') {
       results.push(filter.removedPostSearch ? SUMMARY_WITHHELD : entry)
+      continue
+    }
+    const block = blockOf(entry)
+    if (block === null) {
+      if (typeof entry === 'object' && entry !== null) results.push(entry)
     } else if (!placed) {
-      results.push({ ...entry, content: keptItems })
+      results.push({ ...block, content: keptItems })
       placed = true
     }
   }
@@ -159,6 +185,8 @@ export function planBuiltinInput(
   query: string,
 ): BuiltinInputPlan {
   const base: Record<string, unknown> = { ...input, query }
+  // The API rejects a request with both lists (400), and an empty allow list may count.
+  if (input.allowed_domains?.length === 0) delete base.allowed_domains
   const queryChanged = input.query !== query
   const allowed = input.allowed_domains ?? []
   if (allowed.length > 0) {

@@ -34,10 +34,46 @@ describe('parseWebSearchResponse', () => {
     ['empty', ''],
     ['no results', { query: 'q' }],
     ['results not an array', { results: 'x' }],
-    ['item without url', { results: [{ tool_use_id: 'a', content: [{ title: 't' }] }] }],
-    ['number entry', { results: [42] }],
   ])('rejects %s', (_name, raw) => {
     expect(parseWebSearchResponse(typeof raw === 'string' ? raw : JSON.stringify(raw))).toBeNull()
+  })
+
+  test('one odd entry does not unfilter the rest: bad items skipped, error blocks kept in place', () => {
+    const error = {
+      tool_use_id: 'e',
+      content: { type: 'web_search_tool_result_error', error_code: 'unavailable' },
+    }
+    const resp = parseWebSearchResponse(
+      JSON.stringify({
+        query: 'q',
+        results: [
+          {
+            tool_use_id: 'a',
+            content: [{ title: 't' }, null, { title: 'Pin', url: 'https://pinterest.com/x' }],
+          },
+          42,
+          error,
+          {
+            tool_use_id: 'b',
+            content: [{ title: 'MDN', url: 'https://developer.mozilla.org/' }, { url: '' }],
+          },
+        ],
+      }),
+    )
+    if (resp === null) throw new Error('expected a parse')
+    expect(collectResults(resp).map((r) => r.url)).toEqual([
+      'https://pinterest.com/x',
+      'https://developer.mozilla.org/',
+    ])
+    const rebuilt = rebuildWebSearchResponse(resp, {
+      kept: [{ title: 'MDN', url: 'https://developer.mozilla.org/' }],
+      hidden: [{ title: 'Pin', url: 'https://pinterest.com/x', reason: 'rule' }],
+      removedPostSearch: false,
+    })
+    expect(rebuilt?.results).toEqual([
+      { tool_use_id: 'a', content: [{ title: 'MDN', url: 'https://developer.mozilla.org/' }] },
+      error,
+    ])
   })
 
   test('keeps unknown fields so the rebuilt output matches the original shape', () => {
@@ -141,6 +177,15 @@ describe('domains', () => {
       input: { query: 'q', mode: 'extended', blocked_domains: ['a.com', 'b.com'] },
     })
     expect(planBuiltinInput(input, ['a.com'], 'q')).toEqual({ kind: 'unchanged' })
+  })
+
+  test('an empty allowed_domains is dropped when blocks are added (both lists are a 400)', () => {
+    const input = parseWebSearchInput({ query: 'q', allowed_domains: [] })
+    if (input === null) throw new Error('parse')
+    expect(planBuiltinInput(input, ['pinterest.com'], 'q')).toEqual({
+      kind: 'rewrite',
+      input: { query: 'q', blocked_domains: ['pinterest.com'] },
+    })
   })
 
   test('parseWebSearchInput rejects non-objects', () => {
