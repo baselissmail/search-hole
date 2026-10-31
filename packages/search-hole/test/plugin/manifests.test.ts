@@ -79,8 +79,10 @@ describe('plugin.json', () => {
     expect(plugin.name).not.toMatch(/^(claude|anthropic|anthropics|cc-plugin)-/)
   })
 
-  it('declares exactly the three documented options', () => {
-    expect(Object.keys(plugin.userConfig).sort()).toEqual(['brave_api_key', 'search_mode', 'tavily_api_key'])
+  it('declares exactly the two documented options', () => {
+    // No search_mode option: its substituted default would pin SEARCHHOLE_MODE and make
+    // /search-hole:mode a no-op (review 2026-10-31). The mode lives in settings.yaml.
+    expect(Object.keys(plugin.userConfig).sort()).toEqual(['brave_api_key', 'tavily_api_key'])
   })
 
   it('keeps both API keys optional and sensitive, with signup hints', () => {
@@ -94,13 +96,6 @@ describe('plugin.json', () => {
     expect(tavily.toLowerCase()).toContain('no credit card')
     expect(tavily).toContain('https://app.tavily.com')
     expect(plugin.userConfig.brave_api_key?.description).toContain('https://brave.com/search/api/')
-  })
-
-  it('defaults search_mode to auto and offers the three ADR-0018 modes', () => {
-    const mode = plugin.userConfig.search_mode
-    expect(mode).toMatchObject({ type: 'string', default: 'auto', options: ['auto', 'builtin', 'engines'] })
-    expect(mode?.sensitive).toBeUndefined()
-    for (const m of ['auto', 'builtin', 'engines']) expect(mode?.description).toContain(m)
   })
 })
 
@@ -123,7 +118,6 @@ describe('.mcp.json', () => {
     expect(mcp.mcpServers['search-hole']?.env).toEqual({
       SEARCHHOLE_BRAVE_API_KEY: '${user_config.brave_api_key}',
       SEARCHHOLE_TAVILY_API_KEY: '${user_config.tavily_api_key}',
-      SEARCHHOLE_MODE: '${user_config.search_mode}',
     })
   })
 

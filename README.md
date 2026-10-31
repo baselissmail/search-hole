@@ -37,7 +37,7 @@ After a rebuild, run the script again and restart Claude Code.
 
 ## Search modes
 
-The default is `auto`. Change it with `/search-hole:mode auto|builtin|engines` or the plugin's `search_mode` setting.
+The default is `auto`. Change it with `/search-hole:mode auto|builtin|engines` (or `searchhole mode …`); a running session picks the change up on its next search. The `SEARCHHOLE_MODE` environment variable overrides the setting.
 
 | Mode | What happens |
 |---|---|

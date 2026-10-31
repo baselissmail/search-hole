@@ -5,7 +5,7 @@
  * context reads `settings.yaml` and checks a few paths; it creates nothing.
  */
 import { randomBytes } from 'node:crypto'
-import { existsSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { parse as parseYaml } from 'yaml'
 import { z } from 'zod'
@@ -55,10 +55,24 @@ export interface SettingsState {
   fileMode?: SearchMode
   /** One line per settings warning, unknown `hosts.*` keys excluded (they are read here). */
   warnings: string[]
+  /** The file's identity when it was read (see `settingsStamp`). */
+  stamp: string
+}
+
+/** Changes when settings.yaml is written, renamed over or removed (cheap: one `stat`). */
+export function settingsStamp(file: string): string {
+  try {
+    const s = statSync(file)
+    return `${s.ino}:${s.mtimeMs}:${s.size}`
+  } catch {
+    return 'missing'
+  }
 }
 
 /** Loads settings.yaml; an invalid file falls back to the defaults and is reported by `doctor`. */
 export function loadSettingsState(file: string, env: AppOptions['env']): SettingsState {
+  // Taken before reading, so a write that races the read is seen as a change next time.
+  const stamp = settingsStamp(file)
   let text: string | undefined
   try {
     text = readTextIfExists(file)
@@ -70,6 +84,7 @@ export function loadSettingsState(file: string, env: AppOptions['env']): Setting
         cause,
       }),
       warnings: [],
+      stamp,
     }
   }
   try {
@@ -77,7 +92,7 @@ export function loadSettingsState(file: string, env: AppOptions['env']): Setting
     const warnings = loaded.warnings
       .filter((w) => !(w.kind === 'unknown_key' && (w.path === 'hosts' || w.path.startsWith('hosts.'))))
       .map(describeSettingsWarning)
-    const state: SettingsState = { settings: loaded.settings, loaded, warnings }
+    const state: SettingsState = { settings: loaded.settings, loaded, warnings, stamp }
     const mode = hostModeFromText(text)
     if (mode !== undefined) state.fileMode = mode
     return state
@@ -85,7 +100,7 @@ export function loadSettingsState(file: string, env: AppOptions['env']): Setting
     const error = isSearchHoleError(e)
       ? e
       : new SearchHoleError('config_invalid', 'settings.yaml could not be loaded.', { cause: e })
-    return { settings: DEFAULT_SETTINGS, error, warnings: [] }
+    return { settings: DEFAULT_SETTINGS, error, warnings: [], stamp }
   }
 }
 

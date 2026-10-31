@@ -5,8 +5,7 @@
       "args": ["${CLAUDE_PLUGIN_ROOT}/dist/searchhole.mjs", "mcp", "--host", "claude-code"],
       "env": {
         "SEARCHHOLE_BRAVE_API_KEY": "${user_config.brave_api_key}",
-        "SEARCHHOLE_TAVILY_API_KEY": "${user_config.tavily_api_key}",
-        "SEARCHHOLE_MODE": "${user_config.search_mode}"
+        "SEARCHHOLE_TAVILY_API_KEY": "${user_config.tavily_api_key}"
       }
     }
   }

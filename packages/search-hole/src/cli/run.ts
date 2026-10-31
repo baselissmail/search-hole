@@ -229,7 +229,12 @@ async function runMode(cmd: Extract<Command, { name: 'mode' }>, io: CliIo, deps:
       return app.searchMode()
     })
     if (cmd.json) json(io, info)
-    else line(io, `${opts.style.green('✓')} Mode set. ${renderMode(info, opts)}`)
+    else if (info.configured !== mode) {
+      line(
+        io,
+        `${opts.style.yellow('⚠')} Saved ${mode} in settings.yaml, but SEARCHHOLE_MODE=${info.configured} in the environment overrides it. Unset it to use the saved mode.`,
+      )
+    } else line(io, `${opts.style.green('✓')} Mode set. ${renderMode(info, opts)}`)
     return 0
   }
   const info = await withApp(io, deps, (app) => app.searchMode())

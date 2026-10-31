@@ -6,6 +6,7 @@ import { SUMMARY_WITHHELD } from '../../src/gateway/builtin.ts'
 import { GUARD_DENY_REASON } from '../../src/gateway/guard.ts'
 import { LOOP_BREAK_NOTE, STEER_REASON } from '../../src/gateway/hook.ts'
 import { STALE_TURN_MS } from '../../src/gateway/session.ts'
+import { SearchHoleError } from '../../src/shared/errors.ts'
 import type { FakeAppOptions } from './fake-app.ts'
 import { type Connected, callHook, connect, ERAS, type Era, harness } from './helpers.ts'
 
@@ -157,6 +158,21 @@ describe.each(ERAS)('hook tool (%s era)', (era) => {
       await client.callTool({ name: 'search', arguments: { query: 'react compiler' } })
       expect(denyOf(await hook(pre('WebSearch', { query: 'react compiler' })))).toBe(STEER_REASON)
       expect(h.app()?.callsTo('searchMode').length).toBe(3)
+    })
+
+    test('a search that fails does not reset the breaker (engines down: no deny loop)', async () => {
+      const { client, hook } = await setup(era, {
+        mode: { configured: 'engines', effective: 'engines' },
+        search: () => {
+          throw new SearchHoleError('no_healthy_engine', 'No search engine answered.')
+        },
+      })
+      expect(denyOf(await hook(pre('WebSearch', { query: 'react compiler' })))).toBe(STEER_REASON)
+      const failed = await client.callTool({ name: 'search', arguments: { query: 'react compiler' } })
+      expect(failed.isError).toBe(true)
+      const retry = await hook(pre('WebSearch', { query: 'react compiler' }))
+      expect(denyOf(retry)).toBeUndefined()
+      expect(JSON.stringify(retry)).toContain(LOOP_BREAK_NOTE)
     })
 
     test('the deny-loop breaker is per agent type', async () => {

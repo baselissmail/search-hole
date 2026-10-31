@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { BUILTIN_BLOCKED_DOMAINS_CAP } from '../../src/app/index.ts'
@@ -156,6 +156,27 @@ describe('search mode (ADR-0018)', () => {
       inactiveReason: 'missing_key',
     })
     expect((await h.app.searchMode()).effective).toBe('engines')
+  })
+
+  it('engines works as engines until every configured engine has failed, then as filtered built-in', async () => {
+    const h = await setup({
+      settings: mockSettings(mock.endpoint('searxng', 'server_error'), mock.endpoint('tavily')),
+    })
+    await h.app.settings.setMode('engines')
+    expect(await h.app.searchMode()).toEqual({ configured: 'engines', effective: 'engines' })
+    await h.app.search({ query: 'react compiler', depth: 'quick' }, {}).catch(() => undefined)
+    expect(await h.app.searchMode()).toEqual({ configured: 'engines', effective: 'builtin' })
+  })
+
+  it('a running app picks up settings.yaml edits made by another process', async () => {
+    const h = await setup({ settings: 'version: 1\n' })
+    expect((await h.app.searchMode()).configured).toBe('auto')
+    const cli = await h.reopen({ host: 'cli' })
+    await cli.settings.setMode('builtin')
+    expect((await h.app.searchMode()).configured).toBe('builtin')
+    expect(h.app.checkQuery('192.168.1.1 router').action).toBe('block')
+    writeFileSync(join(h.home, 'settings.yaml'), 'version: 1\nqueryHygiene: { mode: "off" }\n')
+    expect(h.app.checkQuery('192.168.1.1 router').action).toBe('ok')
   })
 
   it('SEARCHHOLE_MODE overrides settings; setMode writes hosts.claude-code.mode keeping comments', async () => {

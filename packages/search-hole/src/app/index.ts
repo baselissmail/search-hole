@@ -15,7 +15,13 @@ import {
   recordBuiltinFetch,
   searchMode,
 } from './builtin.ts'
-import { type AppContext, configuredMode, createContext, loadSettingsState } from './context.ts'
+import {
+  type AppContext,
+  configuredMode,
+  createContext,
+  loadSettingsState,
+  settingsStamp,
+} from './context.ts'
 import { runDoctor } from './doctor.ts'
 import { Engines } from './engines.ts'
 import { lazyFetcher, runFetch } from './fetch.ts'
@@ -39,7 +45,7 @@ const HEARTBEAT_MS = 30_000
 /** Builds the app. Throws `config_invalid` only when no data folder can be resolved. */
 export const createApp: CreateApp = async (opts: AppOptions): Promise<App> => {
   const ctx: AppContext = createContext(opts)
-  let engines = new Engines(ctx)
+  const engines = new Engines(ctx)
   const rules = new RulesService(ctx)
   const receipts = new Receipts(ctx)
   const fetcher = lazyFetcher(ctx)
@@ -64,27 +70,35 @@ export const createApp: CreateApp = async (opts: AppOptions): Promise<App> => {
     }
   }
 
-  const builtinDeps = () => ({ ctx, engines, rules, receipts })
-  const freshnessDefaults = async () =>
-    rules.context(undefined, await ctx.store.read()).defaults.freshness ?? {}
   const reloadSettings = (): void => {
     ctx.settings = loadSettingsState(ctx.layout.settings, ctx.env)
-    const old = engines
-    engines = new Engines(ctx)
-    void old.close()
+    engines.reconfigure()
   }
+  /** A gateway lives for the whole session: pick up settings.yaml edits (CLI, skills, editor). */
+  const freshSettings = (): void => {
+    if (settingsStamp(ctx.layout.settings) !== ctx.settings.stamp) reloadSettings()
+  }
+
+  const builtinDeps = () => {
+    freshSettings()
+    return { ctx, engines, rules, receipts }
+  }
+  const freshnessDefaults = async () =>
+    rules.context(undefined, await ctx.store.read()).defaults.freshness ?? {}
 
   const app: App = {
     version: opts.version,
     host: opts.host,
 
     async search(args, rctx) {
+      freshSettings()
       const out = await runSearch({ ctx, engines, rules, receipts }, args, rctx)
       await heartbeat()
       return out
     },
 
     async fetch(args, rctx) {
+      freshSettings()
       const out = await runFetch({ ctx, rules, receipts, fetcher: fetcher.get }, args, rctx)
       await heartbeat()
       return out
@@ -104,6 +118,7 @@ export const createApp: CreateApp = async (opts: AppOptions): Promise<App> => {
     recordBuiltinFetch: (url, rctx) => recordBuiltinFetch(builtinDeps(), url, rctx),
 
     checkQuery(query) {
+      freshSettings()
       const h = ctx.settings.settings.queryHygiene
       const r = scanQuery(query, {
         mode: h.mode,
@@ -115,10 +130,12 @@ export const createApp: CreateApp = async (opts: AppOptions): Promise<App> => {
     },
 
     async engineStatus() {
+      freshSettings()
       return engines.status(await ctx.store.read())
     },
 
     async probeEngines(budgetMs) {
+      freshSettings()
       const store = await ctx.store.read()
       await engines.probe(budgetMs, store)
       return engines.status(store)
@@ -129,6 +146,7 @@ export const createApp: CreateApp = async (opts: AppOptions): Promise<App> => {
     },
 
     async closeTurn(rctx) {
+      freshSettings()
       return receipts.closeTurn(rctx, await ctx.store.read(), ctx.settings.settings.hooks.receiptLine)
     },
 
@@ -217,6 +235,7 @@ export const createApp: CreateApp = async (opts: AppOptions): Promise<App> => {
 
     settings: {
       async get() {
+        freshSettings()
         const s = JSON.parse(JSON.stringify(ctx.settings.settings)) as Record<string, unknown>
         return {
           ...s,
@@ -237,7 +256,10 @@ export const createApp: CreateApp = async (opts: AppOptions): Promise<App> => {
       },
     },
 
-    doctor: (o) => runDoctor({ ctx, engines, rules, searchMode: () => searchMode(builtinDeps()) }, o),
+    doctor(o) {
+      freshSettings()
+      return runDoctor({ ctx, engines, rules, searchMode: () => searchMode(builtinDeps()) }, o)
+    },
 
     async close() {
       await fetcher.close()

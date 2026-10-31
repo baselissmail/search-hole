@@ -32,16 +32,21 @@ export interface BuiltinDeps {
   receipts: Receipts
 }
 
-/** ADR-0018: `engines` only when configured so, or `auto` with at least one healthy engine. */
+/**
+ * ADR-0018: `auto` works as engines while one engine is healthy; `engines` does until every
+ * configured engine has failed (unknown counts as usable), then falls back to filtered built-in.
+ */
 export async function searchMode(
   d: BuiltinDeps,
 ): Promise<{ configured: SearchMode; effective: 'engines' | 'builtin' }> {
   const configured = configuredMode(d.ctx)
-  if (configured !== 'auto') return { configured, effective: configured }
+  if (configured === 'builtin') return { configured, effective: 'builtin' }
   const store = await d.ctx.store.read()
   const resolved = await d.engines.resolveAll(store)
   for (const r of resolved) {
-    if (r.configured && (await d.engines.state(r, store)) === 'healthy')
+    if (!r.configured) continue
+    const state = await d.engines.state(r, store)
+    if (state === 'healthy' || (configured === 'engines' && state === 'unknown'))
       return { configured, effective: 'engines' }
   }
   return { configured, effective: 'builtin' }

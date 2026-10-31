@@ -101,7 +101,6 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
       _meta: { 'anthropic/alwaysLoad': true },
     },
     async (args, ctx) => {
-      deps.sessions.noteSearchCall()
       try {
         const rctx = ctxOf(ctx)
         const app = await deps.getApp()
@@ -114,6 +113,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         if (args.limit !== undefined) search.limit = Math.min(args.limit, LIMIT_MAX[args.depth ?? 'deep'])
         if (args.receiptId !== undefined) search.receiptId = args.receiptId
         const outcome = await app.search(search, rctx)
+        deps.sessions.noteSearchCall()
         return {
           content: text(renderSearchText(outcome).text),
           ...(structured ? { structuredContent: searchStructured(outcome) } : {}),

@@ -53,7 +53,7 @@ export const PLUGIN_TOOL_PREFIX = 'mcp__plugin_search-hole_search-hole__'
 export const STEER_REASON = `search-hole is active: use ${PLUGIN_TOOL_PREFIX}search (and ${PLUGIN_TOOL_PREFIX}fetch for pages) instead of WebSearch; site: operators work. It applies the user's source rules.`
 
 /** Context added when the deny-loop breaker lets WebSearch through. */
-export const LOOP_BREAK_NOTE = `search-hole: built-in WebSearch allowed because ${PLUGIN_TOOL_PREFIX}search was not used after the last denial; results are still filtered by the user's rules.`
+export const LOOP_BREAK_NOTE = `search-hole: built-in WebSearch allowed because ${PLUGIN_TOOL_PREFIX}search was not used, or failed, after the last denial; results are still filtered by the user's rules.`
 
 /** Longest Stop `systemMessage` we send (Claude Code caps hook strings at 10,000 characters). */
 const MAX_SYSTEM_MESSAGE_CHARS = 1_000

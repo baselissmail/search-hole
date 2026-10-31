@@ -56,7 +56,7 @@ export class GatewaySessions {
   hookKey: string | undefined
   turn: OpenTurn | undefined
   lastStopAt: number | undefined
-  /** `search` tool calls served by this process (deny-loop breaker). */
+  /** `search` tool calls that returned results here (deny-loop breaker; failures don't count). */
   searchCalls = 0
 
   private readonly host: string
@@ -159,7 +159,7 @@ export class GatewaySessions {
     return true
   }
 
-  /** Counts a `search` tool call (it resets the deny-loop breaker). */
+  /** Counts a `search` call that returned (it resets the deny-loop breaker). */
   noteSearchCall(): void {
     this.searchCalls++
   }
@@ -176,7 +176,7 @@ export class GatewaySessions {
     }
   }
 
-  /** True when the last WebSearch here was denied and no `search` call has happened since. */
+  /** True when the last WebSearch here was denied and no `search` has succeeded since. */
   denyLoopBroken(sessionId: string, agentType: string): boolean {
     const at = this.denies.get(denyKey(sessionId, agentType))
     return at !== undefined && at === this.searchCalls

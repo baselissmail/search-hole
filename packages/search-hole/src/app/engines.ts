@@ -161,9 +161,12 @@ export function healthFromRow(row: {
   }
 }
 
+/** Longest engine timeout (settings allow 120 s), so a replaced transport outlives its requests. */
+const TRANSPORT_DRAIN_MS = 125_000
+
 /** Engine plumbing shared by every request of one App. */
 export class Engines {
-  readonly slots: readonly EngineSlot[]
+  slots: readonly EngineSlot[]
   private transportInstance: EngineTransport | null = null
   private readonly keyCache: KeyCache
   private stores: { write: SecretStore; read: readonly SecretStore[] } | null = null
@@ -176,7 +179,18 @@ export class Engines {
     this.slots = this.buildSlots()
   }
 
-  /** Rebuilds the slots after a settings change. */
+  /**
+   * Applies changed settings: new slots, while health and cached keys carry over. The old
+   * transport may still serve a search in flight, so it closes once any request has timed out.
+   */
+  reconfigure(): void {
+    this.slots = this.buildSlots()
+    const old = this.transportInstance
+    this.transportInstance = null
+    if (old) setTimeout(() => void old.close().catch(() => undefined), TRANSPORT_DRAIN_MS).unref()
+  }
+
+  /** Builds the slots from the current settings. */
   private buildSlots(): EngineSlot[] {
     const adapters = createP1Adapters({ now: this.ctx.now })
     const settings = this.ctx.settings.settings
