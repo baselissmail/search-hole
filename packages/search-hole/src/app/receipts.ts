@@ -28,12 +28,14 @@ import {
   type SourceType,
   type Warning,
 } from '../shared/types.ts'
-import type { Store, StoredDate } from '../store/index.ts'
+import type { SessionWrite, Store, StoredDate } from '../store/index.ts'
 import type { AppContext } from './context.ts'
 import type { Receipt, ReceiptSearchLine, ReceiptSource, RequestCtx } from './types.ts'
 
 /** `_meta`- and env-keyed sessions close their receipt after this much inactivity (ADR-0005). */
 export const RECEIPT_IDLE_MS = 10 * 60_000
+/** Another gateway opening the same hook session's turn this recently is a duplicate copy. */
+export const DUPLICATE_TURN_WINDOW_MS = 10_000
 const MAX_RECEIPTS = 500
 const MAX_URLS = 4000
 const RECEIPT_ID = /^rcpt_[A-Za-z0-9_-]{22}$/
@@ -64,6 +66,11 @@ interface MemSession {
   lastReceiptId?: string
   /** The receipt the last Stop closed, until the next prompt opens a new turn. */
   lastStopReceiptId?: string
+  /**
+   * Set for this turn when another search-hole copy opened it first (ADR-0006 point 11):
+   * that copy logs the hooks' work and prints the Stop line; this one stays quiet.
+   */
+  duplicateOf?: string
   lastActivity: number
 }
 
@@ -219,25 +226,36 @@ export class Receipts {
     return s
   }
 
+  private sessionWrite(s: MemSession, rctx: RequestCtx): SessionWrite {
+    return {
+      id: s.key,
+      hostProfile: this.ctx.host,
+      ...(s.source === 'fallback' ? {} : { hostKey: s.key }),
+      keySource: s.source,
+      ...(rctx.client?.name ? { clientName: rctx.client.name } : {}),
+      ...(rctx.client?.version ? { clientVersion: rctx.client.version } : {}),
+      ...(rctx.protocolEra ? { protocolEra: rctx.protocolEra } : {}),
+      ...(rctx.projectDir ? { projectDir: rctx.projectDir } : {}),
+      gatewayId: this.ctx.gatewayId,
+      ...(s.openReceiptId ? { openReceiptId: s.openReceiptId } : {}),
+      turnOpen: s.turnOpen,
+    }
+  }
+
   private persistSession(s: MemSession, rctx: RequestCtx, store: Store | null): void {
-    if (!store) return
+    // A duplicate copy never overwrites the session row of the copy that owns the turn.
+    if (!store || s.duplicateOf !== undefined) return
     try {
-      store.sessions.upsert({
-        id: s.key,
-        hostProfile: this.ctx.host,
-        ...(s.source === 'fallback' ? {} : { hostKey: s.key }),
-        keySource: s.source,
-        ...(rctx.client?.name ? { clientName: rctx.client.name } : {}),
-        ...(rctx.client?.version ? { clientVersion: rctx.client.version } : {}),
-        ...(rctx.protocolEra ? { protocolEra: rctx.protocolEra } : {}),
-        ...(rctx.projectDir ? { projectDir: rctx.projectDir } : {}),
-        gatewayId: this.ctx.gatewayId,
-        ...(s.openReceiptId ? { openReceiptId: s.openReceiptId } : {}),
-        turnOpen: s.turnOpen,
-      })
+      store.sessions.upsert(this.sessionWrite(s, rctx))
     } catch (e) {
       this.ctx.logger.warn({ err: e }, 'could not store the session')
     }
+  }
+
+  /** True while another search-hole copy owns this hook session's turn (see `duplicateOf`). */
+  isDuplicate(rctx: RequestCtx): boolean {
+    const key = rctx.session?.key
+    return key !== undefined && this.sessions.get(key)?.duplicateOf !== undefined
   }
 
   /** True when this receipt exists here or in the store. */
@@ -386,7 +404,27 @@ export class Receipts {
     s.lastReceiptId = id
     s.turnOpen = true
     delete s.lastStopReceiptId
+    delete s.duplicateOf
     s.lastActivity = this.ctx.now()
+    if (sess.source === 'hook' && store) {
+      let claim: ReturnType<Store['sessions']['claimTurn']>
+      try {
+        claim = store.sessions.claimTurn(
+          { ...this.sessionWrite(s, rctx), gatewayId: this.ctx.gatewayId, openReceiptId: id },
+          DUPLICATE_TURN_WINDOW_MS,
+        )
+      } catch (e) {
+        this.ctx.logger.warn({ err: e }, 'could not store the session')
+      }
+      if (claim?.kind === 'duplicate') {
+        s.duplicateOf = claim.of
+        this.ctx.logger.warn(
+          { duplicateOf: claim.of },
+          'another search-hole copy serves this session; this one stays quiet for the turn',
+        )
+      }
+      if (claim !== undefined) return { receiptId: id }
+    }
     this.persistSession(s, rctx, store)
     return { receiptId: id }
   }
@@ -419,7 +457,7 @@ export class Receipts {
     s.lastActivity = this.ctx.now()
     this.persistSession(s, rctx, store)
     const c = this.counts(id, store)
-    if (c.searches === 0 || !lineEnabled) return { receiptId: id }
+    if (s.duplicateOf !== undefined || c.searches === 0 || !lineEnabled) return { receiptId: id }
     return { receiptId: id, receiptLine: turnLine(id, c) }
   }
 

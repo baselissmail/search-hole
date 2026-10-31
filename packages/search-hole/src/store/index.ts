@@ -60,6 +60,8 @@ import {
 } from './queries/rules.ts'
 import { getSearch, listResults, listSearchesAfter, maxSearchId, writePlan } from './queries/searches.ts'
 import {
+  claimTurn,
+  countDuplicateReceipts,
   ensureReceipt,
   getReceipt,
   getSession,
@@ -572,10 +574,15 @@ export async function openStore(opts: OpenStoreOptions): Promise<Store> {
     sessions: {
       upsert: (w) => softWrite((d) => upsertSession(d, w, now())).ok,
       get: (id) => read((d) => getSession(d, id), undefined),
+      claimTurn: (w, windowMs) => {
+        const r = softWrite((d) => claimTurn(d, w, windowMs, now()))
+        return r.ok ? r.value : undefined
+      },
     },
 
     receipts: {
       ensure: (id, sessionId) => softWrite((d) => ensureReceipt(d, id, sessionId ?? null, now())).ok,
+      duplicatesSince: (since) => read((d) => countDuplicateReceipts(d, since), 0),
       get: (id) => read((d) => getReceipt(d, id), undefined),
       close: (id) => {
         const r = softWrite((d) => setReceiptClosed(d, id, now(), now()))

@@ -688,10 +688,21 @@ export interface SearchLogApi {
 export interface SessionsApi {
   upsert(w: SessionWrite): boolean
   get(id: string): SessionRow | undefined
+  /**
+   * Opens a turn with receipt `w.openReceiptId`, or reports that another gateway opened this
+   * session's turn within `windowMs` (two copies serving one session, ADR-0006 point 11).
+   * Undefined when the write was skipped (busy, read-only).
+   */
+  claimTurn(
+    w: SessionWrite & { gatewayId: string; openReceiptId: string },
+    windowMs: number,
+  ): { kind: 'claimed' } | { kind: 'duplicate'; of: string } | undefined
 }
 
 export interface ReceiptsApi {
   ensure(id: string, sessionId?: string): boolean
+  /** Receipts marked `duplicate_of` created since `since` (epoch ms). */
+  duplicatesSince(since: number): number
   get(id: string): ReceiptRow | undefined
   close(id: string): boolean
   reopen(id: string): boolean

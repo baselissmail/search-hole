@@ -67,6 +67,9 @@ function engineCheck(s: EngineStatus): DoctorCheck {
 }
 
 /** Runs every check. `probe` first probes engines whose health is unknown. */
+/** How far back doctor looks for duplicate-copy turns. */
+const DUPLICATE_LOOKBACK_MS = 7 * 24 * 60 * 60_000
+
 export async function runDoctor(d: DoctorDeps, opts: { probe?: boolean } = {}): Promise<DoctorReport> {
   const { ctx } = d
   const checks: DoctorCheck[] = [nodeCheck()]
@@ -126,6 +129,17 @@ export async function runDoctor(d: DoctorDeps, opts: { probe?: boolean } = {}): 
       checks.push({ id: 'store', status: 'info', title: 'The database will be upgraded on the next search' })
     } else {
       checks.push({ id: 'store', status: 'warn', title: `Search history is ${st.mode}`, detail: st.message })
+    }
+    // ADR-0006 point 10/11: two installed copies answering one Claude Code session.
+    const duplicates = store.receipts.duplicatesSince(ctx.now() - DUPLICATE_LOOKBACK_MS)
+    if (duplicates > 0) {
+      checks.push({
+        id: 'duplicates',
+        status: 'warn',
+        title: 'Two copies of search-hole answered the same Claude Code session',
+        detail: `${duplicates} turn${duplicates === 1 ? '' : 's'} in the last 7 days; one copy stayed quiet each time.`,
+        fix: 'Keep one copy: look for a second search-hole in `claude plugin list` and a manual one in `claude mcp list`, and remove the extra.',
+      })
     }
   }
 

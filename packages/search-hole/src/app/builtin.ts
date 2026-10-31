@@ -160,7 +160,10 @@ export async function filterBuiltinResults(
       ...(rule === undefined ? {} : { rule }),
     }
   })
-  if (store) {
+  // A duplicate copy filters too (Claude Code may use either copy's output) but logs nothing:
+  // the copy that owns the turn logs this search once (ADR-0006 point 11).
+  const duplicate = d.receipts.isDuplicate(rctx)
+  if (store && !duplicate) {
     try {
       store.recordBuiltinSearch({
         receiptId,
@@ -178,15 +181,17 @@ export async function filterBuiltinResults(
   }
   const byReason: Partial<Record<HiddenReason, number>> = {}
   for (const h of hiddenOut) byReason[h.reason] = (byReason[h.reason] ?? 0) + 1
-  d.receipts.noteSearch(receiptId, {
-    query: queryRedacted,
-    at: new Date(now).toISOString(),
-    mode: 'builtin',
-    engines: [],
-    kept: ordered.length,
-    hidden: hiddenOut.length,
-    hiddenByReason: byReason,
-  })
+  if (!duplicate) {
+    d.receipts.noteSearch(receiptId, {
+      query: queryRedacted,
+      at: new Date(now).toISOString(),
+      mode: 'builtin',
+      engines: [],
+      kept: ordered.length,
+      hidden: hiddenOut.length,
+      hiddenByReason: byReason,
+    })
+  }
   return {
     receiptId,
     kept: ordered.map((x) => x.result),
@@ -232,6 +237,7 @@ export async function checkUrl(
 
 /** Records a page Claude Code's WebFetch opened, for the receipt. */
 export async function recordBuiltinFetch(d: BuiltinDeps, url: string, rctx: RequestCtx): Promise<void> {
+  if (d.receipts.isDuplicate(rctx)) return // the copy that owns the turn records it
   const store = await d.ctx.store.write()
   const { receiptId } = d.receipts.assign(rctx, undefined, store)
   const normalized = normalizeOriginal(url) ?? url

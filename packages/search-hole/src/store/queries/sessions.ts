@@ -82,6 +82,57 @@ export function getSession(db: Db, id: string): SessionRow | undefined {
   }
 }
 
+/**
+ * Opens a turn for a session, unless another gateway opened this session's turn within
+ * `windowMs`: then two copies of search-hole serve one host session (ADR-0006 point 11), and
+ * this receipt is recorded as `duplicate_of` that turn while the session row stays the
+ * other gateway's. Run inside one write transaction, so two racing gateways can't both win.
+ */
+export function claimTurn(
+  db: Db,
+  w: SessionWrite & { gatewayId: string; openReceiptId: string },
+  windowMs: number,
+  now: number,
+): { kind: 'claimed' } | { kind: 'duplicate'; of: string } {
+  const raw = db
+    .prepare(
+      `SELECT s.gateway_id, s.open_receipt_id, s.turn_open, r.created_at
+         FROM sessions s LEFT JOIN receipts r ON r.id = s.open_receipt_id
+        WHERE s.id = ?`,
+    )
+    .get([w.id])
+  const row =
+    raw === undefined
+      ? undefined
+      : z
+          .object({
+            gateway_id: z.string().nullable(),
+            open_receipt_id: z.string().nullable(),
+            turn_open: z.number().int(),
+            created_at: z.number().nullable(),
+          })
+          .parse(raw)
+  ensureReceipt(db, w.openReceiptId, w.id, now)
+  if (
+    row !== undefined &&
+    row.gateway_id !== null &&
+    row.gateway_id !== w.gatewayId &&
+    row.turn_open !== 0 &&
+    row.open_receipt_id !== null &&
+    row.open_receipt_id !== w.openReceiptId &&
+    row.created_at !== null &&
+    now - row.created_at <= windowMs
+  ) {
+    db.prepare('UPDATE receipts SET duplicate_of = $of WHERE id = $id').run({
+      of: row.open_receipt_id,
+      id: w.openReceiptId,
+    })
+    return { kind: 'duplicate', of: row.open_receipt_id }
+  }
+  upsertSession(db, { ...w, turnOpen: true }, now)
+  return { kind: 'claimed' }
+}
+
 // ── Receipts ─────────────────────────────────────────────────────────────
 
 const receiptRow = z.object({
@@ -133,6 +184,14 @@ export function setReceiptClosed(db: Db, id: string, closedAt: number | null, no
       .prepare('UPDATE receipts SET closed_at = $closedAt, updated_at = $now WHERE id = $id')
       .run({ id, closedAt, now }).changes > 0
   )
+}
+
+/** Receipts marked `duplicate_of` created since `since` (doctor: duplicate copies). */
+export function countDuplicateReceipts(db: Db, since: number): number {
+  const raw = db
+    .prepare('SELECT COUNT(*) AS n FROM receipts WHERE duplicate_of IS NOT NULL AND created_at >= ?')
+    .get([since])
+  return z.object({ n: z.number().int() }).parse(raw).n
 }
 
 /** The most recently created receipt of a session. */

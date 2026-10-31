@@ -129,3 +129,13 @@ Our answers to each problem are in the Decision below.
 - **Migration race test:** 50 processes start at once on an old DB. Exactly one migrates, all end up serving, and nobody sees a half-applied schema.
 - **Two-version test:** v(n) and v(n+1) run against one DB with an additive migration and then a writer-breaking one. Assert that the old version is read-write and then read-only, as specified. This is the "two gateway versions sharing one DB" mock scenario from §12.3.
 - **Lease test:** kill -9 the owner mid-refresh, then check that a takeover happens after 30 s and the last good list stays in force.
+
+## Amendment (2026-10-31, v0.1.1): how the duplicate-copy guard works (point 11)
+
+Two copies serving one Claude Code session usually means two installed plugins (user and project scope, or a local marketplace plus a published one). Both get every hook, so without a guard each Stop line prints twice and each built-in search is logged twice.
+
+- **Detection is by timing, not liveness.** Gateways heartbeat only on `search`/`fetch`, so a hooks-only gateway may have no fresh `gateways` row. Instead, `sessions.claimTurn` runs in one `BEGIN IMMEDIATE`. It checks whether another gateway opened this session's turn under 10 s ago, with the turn still open. If so, this gateway's new receipt is marked `duplicate_of` that turn and the session row is left alone. Otherwise it claims the turn. A closed turn never makes a copy quiet, so a plugin reload between prompts is safe. The winner is decided per turn, so it can alternate.
+- **The quiet copy** still filters built-in results, because Claude Code may use either copy's output. It doesn't log hook-driven searches or WebFetch pages, doesn't write the session row, and prints no Stop line. Calls the model makes to its own tools are real and are logged under its receipt.
+- **`doctor`** warns when duplicate turns happened in the last 7 days, and says where to look (`claude plugin list`, `claude mcp list`).
+- **Limitation:** turn hooks never create the database. The very first turn of a fresh install, before any search, can't be claimed, so both copies act as primary for that one turn.
+
