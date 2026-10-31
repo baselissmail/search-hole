@@ -40,6 +40,8 @@ export interface IoOptions {
   hiddenAnswer?: string
   confirmAnswer?: boolean
   signal?: AbortSignal
+  /** argv[1] as main.ts would pass it. */
+  entry?: string
 }
 
 export interface FakeIo extends CliIo {
@@ -70,6 +72,7 @@ export function makeIo(opts: IoOptions = {}): FakeIo {
     stdinIsTTY: opts.tty ?? false,
     env: opts.env ?? {},
     cwd: opts.cwd ?? '/work/project',
+    ...(opts.entry === undefined ? {} : { entry: opts.entry }),
     ...(opts.signal === undefined ? {} : { signal: opts.signal }),
     readStdin: async () => {
       io.stdinReads++

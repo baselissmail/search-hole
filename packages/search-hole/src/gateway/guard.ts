@@ -44,6 +44,7 @@ export const RULE_CHANGING_VERBS: ReadonlySet<string> = new Set([
   'approve',
   'reject',
   'uninstall',
+  'setup',
 ])
 
 /** `suggestions <sub>` sub-verbs that change state (listing stays allowed). */

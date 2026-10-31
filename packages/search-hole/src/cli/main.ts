@@ -13,6 +13,10 @@ import { createNodeIo } from './io.ts'
 import { runCli } from './run.ts'
 
 const argv = process.argv.slice(2)
-const outcome = await runCli(argv, createNodeIo({ gateway: argv[0] === 'mcp' }))
+const entry = process.argv[1]
+const outcome = await runCli(
+  argv,
+  createNodeIo({ gateway: argv[0] === 'mcp', ...(entry === undefined ? {} : { entry }) }),
+)
 process.exitCode = outcome.code
 if (!outcome.keepAlive) setTimeout(() => process.exit(outcome.code), 1500).unref()

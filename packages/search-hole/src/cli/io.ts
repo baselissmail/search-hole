@@ -22,6 +22,8 @@ export interface CliIo {
   readonly cwd: string
   /** Aborts on Ctrl-C so a running search can stop. */
   readonly signal?: AbortSignal
+  /** The running script (argv[1]); `setup` writes it into client configs. */
+  readonly entry?: string
   /** Everything piped on stdin. Never call on a TTY. */
   readStdin(): Promise<string>
   /** Prompts on stderr and reads one line with echo off. TTY only. */
@@ -225,7 +227,7 @@ const INTERRUPT_GRACE_MS = 1000
  * (`searchhole log | head`) ends quietly instead of crashing. With `gateway` (the `mcp`
  * command) none of this is installed: the gateway owns signals and the stdio streams.
  */
-export function createNodeIo(opts: { gateway?: boolean } = {}): CliIo {
+export function createNodeIo(opts: { gateway?: boolean; entry?: string } = {}): CliIo {
   const controller = new AbortController()
   if (opts.gateway !== true) {
     process.on('SIGINT', () => {
@@ -253,6 +255,7 @@ export function createNodeIo(opts: { gateway?: boolean } = {}): CliIo {
     stdinIsTTY: process.stdin.isTTY === true,
     env: process.env,
     cwd: process.cwd(),
+    ...(opts.entry === undefined ? {} : { entry: opts.entry }),
     signal: controller.signal,
     readStdin: () => readAllText(process.stdin),
     promptHidden: (prompt) =>

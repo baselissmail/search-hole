@@ -70,6 +70,8 @@ export interface CliDeps {
   searxng?: Partial<Omit<SearxngDeps, 'say' | 'confirmPull'>>
   /** IANA zone for times in output (default: local). */
   timeZone?: string
+  /** The user's home folder (default `os.homedir()`); tests point it at a temp dir. */
+  homedir?: () => string
   now?: () => number
 }
 
@@ -120,6 +122,53 @@ async function withApp<T>(io: CliIo, deps: CliDeps, fn: (app: App) => Promise<T>
 
 // ── Commands ─────────────────────────────────────────────────────────────
 
+/** `searchhole setup <client>` (P7): preview, confirm, then merge search-hole into the app's MCP config. */
+async function runSetupCommand(
+  cmd: Extract<Command, { name: 'setup' }>,
+  io: CliIo,
+  deps: CliDeps,
+): Promise<number> {
+  const setup = await import('./setup.ts')
+  const { homedir } = await import('node:os')
+  const home = (deps.homedir ?? homedir)()
+  const base = {
+    client: cmd.client,
+    scope: cmd.project ? ('project' as const) : ('user' as const),
+    bundlePath: setup.resolveBundlePath(io.entry),
+    home,
+    cwd: io.cwd,
+    platform: process.platform,
+    env: io.env,
+    passEnv: cmd.env,
+  }
+  const preview = setup.setupClient({ ...base, dryRun: true })
+  const style = renderOpts(io, deps).style
+  for (const w of preview.warnings) io.stderr.write(`${style.yellow(`⚠ ${w}`)}\n`)
+  const done = (r: typeof preview): number => {
+    if (cmd.json) json(io, r)
+    else if (r.file === null) line(io, r.after)
+    else for (const l of r.instructions) line(io, l)
+    return 0
+  }
+  if (cmd.dryRun || !preview.changed || preview.file === null) return done(preview)
+  if (!cmd.yes) {
+    if (!io.stdinIsTTY) {
+      throw new SearchHoleError(
+        'invalid_argument',
+        `This writes ${preview.file} and was run without a terminal.`,
+        {
+          fix: 'Run it yourself in a terminal, add --dry-run to see the change, or pass --yes.',
+        },
+      )
+    }
+    if (!(await io.confirm(`Write ${preview.file}? (a backup is kept)`, true))) {
+      line(io, 'Nothing written.')
+      return 0
+    }
+  }
+  return done(setup.setupClient({ ...base, dryRun: false }))
+}
+
 /** `searchhole uninstall [--purge]` (ADR-0006 point 13). */
 async function runUninstallCommand(
   cmd: Extract<Command, { name: 'uninstall' }>,
@@ -130,7 +179,7 @@ async function runUninstallCommand(
   const { existsSync } = await import('node:fs')
   const { homedir } = await import('node:os')
   const { resolveRoots, rootLayout } = await import('../shared/paths.ts')
-  const home = homedir()
+  const home = (deps.homedir ?? homedir)()
   const roots = resolveRoots({ env: io.env, platform: process.platform, homedir: home, exists: existsSync })
   const plan = planUninstall({ roots, home })
   const style = renderOpts(io, deps).style
@@ -759,6 +808,8 @@ async function execute(
       return runUi(cmd, io, deps)
     case 'uninstall':
       return runUninstallCommand(cmd, io, deps)
+    case 'setup':
+      return runSetupCommand(cmd, io, deps)
     case 'mcp':
       // stdout belongs to the MCP protocol from here on; the CLI prints nothing to it.
       {

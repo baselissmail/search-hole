@@ -9,6 +9,7 @@ import type { HostProfile, ListFormat, ListKind, ListMode, SearchMode } from '..
 import { parseDuration, ttlToUntil, untilToMs } from '../core/rules/time.ts'
 import { SearchHoleError } from '../shared/errors.ts'
 import { type Depth, ENGINE_ID_LIST, type EngineId, type RuleAction } from '../shared/types.ts'
+import { isSetupClient, SETUP_CLIENT_IDS, type SetupClient } from './setup.ts'
 
 export type ScopeFlag = 'global' | 'project' | 'session'
 export type SearxngSub = 'up' | 'down' | 'status' | 'apply'
@@ -87,6 +88,15 @@ export type Command =
   | { name: 'mcp'; host: HostProfile }
   | { name: 'ui'; port?: number; open: boolean; detach: boolean; stay: boolean }
   | { name: 'uninstall'; purge: boolean; yes: boolean; json: boolean }
+  | {
+      name: 'setup'
+      client: SetupClient
+      project: boolean
+      env: string[]
+      dryRun: boolean
+      yes: boolean
+      json: boolean
+    }
 
 /** Every command word, in help order. */
 export const COMMAND_NAMES = [
@@ -110,6 +120,7 @@ export const COMMAND_NAMES = [
   'keys',
   'doctor',
   'searxng',
+  'setup',
   'ui',
   'uninstall',
   'mcp',
@@ -768,6 +779,38 @@ function parseUi(args: readonly string[]): Command {
   }
 }
 
+function parseSetup(args: readonly string[]): Command {
+  const { values, positionals } = guard('setup', () =>
+    parseArgs({
+      args: [...args],
+      allowPositionals: true,
+      options: {
+        ...HELP_OPTION,
+        project: { type: 'boolean' },
+        env: { type: 'string', multiple: true },
+        'dry-run': { type: 'boolean' },
+        yes: { type: 'boolean', short: 'y' },
+        json: { type: 'boolean' },
+      },
+    }),
+  )
+  if (values.help === true) return { name: 'help', topic: 'setup' }
+  noExtra('setup', positionals, 1)
+  const client = positionals[0]
+  if (client === undefined || !isSetupClient(client)) {
+    throw usageError('setup', `Name the app to set up: ${SETUP_CLIENT_IDS.join(', ')}.`)
+  }
+  return {
+    name: 'setup',
+    client,
+    project: values.project === true,
+    env: [...(values.env ?? [])],
+    dryRun: values['dry-run'] === true,
+    yes: values.yes === true,
+    json: values.json === true,
+  }
+}
+
 function parseUninstall(args: readonly string[]): Command {
   const { values, positionals } = guard('uninstall', () =>
     parseArgs({
@@ -850,6 +893,8 @@ export function parseCommand(argv: readonly string[], now: number = Date.now()):
       return parseUi(rest)
     case 'uninstall':
       return parseUninstall(rest)
+    case 'setup':
+      return parseSetup(rest)
     case 'version':
       return parseVersion(rest)
     default: {
