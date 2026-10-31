@@ -18,7 +18,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsdown && node scripts/copy-dashboard.mjs",
+    "build": "tsdown && node scripts/copy-ui-assets.mjs",
     "dev": "node --experimental-strip-types src/cli/main.ts",
     "test": "vitest run",
     "test:watch": "vitest",

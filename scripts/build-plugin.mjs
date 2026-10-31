@@ -75,10 +75,12 @@ function pnpmBuild(dir, what) {
   )
 }
 
-/** Builds the dashboard (when present), then the package, which copies it into dist/ui (ADR-0020). */
+/** Builds the UI apps (when present), then the package, which copies them into dist/ (ADR-0020, ADR-0021). */
 function runBuild() {
-  const dashboard = join(REPO_ROOT, 'apps', 'dashboard')
-  if (existsSync(join(dashboard, 'package.json'))) pnpmBuild(dashboard, 'dashboard')
+  for (const app of ['dashboard', 'receipt-app']) {
+    const dir = join(REPO_ROOT, 'apps', app)
+    if (existsSync(join(dir, 'package.json'))) pnpmBuild(dir, app)
+  }
   pnpmBuild(PACKAGE_DIR, 'package')
 }
 

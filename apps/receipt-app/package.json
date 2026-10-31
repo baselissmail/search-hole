@@ -1,0 +1,29 @@
+{
+  "name": "@search-hole/receipt-app",
+  "version": "0.1.1",
+  "private": true,
+  "description": "The search-hole receipt panel: an MCP App (single HTML file) the gateway serves as ui://search-hole/\u2026/receipt.html.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/client": "2.4.0",
+    "@modelcontextprotocol/core": "2.4.0",
+    "@modelcontextprotocol/ext-apps": "2.0.3",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@playwright/test": "1.64.1",
+    "@types/node": "26.6.6",
+    "typescript": "7.0.2",
+    "vite": "8.3.4",
+    "vite-plugin-singlefile": "2.3.4",
+    "vitest": "5.0.5"
+  }
+}

@@ -56,9 +56,10 @@ describe.each(ERAS)('tools/list (%s era)', (era) => {
     const h = harness({ host: 'claude-desktop', env: {} })
     const { client } = track(await connect(h.gateway, era))
     const receipt = (await client.listTools()).tools.find((t) => t.name === 'receipt')
-    const uri = (receipt?._meta as { ui: { resourceUri: string } }).ui.resourceUri
+    const meta = (receipt?._meta ?? {}) as { ui?: { resourceUri?: string }; 'ui/resourceUri'?: string }
+    const uri = meta.ui?.resourceUri ?? ''
     expect(uri).toMatch(/^ui:\/\/search-hole\/v[\w.-]+\/receipt\.html$/)
-    expect((receipt?._meta as Record<string, unknown>)['ui/resourceUri']).toBe(uri)
+    expect(meta['ui/resourceUri']).toBe(uri)
     const read = await client.readResource({ uri })
     expect(read.contents[0]).toMatchObject({ uri, mimeType: 'text/html;profile=mcp-app' })
     expect(String((read.contents[0] as { text?: string }).text)).toContain('<html')

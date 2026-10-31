@@ -139,6 +139,15 @@ test('keyboard: move, expand, block a site with Undo, palette, shortcuts', async
   await expect(page.getByRole('dialog')).toHaveCount(0)
 })
 
+test('a theme chosen in the dashboard wins over the OS preference', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' })
+  await page.addInitScript(() => localStorage.setItem('search-hole.theme', 'dark'))
+  await signIn(page)
+  const color = await page.locator('body').evaluate((b) => getComputedStyle(b).backgroundColor)
+  const [r = 255] = (color.match(/\d+/g) ?? []).map(Number)
+  expect(r, `body background ${color}`).toBeLessThan(60)
+})
+
 test('a suggestion can be approved from the Rules page', async ({ page }) => {
   await signIn(page, '/rules')
   await page.getByRole('button', { name: /Approve the suggestion for w3schools\.com/ }).click()

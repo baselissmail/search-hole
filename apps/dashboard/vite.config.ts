@@ -72,6 +72,9 @@ export default defineConfig({
     emptyOutDir: true,
     // Never inline assets as data: URIs; the CSP only allows same-origin fonts and images.
     assetsInlineLimit: 0,
+    // Browsers with native light-dark(): older targets make Lightning CSS polyfill it from the
+    // OS preference, so a theme chosen in Settings would be ignored.
+    cssTarget: ['chrome123', 'edge123', 'firefox120', 'safari17.5'],
     modulePreload: { polyfill: false },
     sourcemap: false,
     // One bundle, served from localhost. The budget that matters is MASTER_PLAN §12.3:
