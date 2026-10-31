@@ -10,7 +10,7 @@ describe('bundled official-docs list', () => {
     const set = compileRuleSet({ lists: bundledLists() })
     expect(set.issues).toEqual([])
     expect(new Set(OFFICIAL_DOCS).size).toBe(OFFICIAL_DOCS.length)
-    expect(set.size.list).toBe(OFFICIAL_DOCS.length)
+    expect(set.size.list).toBe(bundledLists().reduce((n, l) => n + l.rules.length, 0))
   })
 
   it('never hides or reweights anything on its own', () => {

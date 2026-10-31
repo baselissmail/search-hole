@@ -1,0 +1,42 @@
+# search-hole vendored copy of the "arosh-github-translation" list (ADR-0016). Do not edit; re-fetch instead.
+# Source: https://raw.githubusercontent.com/arosh/ublacklist-github-translation/master/uBlacklist.txt
+# Pinned: https://raw.githubusercontent.com/arosh/ublacklist-github-translation/bd0bc03be08b308f81368ecbf3919b62c9b313d5/uBlacklist.txt
+# License: CC0-1.0
+# Fetched: 2026-10-31
+# SHA-256: c65dd193cb810062d4f296efd31cacf032b054cf8a80d6c3683f8b0d0c08ef81
+# ---- end of search-hole vendor header; upstream file follows unchanged ----
+*://lightrun.com/*
+*://giters.com/*
+*://www.giters.com/*
+*://githubmemory.com/*
+*://www.wenyanet.com/*
+*://codesti.com/*
+*://awesomeopensource.com/*
+*://www.findbestopensource.com/*
+*://githubhelp.com/*
+*://reposhub.com/*
+*://githubplus.com/*
+*://pythonrepo.com/*
+*://bestofcpp.com/*
+*://kandi.openweaver.com/*
+*://issueantenna.com/*
+*://gitanswer.net/*
+*://issuehint.com/*
+*://rustrepo.com/*
+*://githubrecord.com/*
+*://bleepcoder.com/*
+*://githubja.com/*
+*://www.gitmemory.com/*
+*://githubmate.com/*
+*://opensourcelibs.com/*
+*://golangrepo.com/*
+*://gitmemory.cn/*
+*://pythonissues.com/*
+*://openprojectrepo.com/*
+*://github.innominds.com/*
+*://githubhot.com/*
+*://curatedgo.com/*
+*://bestrustcrates.com/*
+*://gitanswer.com/*
+*://www.higithub.com/*
+*://githublab.com/*

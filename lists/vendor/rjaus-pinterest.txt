@@ -1,0 +1,70 @@
+# search-hole vendored copy of the "rjaus-pinterest" list (ADR-0016). Do not edit; re-fetch instead.
+# Source: https://raw.githubusercontent.com/rjaus/ublacklist-pinterest/main/ublacklist-pinterest.txt
+# Pinned: https://raw.githubusercontent.com/rjaus/ublacklist-pinterest/a8c47411f3c4640f0ea2c344853f390912538c3f/ublacklist-pinterest.txt
+# License: CC0-1.0
+# Fetched: 2026-10-31
+# SHA-256: 6eb10a6c5dea3276ab49c072b92d77cdab78698f0d89458f45d242228f34f557
+# ---- end of search-hole vendor header; upstream file follows unchanged ----
+---
+name: uBlacklist Pinterest basic list
+description: A uBlacklist blocklist to remove Pinterest from your search results.
+homepage: https://github.com/rjaus/ublacklist-pinterest
+---
+
+# Basic list
+
+## Main TLDs
+*://*.pinterest.at/*
+*://*.pinterest.co.at/*
+*://*.pinterest.com.au/*
+*://*.pinterest.be/*
+*://*.pinterest.com.bo/*
+*://*.pinterest.ca/*
+*://*.pinterest.co/*
+*://*.pinterest.com/*
+*://*.pinterest.ch/*
+*://*.pinterest.cl/*
+*://*.pinterest.de/*
+*://*.pinterest.dk/*
+*://*.pinterest.ec/*
+*://*.pinterest.com.ec/*
+*://*.pinterest.es/*
+*://*.pinterest.fr/*
+*://*.pinterest.hu/*
+*://*.pinterest.id/*
+*://*.pinterest.ie/*
+*://*.pinterest.in/*
+*://*.pinterest.co.in/*
+*://*.pinterest.info/*
+*://*.pinterest.it/*
+*://*.pinterest.jp/*
+*://*.pinterest.kr/*
+*://*.pinterest.co.kr/*
+*://*.pinterest.mx/*
+*://*.pinterest.com.mx/*
+*://*.pinterest.nl/*
+*://*.pinterest.nz/*
+*://*.pinterest.co.nz/*
+*://*.pinterest.pe/*
+*://*.pinterest.com.pe/*
+*://*.pinterest.ph/*
+*://*.pinterest.pt/*
+*://*.pinterest.com.py/*
+*://*.pinterest.ru/*
+*://*.pinterest.se/*
+*://*.pinterest.th/*
+*://*.pinterest.tw/*
+*://*.pinterest.uk/*
+*://*.pinterest.co.uk/*
+*://*.pinterest.com.uy/*
+*://*.pinterest.vn/*
+*://*.pinterest.com.vn/*
+
+## Misspells
+*://*.pintrest.com/*
+*://*.pinterst.com/*
+*://*.pintrist.com/*
+
+## Shorter redirections
+*://*.pin.it/*
+*://*.pinimg.com/*
