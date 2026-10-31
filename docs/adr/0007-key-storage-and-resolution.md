@@ -74,3 +74,7 @@ Keys reach the gateway in different ways per host. The CLI and dashboard can't r
 - Windows DPAPI round-trip in CI (`windows-latest`), plus measured PowerShell startup cost.
 - The MCPB placeholder string and empty values are treated as unset; host env takes precedence over keychain; a forced env value shows as locked.
 - **P1/P3:** with `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1`, and separately with `CLAUDE_CODE_MCP_ALLOWLIST_ENV=1`, check whether `SEARCHHOLE_BRAVE_API_KEY` from the plugin's `.mcp.json` `env` reaches the gateway (an open question in the evidence). If it is scrubbed, `doctor` must say so and point to `searchhole keys set`. The plugin's whole key path depends on this.
+
+## Amendment (2026-10-31, v0.1.1): stale-while-revalidate on the engine path
+
+The 60 s cache stays, but the App's engine path now serves an expired entry at once and refreshes it in the background. Concurrent callers share one lookup, and `clear()` (after `keys set/remove` in the same process) stops an in-flight refresh from writing a forgotten value back. Gateways also look keys up in the background at start. Before this, the mode decision on each WebSearch PreToolUse spawned macOS `security` once a minute per keyed engine: 90–110 ms, and up to the 8 s timeout with a locked keychain. A key changed from another process is now seen within one TTL plus one call. `keys status` and `doctor` still read uncached.
