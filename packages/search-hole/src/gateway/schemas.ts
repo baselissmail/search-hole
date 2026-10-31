@@ -117,6 +117,14 @@ export const fetchOutput = z.object({
 })
 
 /** `receipt` arguments (ADR-0012). */
+/** `apply_rule` (app-only, ADR-0021 point 7): one action the receipt panel was given a token for. */
+export const applyRuleInput = z.object({
+  kind: z.enum(['block', 'approve']),
+  value: z.string().min(1).max(253),
+  token: z.string().min(16).max(200),
+})
+export type ApplyRuleInput = z.output<typeof applyRuleInput>
+
 export const receiptInput = z.object({
   receiptIds: z.array(receiptId).min(1).max(20).optional().describe("Default: this session's latest"),
   format: z.enum(['summary', 'full']).optional(),

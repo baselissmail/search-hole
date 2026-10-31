@@ -27,6 +27,7 @@ import type { ProcessContext } from './context.ts'
 import { dotDir, type ProtectedRoots } from './guard.ts'
 import { refineHostProfile } from './host.ts'
 import { MAX_INSTRUCTIONS_CHARS, SERVER_INSTRUCTIONS } from './instructions.ts'
+import { ActionTokens, registerPanelResource } from './panel.ts'
 import { GatewaySessions } from './session.ts'
 import { registerTools } from './tools.ts'
 
@@ -77,6 +78,8 @@ export class Gateway {
   readonly env: Env
   readonly log: Logger
   readonly sessions: GatewaySessions
+  /** One-time tokens for the receipt panel's buttons (ADR-0021), shared by every server instance. */
+  readonly tokens = new ActionTokens()
   readonly proc: ProcessContext
   readonly protocolMode: ProtocolMode
   /** The server factory for `serveStdio` / `createMcpHandler`. */
@@ -135,6 +138,8 @@ export class Gateway {
     )
     registerTools(server, {
       host: this.host,
+      version: this.version,
+      tokens: this.tokens,
       era,
       log: this.log,
       sessions: this.sessions,
@@ -142,6 +147,7 @@ export class Gateway {
       proc: this.proc,
       protectedRoots: () => this.protectedRoots(),
     })
+    registerPanelResource(server, this.version)
     return server
   }
 

@@ -16,23 +16,52 @@ const track = (c: Connected): Connected => {
 }
 
 describe.each(ERAS)('tools/list (%s era)', (era) => {
-  test('claude-code registers the four model tools, then the app-only hook, in order', async () => {
+  test('claude-code registers the four model tools, then the app-only apply_rule and hook, in order', async () => {
     const h = harness({ host: 'claude-code' })
     const { client } = track(await connect(h.gateway, era))
     const { tools } = await client.listTools()
-    expect(tools.map((t) => t.name)).toEqual(['search', 'fetch', 'receipt', 'suggest_rule', 'hook'])
-    const hook = tools.find((t) => t.name === 'hook')
-    expect(hook?._meta).toEqual({ ui: { visibility: ['app'] } })
-    expect(tools.some((t) => t.name === 'apply_rule')).toBe(false)
+    expect(tools.map((t) => t.name)).toEqual([
+      'search',
+      'fetch',
+      'receipt',
+      'suggest_rule',
+      'apply_rule',
+      'hook',
+    ])
+    for (const name of ['hook', 'apply_rule']) {
+      expect(tools.find((t) => t.name === name)?._meta).toEqual({ ui: { visibility: ['app'] } })
+    }
   })
 
-  test('other hosts get no hook tool', async () => {
-    for (const host of ['generic', 'cursor', 'codex', 'claude-desktop'] as const) {
-      const h = harness({ host, env: {} })
-      const c = track(await connect(h.gateway, era))
+  test('apply_rule only on hosts that hide app-only tools or render the panel (ADR-0012, ADR-0021); hook only on claude-code', async () => {
+    for (const host of ['cursor', 'claude-desktop', 'vscode'] as const) {
+      const c = track(await connect(harness({ host, env: {} }).gateway, era))
       const { tools } = await c.client.listTools()
-      expect(tools.map((t) => t.name)).toEqual(['search', 'fetch', 'receipt', 'suggest_rule'])
+      expect(
+        tools.map((t) => t.name),
+        host,
+      ).toEqual(['search', 'fetch', 'receipt', 'suggest_rule', 'apply_rule'])
     }
+    for (const host of ['generic', 'codex'] as const) {
+      const c = track(await connect(harness({ host, env: {} }).gateway, era))
+      const { tools } = await c.client.listTools()
+      expect(
+        tools.map((t) => t.name),
+        host,
+      ).toEqual(['search', 'fetch', 'receipt', 'suggest_rule'])
+    }
+  })
+
+  test('receipt links the versioned panel resource, which serves the MCP App', async () => {
+    const h = harness({ host: 'claude-desktop', env: {} })
+    const { client } = track(await connect(h.gateway, era))
+    const receipt = (await client.listTools()).tools.find((t) => t.name === 'receipt')
+    const uri = (receipt?._meta as { ui: { resourceUri: string } }).ui.resourceUri
+    expect(uri).toMatch(/^ui:\/\/search-hole\/v[\w.-]+\/receipt\.html$/)
+    expect((receipt?._meta as Record<string, unknown>)['ui/resourceUri']).toBe(uri)
+    const read = await client.readResource({ uri })
+    expect(read.contents[0]).toMatchObject({ uri, mimeType: 'text/html;profile=mcp-app' })
+    expect(String((read.contents[0] as { text?: string }).text)).toContain('<html')
   })
 
   test('search carries anthropic/alwaysLoad; schemas are object-rooted; annotations explicit', async () => {

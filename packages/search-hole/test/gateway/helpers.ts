@@ -92,14 +92,21 @@ export interface Connected {
 }
 
 /** Connects an SDK client in the given era through `createMcpHandler` in-process. */
-export async function connect(gateway: Gateway, era: Era): Promise<Connected> {
+export async function connect(
+  gateway: Gateway,
+  era: Era,
+  opts: { capabilities?: Record<string, unknown> } = {},
+): Promise<Connected> {
   const handler = createMcpHandler(gateway.factory)
   const transport = new StreamableHTTPClientTransport(new URL('http://gateway.test/mcp'), {
     fetch: (url, init) => handler.fetch(new Request(url, init)),
   })
   const client = new Client(
     { name: 'test-host', version: '1.0.0' },
-    era === 'modern' ? { versionNegotiation: { mode: 'auto' } } : {},
+    {
+      ...(era === 'modern' ? { versionNegotiation: { mode: 'auto' as const } } : {}),
+      ...(opts.capabilities === undefined ? {} : { capabilities: opts.capabilities }),
+    },
   )
   await client.connect(transport)
   if (client.getProtocolEra() !== era) throw new Error(`expected ${era}, got ${client.getProtocolEra()}`)

@@ -82,6 +82,7 @@ describe('stdio in-process', () => {
       'fetch',
       'receipt',
       'suggest_rule',
+      'apply_rule',
       'hook',
     ])
     const call = resultOf(
@@ -243,7 +244,7 @@ describe('stdio in a spawned process', () => {
     )
     expect(client.getProtocolEra()).toBe('legacy')
     const { tools } = await client.listTools()
-    expect(tools.length).toBe(5)
+    expect(tools.length).toBe(6) // four model tools + app-only apply_rule and hook (claude-code)
     await client.close()
   })
 })

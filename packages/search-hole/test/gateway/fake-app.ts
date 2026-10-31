@@ -4,6 +4,7 @@
  * (src/app/types.ts) and records every call with its RequestCtx.
  */
 import type {
+  AddRuleInput,
   App,
   AppOptions,
   BuiltinFilterResult,
@@ -13,6 +14,7 @@ import type {
   HostProfile,
   Receipt,
   RequestCtx,
+  RuleListing,
   SearchArgs,
   SearchMode,
   SuggestRuleInput,
@@ -83,6 +85,8 @@ export interface FakeAppOptions {
   overBudget?: string
   /** What `dashboardUrl` returns (undefined: the method is absent). */
   dashboardUrl?: string | null
+  /** Pending and other suggestions (`suggestions.list`). */
+  suggestions?: Array<{ id: number; input: SuggestRuleInput; createdAt: string; status: string }>
   /** Domains the user blocks (used by builtinBlockedDomains, filterBuiltinResults, checkUrl). */
   blockedDomains?: string[]
   /** Domains blocked by a path/regex rule: hidden only after the search (removedPostSearch). */
@@ -321,8 +325,18 @@ export class FakeApp implements App {
 
   rules = {
     list: async () => [],
-    add: async (): Promise<never> => {
-      throw new Error('not in the fake')
+    add: async (input: AddRuleInput): Promise<RuleListing> => {
+      this.record('rules.add', [input], undefined)
+      return {
+        id: 'r_fake1',
+        scope: 'global',
+        match: input.match,
+        action: input.action,
+        weight: input.weight ?? 0,
+        important: false,
+        source: 'rules.yaml',
+        ...(input.note === undefined ? {} : { note: input.note }),
+      }
     },
     remove: async () => [],
     explain: async () => ({ decision: 'kept', lines: [] }),
@@ -336,9 +350,20 @@ export class FakeApp implements App {
   }
 
   suggestions = {
-    list: async () => [],
-    approve: async (): Promise<never> => {
-      throw new Error('not in the fake')
+    list: async () => this.opts.suggestions ?? [],
+    approve: async (id: number): Promise<RuleListing> => {
+      this.record('suggestions.approve', [id], undefined)
+      const s = (this.opts.suggestions ?? []).find((x) => x.id === id)
+      if (s === undefined) throw new Error(`no suggestion ${id}`)
+      return {
+        id: 'r_fake2',
+        scope: 'global',
+        match: s.input.match,
+        action: s.input.action,
+        weight: 0,
+        important: false,
+        source: 'rules.yaml',
+      }
     },
     reject: async () => {},
   }
