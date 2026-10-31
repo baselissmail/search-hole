@@ -39,4 +39,6 @@ Add `important: true` (global and session rules only) to make a rule beat narrow
 3. **Your rules always beat lists**, including a list's `$important`.
 4. **Ranking** (`raise`/`lower`) never hides or un-hides anything; the most specific match in the closest scope wins.
 
+**What reordering changes.** `raise`, `lower` and `pin` change the order of the results Claude sees. Assistants weigh earlier results more, so this shifts which sources get read, opened and cited; it is a nudge, not a guarantee. With your engines, it can also change *which* results are returned, because search-hole fetches more than it returns and keeps the top 10 (up to 20). With Claude Code's built-in search, it only reorders the results that search returned. It never adds a site the search didn't find, never hides anything, and doesn't change what is sent to the engines (only blocks are). The score starts from each result's original position, so a raise is weighed against it, and in engines mode a site that several engines agree on outranks a small raise.
+
 See why any URL is kept or hidden: `/search-hole:explain <url>`. Full design: [ADR-0008](adr/0008-rule-format-and-precedence.md).

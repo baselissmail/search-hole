@@ -8,6 +8,7 @@
 
 import { performance } from 'node:perf_hooks'
 import { redact } from '../core/hygiene.ts'
+import { rrfTerm, scoreKey } from '../core/merge/score.ts'
 import { classifySource } from '../core/sourcetype.ts'
 import { canonicalKey, hostOf, normalizeOriginal, registrableDomain } from '../core/url.ts'
 import { retentionDaysFor } from '../shared/settings.ts'
@@ -128,10 +129,13 @@ export async function filterBuiltinResults(
   const pinned = kept
     .filter((x) => x.decision.pin !== undefined)
     .sort((a, b) => (a.decision.pin?.order ?? 0) - (b.decision.pin?.order ?? 0) || a.rank - b.rank)
-  const factor = (x: Decided): number => x.decision.weight.factor * x.decision.preferFactor
+  // The same scoring as engines mode (ADR-0010): the rank's RRF term times the rule weight and
+  // the profile's prefer lift, so `raise 1` nudges and `raise 3` lifts, rather than any raise
+  // jumping above every unraised result.
+  const score = (x: Decided): number => rrfTerm(x.rank) * x.decision.weight.factor * x.decision.preferFactor
   const rest = kept
     .filter((x) => x.decision.pin === undefined)
-    .sort((a, b) => factor(b) - factor(a) || a.rank - b.rank)
+    .sort((a, b) => scoreKey(score(b)) - scoreKey(score(a)) || a.rank - b.rank)
   const ordered = [...pinned, ...rest]
 
   const hiddenOut: BuiltinFilterResult['hidden'] = hidden.map((x) => {

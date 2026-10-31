@@ -287,3 +287,27 @@ describe('turns and receipts (ADR-0005, ADR-0014)', () => {
     expect(c.receiptId).not.toBe(a.receiptId)
   })
 })
+
+describe('built-in reordering uses the engines-mode scoring (ADR-0010)', () => {
+  const ten = Array.from({ length: 10 }, (_, i) => ({
+    title: `R${i + 1}`,
+    url: `https://site${i + 1}.example.org/`,
+  }))
+  const order = async (rules: string): Promise<string[]> => {
+    const h = await setup({ rules: `version: 1\nrules:\n${rules}` })
+    const out = await h.app.filterBuiltinResults('q', ten, hookSession())
+    return out.kept.map((r) => r.title)
+  }
+
+  it('raise 1 nudges (#10 → #7), raise 3 lifts (#10 → #1), lower 3 drops (#1 → #10)', async () => {
+    expect(
+      (await order('  - { match: site10.example.org, action: raise, weight: 1 }\n')).indexOf('R10'),
+    ).toBe(6)
+    expect(
+      (await order('  - { match: site10.example.org, action: raise, weight: 3 }\n')).indexOf('R10'),
+    ).toBe(0)
+    expect((await order('  - { match: site1.example.org, action: lower, weight: 3 }\n')).indexOf('R1')).toBe(
+      9,
+    )
+  })
+})
