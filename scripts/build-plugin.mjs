@@ -127,9 +127,16 @@ function pnpmBuild(dir, what) {
     ['mise', ['exec', '--', 'pnpm', '-C', dir, 'build']],
     ['pnpm', ['-C', dir, 'build']],
   ]
+  // Windows ships pnpm and mise as .cmd shims, which Node runs only through a shell (since the
+  // 2024 batch-file fix), so quote each argument for cmd.exe there (paths may contain spaces).
+  const win = process.platform === 'win32'
+  const quote = (a) => (/[\s"&|<>^]/.test(a) ? `"${a.replace(/"/g, '""')}"` : a)
   for (const [cmd, args] of attempts) {
-    const res = spawnSync(cmd, args, { stdio: 'inherit', cwd: REPO_ROOT })
-    if (res.error && res.error.code === 'ENOENT') continue
+    const res = win
+      ? spawnSync([cmd, ...args].map(quote).join(' '), { stdio: 'inherit', cwd: REPO_ROOT, shell: true })
+      : spawnSync(cmd, args, { stdio: 'inherit', cwd: REPO_ROOT })
+    // Not installed: ENOENT, or cmd.exe's 9009 ("is not recognized") through the Windows shell.
+    if ((res.error && res.error.code === 'ENOENT') || (win && res.status === 9009)) continue
     if (res.error) throw res.error
     if (res.status !== 0) throw new Error(`The ${what} build failed (${cmd} exited ${res.status}).`)
     return
@@ -309,7 +316,7 @@ export function installSteps(out, target = 'claude') {
     '',
     `Plugin assembled at: ${out}`,
     '',
-    'Needs Claude Code 2.1.296 or newer and Node.js 22.13+ on PATH.',
+    'Needs Claude Code 2.1.296 or newer and Node.js 22.19+ on PATH.',
     '',
     'Quick try (one session, nothing installed):',
     `  claude --plugin-dir "${out}"`,

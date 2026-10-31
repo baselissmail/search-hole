@@ -45,3 +45,8 @@ rmSync(join(pkg, 'dist', 'lists'), { recursive: true, force: true })
 mkdirSync(join(pkg, 'dist', 'lists'), { recursive: true })
 for (const f of lists) cpSync(join(vendor, f), join(pkg, 'dist', 'lists', f))
 console.log(`copy-ui-assets: ${lists.length} starter lists → dist/lists`)
+
+// The bundle inlines MIT/ISC/BSD code and ships CC0/Unlicense starter lists: their notices travel
+// with every artifact built from dist/ (npm package, Claude plugin, .mcpb).
+for (const f of ['LICENSE', 'THIRD_PARTY_NOTICES.md']) cpSync(join(pkg, '..', '..', f), join(pkg, 'dist', f))
+console.log('copy-ui-assets: LICENSE and THIRD_PARTY_NOTICES.md → dist/')
