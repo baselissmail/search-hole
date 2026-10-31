@@ -29,11 +29,25 @@ A local search gateway for AI assistants. You choose the engines and sites your 
 
    For a quick try with nothing installed: `claude --plugin-dir "<repo>/distribution/marketplace/search-hole"`.
 
-3. Restart Claude Code, then run `/search-hole:doctor`. The plugin has three optional settings (Brave key, Tavily key, search mode); leave the keys empty to start with zero setup, and change them later with `claude plugin configure search-hole`.
+3. Restart Claude Code, then run `/search-hole:doctor`. The plugin has two optional settings, a Brave key and a Tavily key; leave them empty to start with zero setup, and change them later with `claude plugin configure search-hole`.
 
 4. Ask a question that needs the web. If the turn searched, a one-line receipt appears when it ends, for example `search-hole · 2 searches · 18 results · 3 hidden`.
 
 After a rebuild, run the script again and restart Claude Code.
+
+## Claude Desktop
+
+1. Build the extension (after `node scripts/build-plugin.mjs`, which builds everything):
+
+   ```sh
+   pnpm -C packages/search-hole build:mcpb
+   ```
+
+   It writes `distribution/out/search-hole-<version>.mcpb`.
+2. In Claude Desktop, open Settings → Extensions → Install Extension…, and pick that file. Leave the Brave and Tavily keys empty, or paste a key; Desktop keeps it in your system keychain.
+3. Ask Claude to search, then to show the search-hole receipt. Desktop shows it as a card. "Full receipt" lists what was searched and opened, and "Block a site…" blocks a site Claude used, with one click. Claude can't press these buttons; only you can.
+
+Without an engine set up, `search` tells Claude to use its built-in search; for a private engine run `searchhole searxng up` in a terminal.
 
 ## Search modes
 

@@ -7,3 +7,6 @@ research/refs
 # Playwright
 test-results/
 playwright-report/
+
+# Packed extensions (.mcpb)
+distribution/out/

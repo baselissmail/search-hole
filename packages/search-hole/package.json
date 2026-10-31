@@ -1,6 +1,6 @@
 {
   "name": "search-hole",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "A local, open-source search gateway for AI assistants: choose the engines and sites your AI searches, see every search, get source receipts.",
   "license": "Apache-2.0",
   "author": "Basel Issmail <basel.issmail@gmail.com>",
@@ -22,9 +22,11 @@
     "dev": "node --experimental-strip-types src/cli/main.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "build:mcpb": "node scripts/build-mcpb.mjs"
   },
   "devDependencies": {
+    "@anthropic-ai/mcpb": "2.1.2",
     "@hono/node-server": "2.1.5",
     "@modelcontextprotocol/client": "2.4.0",
     "@modelcontextprotocol/core": "2.4.0",

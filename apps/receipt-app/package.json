@@ -1,6 +1,6 @@
 {
   "name": "@search-hole/receipt-app",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "description": "The search-hole receipt panel: an MCP App (single HTML file) the gateway serves as ui://search-hole/\u2026/receipt.html.",
   "license": "Apache-2.0",

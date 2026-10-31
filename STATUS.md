@@ -136,6 +136,40 @@ Known for P4b:
 - The bundle is 233 KB gzipped, against the ~250 KB budget.
 - `contract.ts` pulls Node types into the dashboard's type program; a browser-only types module would fix it.
 
-Next: dogfood the dashboard, then P5 (in-chat receipt panel as an MCP App, plus the Claude Desktop `.mcpb` extension).
+## P5 receipt panel + Claude Desktop extension (2026-10-31, v0.2.0)
+
+ADR-0021.
+
+**Receipt panel** (`apps/receipt-app`):
+- A single-file MCP App, 64 KB gzipped against the 80 KB budget.
+- `receipt` links `ui://search-hole/v<version>/receipt.html` on every host.
+- Hosts that render apps get:
+  - an inline card with 4–5 data points and two actions, "Full receipt" and "Block a site…";
+  - a fullscreen receipt with per-site Block and per-suggestion Approve.
+- Claude Code and other text hosts keep the text receipt.
+
+**`apply_rule`:**
+- App-only (`visibility: ["app"]`), on claude-desktop, vscode, cursor and claude-code (hidden).
+- Requires the client's MCP Apps capability and a one-time HMAC token from the result's `_meta`, bound to the action and valid for 10 minutes.
+- The model never sees the tokens.
+
+**Claude Desktop:**
+- `distribution/claude-desktop/manifest.json` (mcpb 0.3, keys sensitive and optional, so the system keychain).
+- `pnpm -C packages/search-hole build:mcpb` packs `distribution/out/search-hole-<version>.mcpb`.
+
+**Acceptance (MASTER_PLAN §11 P5):**
+- [x] The panel is within budget, themed by the host (theme, variables, fonts, safe areas), has a fullscreen receipt, and calls `callServerTool`. Proven in Chrome through ext-apps' own AppBridge:
+  - the card, axe in light and dark, the host theme winning over the OS;
+  - token calls and `updateModelContext`;
+  - hostile titles inert;
+  - the fallback commands without `serverTools`.
+- [x] Text fallback in Claude Code. `apply_rule` is refused without the UI capability, and refused for replayed or swapped tokens. Covered by gateway tests and by the legacy era over real stdio.
+- [x] `.mcpb` built and validated with Anthropic's mcpb toolchain. Desktop's own substitution (`getMcpConfigForManifest`) is tested, including an unset key counting as unset.
+- [ ] **Needs Basel's Claude Desktop** (ADR-0002/0021 "validate early"): install the `.mcpb`; confirm it starts on Desktop's Node with `node:sqlite`; confirm the receipt card renders and its buttons work. VS Code rendering is likewise unverified on a real host.
+- [ ] Signing (`mcpb sign`) waits for a certificate (P8). claude.ai on the web needs the v2 remote connector.
+
+Fixed along the way: Vite's CSS target polyfilled `light-dark()` from the OS preference, so the panel ignored the host theme and the dashboard ignored a theme chosen in Settings. Both now use native `light-dark()`, with a regression test each.
+
+Next: P6, the lists ecosystem (subscriptions, importers for uBlacklist/AdGuard/hosts/Goggles, and the list matcher's host prefilter). Your dogfooding of the dashboard, panel and Desktop extension may reorder it.
 
 Deferred past v0.1: dashboard (P4), MCP App panel and `.mcpb` (P5), list subscriptions and importers (P6), Cursor/Codex manifests (P7), release engineering (P8).
