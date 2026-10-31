@@ -3,3 +3,7 @@ coverage/
 dist/
 node_modules/
 research/refs
+
+# Playwright
+test-results/
+playwright-report/

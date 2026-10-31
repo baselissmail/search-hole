@@ -1,0 +1,183 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+@import "tailwindcss";
+@import "sonner/dist/styles.css";
+
+/* Fonts are bundled from the geist package (SIL OFL 1.1); nothing loads from another origin. */
+@font-face {
+  font-family: "Geist";
+  src: url("../node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("../node_modules/geist/dist/fonts/geist-mono/GeistMono-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/*
+ * Tokens. Neutral chrome; colour only for state (always with an icon and a word). Each token is a
+ * light-dark() pair: `color-scheme` on <html> picks the side, following the system unless
+ * data-theme pins it. Text pairs meet WCAG AA (4.5:1) on bg, surface and surface-2.
+ */
+@theme {
+  --color-*: initial;
+  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --color-bg: light-dark(#fafafa, #0a0a0b);
+  --color-surface: light-dark(#ffffff, #111113);
+  --color-surface-2: light-dark(#f4f4f5, #18181b);
+  --color-surface-3: light-dark(#e9e9ec, #232327);
+  --color-border: light-dark(#e4e4e7, #27272a);
+  --color-border-strong: light-dark(#d4d4d8, #3f3f46);
+  --color-fg: light-dark(#18181b, #fafafa);
+  --color-fg-muted: light-dark(#52525b, #a1a1aa);
+  --color-fg-subtle: light-dark(#71717a, #8b8b94);
+  --color-inverse: light-dark(#ffffff, #09090b);
+  --color-focus: light-dark(#2563eb, #60a5fa);
+  --color-bar: light-dark(#71717a, #8b8b94);
+  --color-bar-track: light-dark(#e4e4e7, #27272a);
+  --color-overlay: light-dark(rgb(9 9 11 / 0.32), rgb(0 0 0 / 0.6));
+
+  --color-ok: light-dark(#15803d, #4ade80);
+  --color-ok-soft: light-dark(#f0fdf4, #0f2a1a);
+  --color-ok-line: light-dark(#bbf7d0, #166534);
+  --color-danger: light-dark(#b91c1c, #f87171);
+  --color-danger-soft: light-dark(#fef2f2, #2c1314);
+  --color-danger-line: light-dark(#fecaca, #7f1d1d);
+  --color-info: light-dark(#1d4ed8, #60a5fa);
+  --color-info-soft: light-dark(#eff6ff, #121d33);
+  --color-info-line: light-dark(#bfdbfe, #1e3a8a);
+  --color-warn: light-dark(#b45309, #fbbf24);
+  --color-warn-soft: light-dark(#fffbeb, #2a1f0a);
+  --color-warn-line: light-dark(#fde68a, #78350f);
+
+  --animate-fade-in: fade-in 120ms ease-out;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+  }
+
+  html {
+    background-color: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    min-height: 100dvh;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklab, var(--color-focus) 28%, transparent);
+  }
+
+  ::placeholder {
+    color: var(--color-fg-subtle);
+    opacity: 1;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+}
+
+/*
+ * Reduced motion. Outside any layer on purpose: unlayered rules beat every layered utility, so
+ * no `!important` is needed to stop transitions and animations.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    transition-duration: 0.01ms;
+    scroll-behavior: auto;
+  }
+}
+
+/* Numbers line up in columns. */
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Rows of the virtualised log keep an exact height: the virtualiser counts on it. */
+@utility row-36 {
+  height: 36px;
+}
+
+@utility row-52 {
+  height: 52px;
+}
+
+/* sonner, restyled with the dashboard's tokens (its CSS is bundled; see vite.config.ts). */
+[data-sonner-toaster] {
+  font-family: var(--font-sans);
+  --normal-bg: var(--color-surface);
+  --normal-border: var(--color-border-strong);
+  --normal-text: var(--color-fg);
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-styled="true"] {
+  border-radius: 0.5rem;
+  box-shadow: 0 8px 24px -12px rgb(0 0 0 / 0.35);
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-description] {
+  color: var(--color-fg-muted);
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-button] {
+  background: var(--color-fg);
+  color: var(--color-inverse);
+}
+
+[data-sonner-toaster] [data-sonner-toast] [data-icon] svg {
+  color: var(--color-fg-muted);
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-type="success"] [data-icon] svg {
+  color: var(--color-ok);
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-type="error"] [data-icon] svg {
+  color: var(--color-danger);
+}
+
+[data-sonner-toaster] [data-sonner-toast] [data-button]:focus-visible,
+[data-sonner-toaster] [data-sonner-toast] [data-close-button]:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}

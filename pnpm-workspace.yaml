@@ -1,6 +1,12 @@
 packages:
   - packages/*
   - apps/*
+# geist (the dashboard's fonts) declares Next.js as a peer; only its font files are used.
+packageExtensions:
+  geist:
+    peerDependenciesMeta:
+      next:
+        optional: true
 minimumReleaseAgeExclude:
   - '@biomejs/biome@2.6.4'
   - '@biomejs/cli-android-arm64@2.6.4'
