@@ -261,6 +261,13 @@ export const settingsSchema = z.strictObject({
   privacy: z
     .strictObject({ wayback: z.boolean().default(false), sitemap: z.boolean().default(false) })
     .prefault({}),
+  /** Subscribed and starter lists (ADR-0022). */
+  lists: z
+    .strictObject({
+      /** Refresh due lists in the background (one HTTPS request per list per interval). */
+      autoUpdate: z.boolean().default(true),
+    })
+    .prefault({}),
   /** The per-session loop guard (ADR-0019); 0 turns a limit off. */
   limits: z
     .strictObject({
@@ -429,6 +436,12 @@ function buildEnvBindings(): EnvBinding[] {
   add('SEARCHHOLE_PRIVACY_WAYBACK', 'privacy.wayback', 'Allow Wayback date lookups', parseBool)
   add('SEARCHHOLE_PRIVACY_SITEMAP', 'privacy.sitemap', 'Allow sitemap lastmod lookups', parseBool)
   add(
+    'SEARCHHOLE_LISTS_AUTO_UPDATE',
+    'lists.autoUpdate',
+    'Refresh subscribed and starter lists in the background',
+    parseBool,
+  )
+  add(
     'SEARCHHOLE_LIMIT_SEARCHES_PER_TURN',
     'limits.searchesPerTurn',
     'Most searches in one Claude Code turn (0 = no limit)',
@@ -584,6 +597,7 @@ const SECTION_PATHS: readonly (readonly string[])[] = [
   ['queryHygiene'],
   ['privacy'],
   ['limits'],
+  ['lists'],
   ['searxng'],
   ...ENGINE_IDS.flatMap(
     (id) =>

@@ -126,7 +126,8 @@ export function openInBrowser(url: string, platform: NodeJS.Platform = process.p
     platform === 'darwin'
       ? ['open', [url]]
       : platform === 'win32'
-        ? ['explorer.exe', [url]]
+        ? // explorer.exe can drop the #c= fragment; the URL protocol handler keeps it.
+          ['rundll32.exe', ['url.dll,FileProtocolHandler', url]]
         : ['xdg-open', [url]]
   try {
     const child = spawn(cmd, args, { stdio: 'ignore', detached: true })
@@ -263,6 +264,7 @@ export async function startDetached(
   const child = spawn(process.execPath, [...process.execArgv, process.argv[1] ?? '', 'ui', ...args], {
     stdio: 'ignore',
     detached: true,
+    windowsHide: true,
     env: process.env,
   })
   child.unref()

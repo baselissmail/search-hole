@@ -37,6 +37,7 @@ const PATCHABLE: Readonly<Record<SettingsPatch['path'], (v: unknown) => boolean>
   'limits.repeatQuery': Number.isInteger,
   'retention.days': Number.isInteger,
   'hooks.receiptLine': (v) => typeof v === 'boolean',
+  'lists.autoUpdate': (v) => typeof v === 'boolean',
 }
 
 const clampInt = (v: number | undefined, lo: number, hi: number, fallback: number): number =>
@@ -54,6 +55,7 @@ export function createDashboardApi(d: DashboardDeps): DashboardApi {
       limits: { ...s.limits },
       retention: { days: s.retention.days },
       hooks: { receiptLine: s.hooks.receiptLine, guard: s.hooks.guard },
+      lists: { autoUpdate: s.lists.autoUpdate },
       locked: [...(ctx.settings.loaded?.locked ?? []), ...(ctx.env.SEARCHHOLE_MODE?.trim() ? ['mode'] : [])],
       paths: { config: ctx.roots.config, data: ctx.roots.data },
     }

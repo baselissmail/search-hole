@@ -12,7 +12,8 @@ import type { Engines } from './engines.ts'
 import type { RulesService } from './rules.ts'
 import type { DoctorCheck, DoctorReport, EngineStatus, SearchMode } from './types.ts'
 
-const MIN_NODE = [22, 13] as const
+/** ADR-0002 (amended): the bundled undici 8 needs zlib zstd, added in 22.19. */
+const MIN_NODE = [22, 19] as const
 const DOCKER_TIMEOUT_MS = 3000
 const SEARXNG_TIMEOUT_MS = 2000
 /** The oldest Claude Code with every hook feature search-hole uses (ADR-0014 point 7). */

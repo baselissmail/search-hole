@@ -44,7 +44,8 @@ describe('searchhole ui lifecycle', () => {
   it('writes ui.json 0600, is found by nonce, signs in, and cleans up on stop', async () => {
     const port = await freePort()
     const { ui, paths } = await start(port)
-    expect(statSync(paths.uiJson).mode & 0o777).toBe(0o600)
+    // POSIX modes only: Windows has ACLs, not mode bits (docs/release.md, Windows).
+    if (process.platform !== 'win32') expect(statSync(paths.uiJson).mode & 0o777).toBe(0o600)
     const found = await findRunningUi(paths)
     expect(found?.nonce).toBe(ui.info.nonce)
     const url = await signInUrl(ui.info)

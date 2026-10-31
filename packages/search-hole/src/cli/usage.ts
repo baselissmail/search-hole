@@ -36,6 +36,7 @@ Setup
 
 Other
   ui [--open]           Open the dashboard on 127.0.0.1 (live log, rules, engines)
+  uninstall [--purge]   List, or with --purge delete, search-hole's data and stored keys
   mcp --host <profile>  Start the MCP gateway on stdio (your AI host runs this)
   version               Print the version
   help [command]        Show help
@@ -150,6 +151,14 @@ already running. It prints a one-time sign-in link (valid 60 s); --open opens it
   --detach  run it in the background and return (what /search-hole:dashboard does)
   --stay    don't exit after ui.idleMinutes (default 30) with no open tab
   --port    use another port for this run`,
+  uninstall: `Usage: searchhole uninstall [--purge] [--yes] [--json]
+
+Without --purge: lists what would be deleted (nothing is touched).
+With --purge: deletes search-hole's files (settings, rules, search log, lists, backups, the
+key file) and every key in its own stores (OS keychain), after you confirm. It deletes known
+files by name, never a whole folder, and refuses your home folder or a filesystem root.
+Other apps keep what they hold; the listing says how to remove the Claude Code plugin, the
+Claude Desktop extension and configs written by \`searchhole setup\`.`,
   mcp: `Usage: searchhole mcp --host <profile>
 
 Starts the MCP gateway on stdio. Your AI host launches this; run it yourself only to test.

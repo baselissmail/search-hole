@@ -1086,6 +1086,8 @@ export class ListsService {
    */
   kick(global: () => FileState, store: Store | null): void {
     if (this.ctx.host === 'cli' || this.closed || this.background !== null) return
+    // settings.yaml lists.autoUpdate: false keeps everything offline (`lists update` still works).
+    if (!this.ctx.settings.settings.lists.autoUpdate) return
     const now = this.ctx.now()
     if (this.lastKick !== null && now - this.lastKick < KICK_EVERY_MS) return
     this.lastKick = now

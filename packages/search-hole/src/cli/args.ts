@@ -86,6 +86,7 @@ export type Command =
   | { name: 'searxng'; sub: SearxngSub; yes: boolean; json: boolean }
   | { name: 'mcp'; host: HostProfile }
   | { name: 'ui'; port?: number; open: boolean; detach: boolean; stay: boolean }
+  | { name: 'uninstall'; purge: boolean; yes: boolean; json: boolean }
 
 /** Every command word, in help order. */
 export const COMMAND_NAMES = [
@@ -110,6 +111,7 @@ export const COMMAND_NAMES = [
   'doctor',
   'searxng',
   'ui',
+  'uninstall',
   'mcp',
   'version',
   'help',
@@ -766,6 +768,29 @@ function parseUi(args: readonly string[]): Command {
   }
 }
 
+function parseUninstall(args: readonly string[]): Command {
+  const { values, positionals } = guard('uninstall', () =>
+    parseArgs({
+      args: [...args],
+      allowPositionals: true,
+      options: {
+        ...HELP_OPTION,
+        purge: { type: 'boolean' },
+        yes: { type: 'boolean', short: 'y' },
+        json: { type: 'boolean' },
+      },
+    }),
+  )
+  if (values.help === true) return { name: 'help', topic: 'uninstall' }
+  noExtra('uninstall', positionals, 0)
+  return {
+    name: 'uninstall',
+    purge: values.purge === true,
+    yes: values.yes === true,
+    json: values.json === true,
+  }
+}
+
 function parseVersion(args: readonly string[]): Command {
   const { values, positionals } = guard('version', () =>
     parseArgs({ args: [...args], allowPositionals: true, options: { json: { type: 'boolean' } } }),
@@ -823,6 +848,8 @@ export function parseCommand(argv: readonly string[], now: number = Date.now()):
       return parseMcp(rest)
     case 'ui':
       return parseUi(rest)
+    case 'uninstall':
+      return parseUninstall(rest)
     case 'version':
       return parseVersion(rest)
     default: {

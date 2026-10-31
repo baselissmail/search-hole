@@ -5,7 +5,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { planUninstall, runUninstall, unsafeRoot } from '../../src/cli/uninstall.ts'
+import { bashChangesRules } from '../../src/gateway/guard.ts'
 import type { EngineId } from '../../src/shared/types.ts'
+import { run } from './helpers.ts'
 
 const dirs: string[] = []
 afterEach(() => {
@@ -93,5 +95,48 @@ describe('uninstall', () => {
     })
     expect(out.keysFailed).toEqual([{ engine: 'brave', error: 'keychain locked' }])
     expect(out.removed.length).toBe(1)
+  })
+})
+
+describe('searchhole uninstall (CLI)', () => {
+  const home = (): string => {
+    const root = temp()
+    for (const f of ['settings.yaml', 'rules.yaml', 'searchhole.db']) writeFileSync(join(root, f), 'x')
+    return root
+  }
+
+  it('without --purge only lists; nothing is touched', async () => {
+    const root = home()
+    const r = await run(['uninstall'], { env: { SEARCHHOLE_HOME: root } })
+    expect(r.code).toBe(0)
+    expect(r.out).toContain(join(root, 'rules.yaml'))
+    expect(r.out).toContain('searchhole uninstall --purge')
+    expect(r.out).toContain('claude plugin uninstall')
+    expect(existsSync(join(root, 'rules.yaml'))).toBe(true)
+  })
+
+  it('--purge needs a terminal or --yes; a "no" deletes nothing', async () => {
+    const root = home()
+    const noTty = await run(['uninstall', '--purge'], { env: { SEARCHHOLE_HOME: root } })
+    expect(noTty.code).not.toBe(0)
+    const declined = await run(['uninstall', '--purge'], {
+      env: { SEARCHHOLE_HOME: root },
+      tty: true,
+      confirmAnswer: false,
+    })
+    expect(declined.out).toContain('Nothing deleted.')
+    expect(existsSync(join(root, 'rules.yaml'))).toBe(true)
+  })
+
+  it('--purge --yes removes keys through the App, then the files', async () => {
+    const root = home()
+    const r = await run(['uninstall', '--purge', '--yes'], { env: { SEARCHHOLE_HOME: root } })
+    expect(r.code).toBe(0)
+    expect(existsSync(root)).toBe(false)
+    expect(r.app.calls.filter((c) => c.method === 'keys.remove').map((c) => c.args[0])).toContain('tavily')
+  })
+
+  it('the Bash guard keeps the model from running it', () => {
+    expect(bashChangesRules('searchhole uninstall --purge --yes')).toBe(true)
   })
 })

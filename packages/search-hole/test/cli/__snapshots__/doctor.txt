@@ -1,6 +1,6 @@
 search-hole 0.1.0 doctor
 
-✓ Node 26.13.0 — meets >=22.13
+✓ Node 26.13.0 — meets >=22.19
 ! No search engine is set up — Claude Code's own search is used
     → searchhole searxng up
 ✗ Database cannot be opened

@@ -416,4 +416,24 @@ describe('background refresh (ADR-0006 point 7)', () => {
     expect(r).toMatchObject({ result: 'skipped' })
     expect(r?.message).toContain('another search-hole process')
   })
+
+  it('settings lists.autoUpdate: false keeps gateways offline; a manual update still works', async () => {
+    const ls = await listServer()
+    ls.files.set('/spam.txt', domains(5))
+    const rules =
+      'version: 1\nsubscriptions:\n  - { name: spam, url: "https://lists.test/spam.txt", format: domains }\n'
+    const h = await setup({
+      host: 'claude-code',
+      seams: ls.seams,
+      rules,
+      settings: 'version: 1\nlists: { autoUpdate: false }\n',
+    })
+    const lists = h.app.lists
+    if (lists === undefined) throw new Error('no list API')
+    await h.app.filterBuiltinResults('q', [PLAIN], hookSession())
+    await new Promise((r) => setTimeout(r, 300))
+    expect(ls.server.seen.filter((r) => r.url === '/spam.txt')).toHaveLength(0)
+    const [r] = await lists.update(['spam'])
+    expect(r).toMatchObject({ result: 'updated', ruleCount: 5 })
+  })
 })

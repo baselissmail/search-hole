@@ -342,7 +342,7 @@ export function sampleDoctor(): DoctorReport {
   return {
     version: '0.1.0',
     checks: [
-      { id: 'node', status: 'ok', title: 'Node 26.13.0', detail: 'meets >=22.13' },
+      { id: 'node', status: 'ok', title: 'Node 26.13.0', detail: 'meets >=22.19' },
       {
         id: 'engines',
         status: 'warn',

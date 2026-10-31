@@ -120,6 +120,84 @@ async function withApp<T>(io: CliIo, deps: CliDeps, fn: (app: App) => Promise<T>
 
 // ── Commands ─────────────────────────────────────────────────────────────
 
+/** `searchhole uninstall [--purge]` (ADR-0006 point 13). */
+async function runUninstallCommand(
+  cmd: Extract<Command, { name: 'uninstall' }>,
+  io: CliIo,
+  deps: CliDeps,
+): Promise<number> {
+  const { planUninstall, runUninstall } = await import('./uninstall.ts')
+  const { existsSync } = await import('node:fs')
+  const { homedir } = await import('node:os')
+  const { resolveRoots, rootLayout } = await import('../shared/paths.ts')
+  const home = homedir()
+  const roots = resolveRoots({ env: io.env, platform: process.platform, homedir: home, exists: existsSync })
+  const plan = planUninstall({ roots, home })
+  const style = renderOpts(io, deps).style
+  if (cmd.json && !cmd.purge) {
+    json(io, plan)
+    return 0
+  }
+  if (!cmd.json) {
+    line(io, plan.remove.length === 0 ? 'No search-hole files found.' : 'search-hole files:')
+    for (const p of plan.remove) line(io, `  ${p}`)
+    line(io, `Stored keys (OS keychain and key file) for: ${plan.keys.join(', ')}`)
+    for (const r of plan.refused) line(io, style.yellow(`⚠ Not touching ${r.root}: ${r.why}.`))
+    line(io, '')
+    line(io, 'Not removed by this command:')
+    for (const e of plan.elsewhere) line(io, `  - ${e}`)
+  }
+  if (!cmd.purge) {
+    line(io, '')
+    line(io, 'Run `searchhole uninstall --purge` to delete the files and keys above.')
+    return 0
+  }
+  const { findRunningUi } = await import('../ui/run.ts')
+  const ui = await findRunningUi(rootLayout(roots))
+  if (ui !== null) {
+    throw new SearchHoleError('invalid_argument', `The dashboard is running (process ${ui.pid}).`, {
+      fix: 'Stop it (Ctrl-C in its terminal, or close the tab and wait), then run this again.',
+    })
+  }
+  if (!cmd.yes) {
+    if (!io.stdinIsTTY) {
+      throw new SearchHoleError(
+        'invalid_argument',
+        'This deletes your search-hole data and was run without a terminal.',
+        {
+          fix: 'Run it yourself in a terminal, or pass --yes.',
+        },
+      )
+    }
+    if (!(await io.confirm('Delete all of the above? This cannot be undone.', false))) {
+      line(io, 'Nothing deleted.')
+      return 0
+    }
+  }
+  // Keys go through the App (it knows every store); close it before deleting the database.
+  const app = await deps.openApp({ host: 'cli', version: VERSION, env: io.env, cwd: io.cwd })
+  let keys: Awaited<ReturnType<typeof runUninstall>>
+  try {
+    keys = await runUninstall({ ...plan, remove: [], roots: [] }, { removeKey: (e) => app.keys.remove(e) })
+  } finally {
+    await app.close().catch(() => undefined)
+  }
+  const files = await runUninstall({ ...plan, keys: [] }, { removeKey: async () => {} })
+  if (cmd.json) {
+    json(io, { ...files, keysRemoved: keys.keysRemoved, keysFailed: keys.keysFailed })
+  } else {
+    line(io, `${style.green('✓')} Deleted ${files.removed.length} item(s) and the stored keys.`)
+    for (const f of [
+      ...files.failed,
+      ...keys.keysFailed.map((k) => ({ path: `key ${k.engine}`, error: k.error })),
+    ]) {
+      line(io, style.yellow(`⚠ Could not delete ${f.path}: ${f.error}`))
+    }
+    line(io, 'Now remove the plugin or extension in each app (see the list above).')
+  }
+  return files.failed.length + keys.keysFailed.length === 0 ? 0 : 1
+}
+
 /** `searchhole ui` (ADR-0004 points 2–3): reuse a running dashboard, or start one. */
 async function runUi(cmd: Extract<Command, { name: 'ui' }>, io: CliIo, deps: CliDeps): Promise<number> {
   const ui = await import('../ui/run.ts')
@@ -679,6 +757,8 @@ async function execute(
       return runSearxng(cmd, io, deps)
     case 'ui':
       return runUi(cmd, io, deps)
+    case 'uninstall':
+      return runUninstallCommand(cmd, io, deps)
     case 'mcp':
       // stdout belongs to the MCP protocol from here on; the CLI prints nothing to it.
       {

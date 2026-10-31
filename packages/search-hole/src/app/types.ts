@@ -287,6 +287,8 @@ export interface SettingsView {
   limits: { searchesPerTurn: number; searchesPerHour: number; repeatQuery: number }
   retention: { days: number }
   hooks: { receiptLine: boolean; guard: boolean }
+  /** Background refresh of subscribed and starter lists (ADR-0022). */
+  lists: { autoUpdate: boolean }
   locked: string[]
   paths: { config: string; data: string }
 }
@@ -298,6 +300,7 @@ export type SettingsPatch =
   | { path: 'limits.searchesPerTurn' | 'limits.searchesPerHour' | 'limits.repeatQuery'; value: number }
   | { path: 'retention.days'; value: number }
   | { path: 'hooks.receiptLine'; value: boolean }
+  | { path: 'lists.autoUpdate'; value: boolean }
 
 /** Dashboard reads and settings writes (ADR-0020); never model-reachable. */
 export interface DashboardApi {
