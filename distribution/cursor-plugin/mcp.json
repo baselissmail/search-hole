@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "search-hole": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${CURSOR_PLUGIN_ROOT}/dist/searchhole.mjs", "mcp", "--host", "cursor"]
+    }
+  }
+}

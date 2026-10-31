@@ -1,0 +1,37 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "search-hole",
+  "version": "0.2.0",
+  "description": "A local search gateway for AI assistants: choose the engines and sites your AI searches, see every search, get source receipts.",
+  "author": {
+    "name": "Basel Issmail",
+    "url": "https://github.com/baselissmail"
+  },
+  "homepage": "https://github.com/baselissmail/search-hole",
+  "repository": "https://github.com/baselissmail/search-hole",
+  "license": "Apache-2.0",
+  "keywords": ["search", "web-search", "privacy", "mcp", "source-filtering"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "search-hole",
+        "shortDescription": "Web search through your own engines and site rules",
+        "longDescription": "search-hole is a local, open-source search gateway. Codex searches through engines you choose (a private SearXNG, Tavily or Brave), your source rules hide, pin, raise or lower sites, and every search is logged on your computer with a receipt of what was searched, hidden and opened. Codex can only suggest rules; you approve them in the dashboard or the terminal.",
+        "developerName": "Basel Issmail",
+        "category": "Productivity",
+        "capabilities": [
+          "Search through your own engines",
+          "Hide, pin, raise and lower sites",
+          "A local log of every search",
+          "Receipts of what was searched and opened"
+        ],
+        "defaultPrompt": [
+          "Search the web for the latest stable Node.js release and cite your sources with dates.",
+          "Find the official docs for this project's main framework and summarise what changed in the last major version."
+        ],
+        "websiteURL": "https://github.com/baselissmail/search-hole",
+        "logo": "./assets/logo.png"
+      }
+    }
+  }
+}
