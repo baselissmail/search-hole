@@ -6,7 +6,7 @@
  *
  *   node scripts/build-plugin.mjs [--skip-build] [--dist <dir>] [--out <dir>]
  *
- * 1. Builds the package (`mise exec -- pnpm -C packages/search-hole build`), unless --skip-build.
+ * 1. Builds the dashboard and then the package (`mise exec -- pnpm -C <dir> build`), unless --skip-build.
  * 2. Copies distribution/claude-plugin/, the built dist/ (every file) and LICENSE into
  *    distribution/marketplace/search-hole/, the plugin directory that the local marketplace
  *    `search-hole-local` points at (git-ignored).
@@ -57,22 +57,29 @@ export function parseArgs(argv) {
   return opts
 }
 
-/** Runs the package build through mise, falling back to a bare pnpm when mise is not installed. */
-function runBuild() {
+/** Runs `pnpm -C <dir> build` through mise, falling back to a bare pnpm when mise is not installed. */
+function pnpmBuild(dir, what) {
   const attempts = [
-    ['mise', ['exec', '--', 'pnpm', '-C', PACKAGE_DIR, 'build']],
-    ['pnpm', ['-C', PACKAGE_DIR, 'build']],
+    ['mise', ['exec', '--', 'pnpm', '-C', dir, 'build']],
+    ['pnpm', ['-C', dir, 'build']],
   ]
   for (const [cmd, args] of attempts) {
     const res = spawnSync(cmd, args, { stdio: 'inherit', cwd: REPO_ROOT })
     if (res.error && res.error.code === 'ENOENT') continue
     if (res.error) throw res.error
-    if (res.status !== 0) throw new Error(`The package build failed (${cmd} exited ${res.status}).`)
+    if (res.status !== 0) throw new Error(`The ${what} build failed (${cmd} exited ${res.status}).`)
     return
   }
   throw new Error(
     'Neither mise nor pnpm is on PATH. Install mise (https://mise.jdx.dev), or run the build yourself and pass --skip-build.',
   )
+}
+
+/** Builds the dashboard (when present), then the package, which copies it into dist/ui (ADR-0020). */
+function runBuild() {
+  const dashboard = join(REPO_ROOT, 'apps', 'dashboard')
+  if (existsSync(join(dashboard, 'package.json'))) pnpmBuild(dashboard, 'dashboard')
+  pnpmBuild(PACKAGE_DIR, 'package')
 }
 
 /** True when `dir` exists and has at least one entry. */

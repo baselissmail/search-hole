@@ -106,6 +106,73 @@ async function withApp<T>(io: CliIo, deps: CliDeps, fn: (app: App) => Promise<T>
 
 // ── Commands ─────────────────────────────────────────────────────────────
 
+/** `searchhole ui` (ADR-0004 points 2–3): reuse a running dashboard, or start one. */
+async function runUi(cmd: Extract<Command, { name: 'ui' }>, io: CliIo, deps: CliDeps): Promise<number> {
+  const ui = await import('../ui/run.ts')
+  const { existsSync } = await import('node:fs')
+  const { homedir } = await import('node:os')
+  const { resolveRoots, rootLayout } = await import('../shared/paths.ts')
+  const { createLogger } = await import('../shared/log.ts')
+  const roots = resolveRoots({
+    env: io.env,
+    platform: process.platform,
+    homedir: homedir(),
+    exists: existsSync,
+  })
+  const paths = rootLayout(roots)
+  const style = renderOpts(io, deps).style
+  const announce = (base: string, url: string): void => {
+    const opened = cmd.open && ui.openInBrowser(url)
+    line(io, `${style.green('✓')} Dashboard: ${base}`)
+    if (!opened) line(io, `  Sign in (once, within 60 s): ${url}`)
+  }
+
+  const running = await ui.findRunningUi(paths)
+  if (running !== null) {
+    announce(`http://127.0.0.1:${running.port}/ (already running)`, await ui.signInUrl(running))
+    return 0
+  }
+  const app = await deps.openApp({ host: 'cli', version: VERSION, env: io.env, cwd: io.cwd })
+  const settings = (await app.settings.get()) as { ui?: { port?: number; idleMinutes?: number } }
+  const port = cmd.port ?? settings.ui?.port ?? 7341
+  if (cmd.detach) {
+    await app.close()
+    const info = await ui.startDetached(paths, ['--port', String(port), ...(cmd.stay ? ['--stay'] : [])])
+    announce(`http://127.0.0.1:${info.port}/ (in the background)`, await ui.signInUrl(info))
+    return 0
+  }
+  if (app.dashboard === undefined) throw new SearchHoleError('internal', 'This build has no dashboard API.')
+  const started = await ui
+    .startUi({
+      app: app as App & { dashboard: NonNullable<App['dashboard']> },
+      paths: { uiJson: paths.uiJson, uiLock: paths.uiLock },
+      port,
+      idleMinutes: settings.ui?.idleMinutes ?? 30,
+      stay: cmd.stay,
+      version: VERSION,
+      logger: createLogger({ env: io.env, bindings: { component: 'ui' } }),
+      assetsDir: ui.defaultAssetsDir(),
+    })
+    .catch(async (e: unknown) => {
+      await app.close().catch(() => undefined)
+      throw e
+    })
+  announce(`http://127.0.0.1:${port}/`, `http://127.0.0.1:${port}/#c=${started.server.mintCode()}`)
+  line(
+    io,
+    style.dim(
+      `  Ctrl-C stops it${cmd.stay ? '' : `; it also exits after ${settings.ui?.idleMinutes ?? 30} idle minutes`}.`,
+    ),
+  )
+  const stop = (): void => void started.stop()
+  process.once('SIGINT', stop)
+  process.once('SIGTERM', stop)
+  await started.done
+  process.off('SIGINT', stop)
+  process.off('SIGTERM', stop)
+  return 0
+}
+
 async function runSearch(
   cmd: Extract<Command, { name: 'search' }>,
   io: CliIo,
@@ -498,6 +565,8 @@ async function execute(
       return runDoctor(cmd, io, deps)
     case 'searxng':
       return runSearxng(cmd, io, deps)
+    case 'ui':
+      return runUi(cmd, io, deps)
     case 'mcp':
       // stdout belongs to the MCP protocol from here on; the CLI prints nothing to it.
       {

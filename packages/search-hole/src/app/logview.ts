@@ -30,7 +30,7 @@ const SOURCE_TYPES: readonly SourceType[] = [
 const pick = <T extends string>(values: readonly T[], v: string | null | undefined): T | undefined =>
   values.find((x) => x === v)
 
-function entryOf(row: SearchLogRow): LogEntry {
+export function entryOf(row: SearchLogRow): LogEntry {
   const entry: LogEntry = {
     searchId: row.id,
     receiptId: row.receiptId,

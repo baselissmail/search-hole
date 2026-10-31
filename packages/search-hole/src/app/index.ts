@@ -23,6 +23,7 @@ import {
   loadSettingsState,
   settingsStamp,
 } from './context.ts'
+import { createDashboardApi } from './dashboard.ts'
 import { runDoctor } from './doctor.ts'
 import { Engines } from './engines.ts'
 import { lazyFetcher, runFetch } from './fetch.ts'
@@ -267,6 +268,14 @@ export const createApp: CreateApp = async (opts: AppOptions): Promise<App> => {
       freshSettings()
       return runDoctor({ ctx, engines, rules, searchMode: () => searchMode(builtinDeps()) }, o)
     },
+
+    dashboard: createDashboardApi({
+      ctx,
+      searchMode: () => searchMode(builtinDeps()),
+      setMode: (mode) => app.settings.setMode(mode),
+      reloadSettings,
+      freshSettings,
+    }),
 
     async close() {
       await fetcher.close()

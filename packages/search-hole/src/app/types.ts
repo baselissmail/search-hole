@@ -240,6 +240,63 @@ export interface LogDetail extends LogEntry {
   }>
 }
 
+/** The dashboard header (ADR-0020). */
+export interface DashboardOverview {
+  days: number
+  searches: number
+  /** Built-in (Claude Code WebSearch) searches among `searches`. */
+  builtin: number
+  kept: number
+  hidden: number
+  /** Searches per engine (engine searches only). */
+  engines: Array<{ engine: string; searches: number }>
+  /** Most-hidden registrable domains. */
+  topHidden: Array<{ domain: string; count: number }>
+  /** Kept results by source type. */
+  sourceTypes: Partial<Record<SourceType, number>>
+  mode: { configured: SearchMode; effective: 'engines' | 'builtin' }
+  version: string
+}
+
+/** One page of the live log, newest first. */
+export interface LogPage {
+  items: LogEntry[]
+  /** Pass as `before` for the next (older) page; null at the end. */
+  nextBefore: number | null
+  /** The newest search id (0 when the log is empty). */
+  maxId: number
+}
+
+/** What the Settings page shows. `locked` lists paths an env var pins (shown read-only). */
+export interface SettingsView {
+  mode: { configured: SearchMode; effective: 'engines' | 'builtin' }
+  queryHygiene: { mode: 'block' | 'redact' | 'off'; hosts: 'block' | 'redact' | 'off' }
+  limits: { searchesPerTurn: number; searchesPerHour: number; repeatQuery: number }
+  retention: { days: number }
+  hooks: { receiptLine: boolean; guard: boolean }
+  locked: string[]
+  paths: { config: string; data: string }
+}
+
+/** The settings the dashboard may change; anything else is edited in settings.yaml. */
+export type SettingsPatch =
+  | { path: 'mode'; value: SearchMode }
+  | { path: 'queryHygiene.mode' | 'queryHygiene.hosts'; value: 'block' | 'redact' | 'off' }
+  | { path: 'limits.searchesPerTurn' | 'limits.searchesPerHour' | 'limits.repeatQuery'; value: number }
+  | { path: 'retention.days'; value: number }
+  | { path: 'hooks.receiptLine'; value: boolean }
+
+/** Dashboard reads and settings writes (ADR-0020); never model-reachable. */
+export interface DashboardApi {
+  page(opts: { before?: number; after?: number; limit?: number; hiddenOnly?: boolean }): Promise<LogPage>
+  /** Searches with `id > after`, oldest first, plus the cursor checks for `reset` (ADR-0004 point 5). */
+  tail(after: number, limit: number): Promise<{ items: LogEntry[]; maxId: number; epoch: number }>
+  overview(days: number): Promise<DashboardOverview>
+  settingsView(): Promise<SettingsView>
+  /** Validates the patch and the resulting file before writing settings.yaml. */
+  patchSettings(patch: SettingsPatch): Promise<SettingsView>
+}
+
 export interface DoctorCheck {
   id: string
   status: 'ok' | 'warn' | 'fail' | 'info'
@@ -344,6 +401,8 @@ export interface App {
     setMode(mode: SearchMode): Promise<void>
   }
   doctor(opts?: { probe?: boolean }): Promise<DoctorReport>
+  /** Optional so that existing fakes stay valid; `createApp` always provides it. */
+  dashboard?: DashboardApi
   close(): Promise<void>
 }
 

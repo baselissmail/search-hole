@@ -675,9 +675,29 @@ export interface MaintenanceApi {
   optimize(): void
 }
 
+/** Totals for the dashboard header (`searchLog.overview`). */
+export interface SearchOverview {
+  readonly searches: number
+  /** Built-in WebSearch searches among `searches`. */
+  readonly builtin: number
+  readonly kept: number
+  readonly hidden: number
+  readonly engines: ReadonlyArray<{ engine: string; searches: number }>
+  readonly topHidden: ReadonlyArray<{ domain: string; count: number }>
+  /** Kept and pinned results by source type code (read tolerantly). */
+  readonly sourceTypes: Readonly<Record<string, number>>
+}
+
 export interface SearchLogApi {
-  /** Newest first; `limit` is clamped to 1..500. */
-  recent(opts: { limit: number; hiddenOnly?: boolean }): SearchLogRow[]
+  /**
+   * Newest first; `limit` is clamped to 1..500. `beforeId` / `afterId` are exclusive keyset
+   * cursors on the search id.
+   */
+  recent(opts: { limit: number; hiddenOnly?: boolean; beforeId?: number; afterId?: number }): SearchLogRow[]
+  /** `id > afterId`, oldest first (the live tail); `limit` clamped to 1..500. */
+  after(afterId: number, limit: number): SearchLogRow[]
+  /** Totals since `since` (epoch ms). */
+  overview(since: number): SearchOverview
   get(id: number): SearchLogRow | undefined
   byReceipt(receiptId: string): SearchLogRow[]
   /** Hidden-result counts by reason, per search id. */

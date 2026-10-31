@@ -29,7 +29,14 @@ import {
   releaseLease,
   renewLease,
 } from './queries/jobs.ts'
-import { getSearchLog, hiddenReasonCounts, listRecentSearches, listSearchesByReceipt } from './queries/log.ts'
+import {
+  getSearchLog,
+  hiddenReasonCounts,
+  listRecentSearches,
+  listSearchesByReceipt,
+  listSearchLogAfter,
+  searchOverview,
+} from './queries/log.ts'
 import {
   bumpDataEpoch,
   kvGet,
@@ -564,8 +571,27 @@ export async function openStore(opts: OpenStoreOptions): Promise<Store> {
     },
 
     searchLog: {
-      recent: ({ limit, hiddenOnly }) =>
-        read((d) => listRecentSearches(d, clampLimit(limit, MAX_SEARCHES_PER_TAIL), hiddenOnly === true), []),
+      recent: ({ limit, hiddenOnly, beforeId, afterId }) =>
+        read(
+          (d) =>
+            listRecentSearches(d, clampLimit(limit, MAX_SEARCHES_PER_TAIL), hiddenOnly === true, {
+              ...(beforeId === undefined ? {} : { beforeId }),
+              ...(afterId === undefined ? {} : { afterId }),
+            }),
+          [],
+        ),
+      after: (afterId, limit) =>
+        read((d) => listSearchLogAfter(d, afterId, clampLimit(limit, MAX_SEARCHES_PER_TAIL)), []),
+      overview: (since) =>
+        read((d) => searchOverview(d, since), {
+          searches: 0,
+          builtin: 0,
+          kept: 0,
+          hidden: 0,
+          engines: [],
+          topHidden: [],
+          sourceTypes: {},
+        }),
       get: (id) => read((d) => getSearchLog(d, id), undefined),
       byReceipt: (receiptId) => read((d) => listSearchesByReceipt(d, receiptId), []),
       hiddenReasons: (ids) => read((d) => hiddenReasonCounts(d, ids), new Map()),

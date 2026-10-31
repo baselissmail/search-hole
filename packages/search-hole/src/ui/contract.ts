@@ -14,6 +14,21 @@
  */
 import type {
   AddRuleInput,
+  DashboardOverview,
+  DoctorReport,
+  EngineStatus,
+  LogDetail,
+  LogEntry,
+  LogPage,
+  RuleListing,
+  SearchMode,
+  SettingsPatch,
+  SettingsView,
+  SuggestRuleInput,
+} from '../app/types.ts'
+
+export type {
+  AddRuleInput,
   DoctorReport,
   EngineStatus,
   LogDetail,
@@ -21,10 +36,7 @@ import type {
   RuleListing,
   SearchMode,
   SuggestRuleInput,
-} from '../app/types.ts'
-import type { SourceType } from '../shared/types.ts'
-
-export type { AddRuleInput, DoctorReport, EngineStatus, LogDetail, LogEntry, RuleListing, SearchMode, SuggestRuleInput }
+}
 
 /** Route paths. `:id` segments are filled by the helpers. */
 export const ROUTES = {
@@ -84,30 +96,9 @@ export interface SessionResponse {
   version: string
 }
 
-export interface Overview {
-  days: number
-  searches: number
-  /** Built-in (Claude Code WebSearch) searches among `searches`. */
-  builtin: number
-  kept: number
-  hidden: number
-  /** Searches per engine (engine searches only). */
-  engines: Array<{ engine: string; searches: number }>
-  /** Most-hidden registrable domains. */
-  topHidden: Array<{ domain: string; count: number }>
-  /** Kept results by source type. */
-  sourceTypes: Partial<Record<SourceType, number>>
-  mode: { configured: SearchMode; effective: 'engines' | 'builtin' }
-  version: string
-}
+export type Overview = DashboardOverview
 
-export interface SearchPage {
-  items: LogEntry[]
-  /** Pass as `before` for the next (older) page; null at the end. */
-  nextBefore: number | null
-  /** The newest id; open the stream with `after` = this to get only newer searches. */
-  maxId: number
-}
+export type SearchPage = LogPage
 
 /**
  * Stream events (SSE, one per `event:` line):
@@ -143,21 +134,4 @@ export interface SuggestionItem {
   status: string
 }
 
-/** What the Settings page shows. `locked` lists paths an env var pins (shown read-only). */
-export interface SettingsView {
-  mode: { configured: SearchMode; effective: 'engines' | 'builtin' }
-  queryHygiene: { mode: 'block' | 'redact' | 'off'; hosts: 'block' | 'redact' | 'off' }
-  limits: { searchesPerTurn: number; searchesPerHour: number; repeatQuery: number }
-  retention: { days: number }
-  hooks: { receiptLine: boolean; guard: boolean }
-  locked: string[]
-  paths: { config: string; data: string }
-}
-
-/** The settings the dashboard may change; anything else is edited in settings.yaml. */
-export type SettingsPatch =
-  | { path: 'mode'; value: SearchMode }
-  | { path: 'queryHygiene.mode' | 'queryHygiene.hosts'; value: 'block' | 'redact' | 'off' }
-  | { path: 'limits.searchesPerTurn' | 'limits.searchesPerHour' | 'limits.repeatQuery'; value: number }
-  | { path: 'retention.days'; value: number }
-  | { path: 'hooks.receiptLine'; value: boolean }
+export type { SettingsPatch, SettingsView }

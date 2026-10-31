@@ -34,6 +34,7 @@ Setup
                         Claude Code search mode
 
 Other
+  ui [--open]           Open the dashboard on 127.0.0.1 (live log, rules, engines)
   mcp --host <profile>  Start the MCP gateway on stdio (your AI host runs this)
   version               Print the version
   help [command]        Show help
@@ -119,6 +120,13 @@ A private SearXNG search engine in Docker, on 127.0.0.1 only (container "search-
   down     stop and remove the container (your settings stay)
   status   show whether it runs and answers
   apply    rewrite its settings and recreate the container after changing searxng.port`,
+  ui: `Usage: searchhole ui [--open] [--detach] [--stay] [--port <n>]
+
+Runs the dashboard on http://127.0.0.1:7341 (ui.port in settings.yaml), or reuses the one
+already running. It prints a one-time sign-in link (valid 60 s); --open opens it in your browser.
+  --detach  run it in the background and return (what /search-hole:dashboard does)
+  --stay    don't exit after ui.idleMinutes (default 30) with no open tab
+  --port    use another port for this run`,
   mcp: `Usage: searchhole mcp --host <profile>
 
 Starts the MCP gateway on stdio. Your AI host launches this; run it yourself only to test.

@@ -57,6 +57,7 @@ export type Command =
   | { name: 'doctor'; probe: boolean; strict: boolean; json: boolean }
   | { name: 'searxng'; sub: SearxngSub; yes: boolean; json: boolean }
   | { name: 'mcp'; host: HostProfile }
+  | { name: 'ui'; port?: number; open: boolean; detach: boolean; stay: boolean }
 
 /** Every command word, in help order. */
 export const COMMAND_NAMES = [
@@ -79,6 +80,7 @@ export const COMMAND_NAMES = [
   'keys',
   'doctor',
   'searxng',
+  'ui',
   'mcp',
   'version',
   'help',
@@ -568,6 +570,36 @@ function parseMcp(args: readonly string[]): Command {
   }
 }
 
+function parseUi(args: readonly string[]): Command {
+  const { values, positionals } = guard('ui', () =>
+    parseArgs({
+      args: [...args],
+      allowPositionals: true,
+      options: {
+        ...HELP_OPTION,
+        port: { type: 'string' },
+        open: { type: 'boolean' },
+        detach: { type: 'boolean' },
+        stay: { type: 'boolean' },
+      },
+    }),
+  )
+  if (values.help === true) return { name: 'help', topic: 'ui' }
+  noExtra('ui', positionals, 0)
+  let port: number | undefined
+  if (values.port !== undefined) {
+    port = /^\d{1,5}$/.test(values.port) ? Number(values.port) : Number.NaN
+    if (!(port >= 1024 && port <= 65535)) throw usageError('ui', '--port takes a number from 1024 to 65535.')
+  }
+  return {
+    name: 'ui',
+    ...(port === undefined ? {} : { port }),
+    open: values.open === true,
+    detach: values.detach === true,
+    stay: values.stay === true,
+  }
+}
+
 function parseVersion(args: readonly string[]): Command {
   const { values, positionals } = guard('version', () =>
     parseArgs({ args: [...args], allowPositionals: true, options: { json: { type: 'boolean' } } }),
@@ -621,6 +653,8 @@ export function parseCommand(argv: readonly string[], now: number = Date.now()):
       return parseSearxng(rest)
     case 'mcp':
       return parseMcp(rest)
+    case 'ui':
+      return parseUi(rest)
     case 'version':
       return parseVersion(rest)
     default: {
