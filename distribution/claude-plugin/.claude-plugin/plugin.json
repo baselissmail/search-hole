@@ -1,6 +1,6 @@
 {
   "name": "search-hole",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A local search gateway for AI assistants: choose the engines and sites your AI searches, see every search, get source receipts.",
   "author": {
     "name": "Basel Issmail",

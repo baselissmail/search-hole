@@ -181,7 +181,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # The engines.node floor of packages/search-hole/package.json (ADR-0002: >= 22.13).
+          # The engines.node floor of packages/search-hole/package.json (ADR-0002 amendment: >= 22.19).
           - runtime: node-floor
             tests: true
             experimental: false

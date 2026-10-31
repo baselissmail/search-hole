@@ -6,19 +6,41 @@ Versions 0.1.0 to 0.2.0 were local test builds. They were never published to npm
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-01
+
 ### Added
 
-- Release engineering (MASTER_PLAN P8):
-  - CI on Linux, macOS and Windows: Biome, typecheck, layer check, SPDX headers, unit tests, builds, bundle-size budgets, Playwright e2e with axe, `claude plugin validate --strict`, the `.mcpb` pack, and a bundle smoke test on Node 22.13, 24 and Bun.
+- **Block lists** (MASTER_PLAN P6, ADR-0017):
+  - Importers for uBlacklist, Adblock Plus and AdGuard (domain rules only), hosts files, plain domain lists and Brave Goggles. Lines that can't be expressed are counted and reported, never guessed.
+  - A prefilter matcher that buckets rules by host and n-gram, so large lists cost little per result.
+  - First-party CC0 lists, each entry with evidence, and a catalog of third-party lists with verified licences. A small starter set is vendored, so it works offline.
+  - Subscriptions and local imports: `searchhole lists`, `lists catalog`, `lists add|remove|import|update`, and `lists enforce|audit|disable`. Fetches use ETag and 304, the private-address guard, an optional SHA-256 pin, and a shrink guard that keeps the old copy when a list loses more than half its rules. Lists refresh in the background under a lease (`lists.autoUpdate`, on by default).
+  - Audit mode, which records what a list would hide without changing results.
+  - The dashboard's Lists page: modes with Undo, each list's contribution, errors with their fixes, the catalog, and subscribe.
+  - `doctor` reports list health, and the plugin has a `lists` skill.
+- **More clients** (MASTER_PLAN P7, ADR-0023):
+  - A Codex plugin (Agent Plugins, no hooks) and a Cursor plugin (`.cursor-plugin`, no hooks), built with `node scripts/build-plugin.mjs --target codex|cursor|all`.
+  - `searchhole setup <client>` for VS Code, Cursor, Windsurf, Zed, Goose, Codex and Claude Desktop. It shows the change, asks, merges into the client's MCP config and keeps a `.bak` copy.
+  - `searchhole uninstall` lists everything search-hole stored. `--purge` deletes its keys and files by name, and refuses a root that is `/`, a drive root or your home folder.
+  - Per-client guides under `docs/clients/`.
+- Release engineering (MASTER_PLAN P8, ADR-0024):
+  - CI on Linux, macOS and Windows: Biome, typecheck, layer check, SPDX headers, unit tests, builds, bundle-size budgets, Playwright e2e with axe, `claude plugin validate --strict`, the `.mcpb` pack, and a bundle smoke test on the Node floor (22.19), Node 24 and Bun.
   - A DCO sign-off check on pull requests.
   - CodeQL, OpenSSF Scorecard and Renovate, with a 14-day minimum release age.
   - A tag-driven release workflow: signed-tag check, npm publish with provenance, a CycloneDX SBOM, the plugin zip and `.mcpb` as release assets, SHA-256 checksums, and build attestations.
 - `scripts/check-bundle-size.mjs` (`pnpm check:size`), `scripts/sbom.mjs` (`pnpm build:sbom`), and the release helpers `pnpm release:bump` and `pnpm check:release`.
 - CONTRIBUTING.md, SECURITY.md, CODE_OF_CONDUCT.md, docs/release.md, docs/dogfood.md, and issue and pull request templates.
 
+- The npm package, the plugins and the `.mcpb` ship `LICENSE` and `THIRD_PARTY_NOTICES`.
+
 ### Changed
 
+- **Node 22.19 or later is required** (was 22.13). The bundled undici 8 needs zlib's zstd support (ADR-0002 amendment). The plugin's preflight and `doctor` say so.
 - The Playwright e2e configs use the `E2E_CHANNEL` environment variable (CI sets `chromium`). Local runs still use the installed Google Chrome.
+
+### Fixed
+
+- `searchhole help setup` and other lazily loaded commands no longer hang. The CLI entry has no top-level await and loads the CLI on demand.
 
 ## [0.2.0] - 2026-10-31
 

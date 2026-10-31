@@ -59,6 +59,11 @@ const sources = [
     'distribution/claude-desktop/manifest.json',
     () => json('distribution/claude-desktop/manifest.json').version,
   ],
+  ['distribution/codex/plugin.json', () => json('distribution/codex/plugin.json').version],
+  [
+    'distribution/cursor-plugin/.cursor-plugin/plugin.json',
+    () => json('distribution/cursor-plugin/.cursor-plugin/plugin.json').version,
+  ],
 ]
 for (const [file, get] of sources) {
   let found

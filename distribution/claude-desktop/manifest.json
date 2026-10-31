@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "search-hole",
   "display_name": "search-hole",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Your own search gateway for Claude: choose the engines and sites it searches, see every search, get source receipts.",
   "long_description": "search-hole is a local, open-source search gateway. It searches through engines you choose (a private SearXNG, Tavily or Brave), applies your source rules (block, allow, pin, raise and lower sites), and gives Claude a receipt of what was searched, hidden and opened. Everything stays on your computer: the search log, your rules and your keys. The receipt card in the chat lets you block a site Claude used with one click; Claude can only suggest rules, you approve them. Run `searchhole doctor` in a terminal, or open the dashboard with `searchhole ui --open`.",
   "author": {

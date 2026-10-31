@@ -7,7 +7,8 @@
  *
  * Rewrites only the top-level "version" value (no reformatting) in
  *   packages/search-hole/package.json, apps/dashboard/package.json, apps/receipt-app/package.json,
- *   distribution/claude-plugin/.claude-plugin/plugin.json, distribution/claude-desktop/manifest.json
+ *   distribution/claude-plugin/.claude-plugin/plugin.json, distribution/claude-desktop/manifest.json,
+ *   distribution/codex/plugin.json, distribution/cursor-plugin/.cursor-plugin/plugin.json
  * and the VERSION constant in packages/search-hole/src/cli/version.ts, then turns
  * `## [Unreleased]` in CHANGELOG.md into a dated `## [X.Y.Z]` section under a fresh, empty
  * Unreleased heading. Check the result with: node .github/scripts/check-release.mjs vX.Y.Z
@@ -47,6 +48,8 @@ const JSON_FILES = [
   'apps/receipt-app/package.json',
   'distribution/claude-plugin/.claude-plugin/plugin.json',
   'distribution/claude-desktop/manifest.json',
+  'distribution/codex/plugin.json',
+  'distribution/cursor-plugin/.cursor-plugin/plugin.json',
 ]
 
 try {
