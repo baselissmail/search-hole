@@ -249,6 +249,18 @@ export async function runDoctor(d: DoctorDeps, opts: { probe?: boolean } = {}): 
       SEARXNG_TIMEOUT_MS,
     )
     if ('failure' in res) {
+      // Not running is a normal state (it is optional): say so plainly in the engine line too.
+      const status = engines.find((e) => e.engine === 'searxng')
+      if (status) status.reachable = false
+      const line = checks.findIndex((c) => c.id === 'engine:searxng')
+      if (line >= 0 && status?.health !== 'unhealthy') {
+        checks[line] = {
+          id: 'engine:searxng',
+          status: 'info',
+          title: 'searxng: not running (optional)',
+          fix: SETUP_FIX.searxng ?? 'Start it with `searchhole searxng up`.',
+        }
+      }
       checks.push({
         id: 'searxng',
         status: 'info',

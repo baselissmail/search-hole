@@ -5,10 +5,12 @@
  * the WebFetch rule check and record. These run from hooks, so reads never create the
  * database; only recording a result (a real tool result) opens it for writing.
  */
+
 import { performance } from 'node:perf_hooks'
 import { redact } from '../core/hygiene.ts'
 import { classifySource } from '../core/sourcetype.ts'
 import { canonicalKey, hostOf, normalizeOriginal, registrableDomain } from '../core/url.ts'
+import { retentionDaysFor } from '../shared/settings.ts'
 import type { HiddenReason, ResultFlag, RuleDecision, RuleRef } from '../shared/types.ts'
 import { type BuiltinRecordedResult, type Store, urlHash } from '../store/index.ts'
 import { type AppContext, configuredMode } from './context.ts'
@@ -127,6 +129,7 @@ export async function filterBuiltinResults(
     const isHidden = x.decision.visibility === 'hidden'
     return {
       url: x.url,
+      ...(x.result.title ? { title: x.result.title } : {}),
       rank: x.rank,
       visibility: x.decision.visibility,
       flags: flagsOf(x.decision),
@@ -145,6 +148,7 @@ export async function filterBuiltinResults(
         profile,
         latencyMs: performance.now() - started,
         ...(rctx.toolUseId === undefined ? {} : { toolUseId: rctx.toolUseId }),
+        retentionDays: retentionDaysFor(d.ctx.settings.settings.retention, 'resultPayloads'),
         results: recorded,
       })
     } catch (e) {

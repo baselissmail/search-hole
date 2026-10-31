@@ -10,6 +10,7 @@
  * session rule set. Writes go through the yaml Document API (comments preserved), atomically
  * and under a lock.
  */
+
 import { createHash } from 'node:crypto'
 import { isAbsolute, join, resolve } from 'node:path'
 import { isMap, isSeq, type YAMLMap } from 'yaml'
@@ -28,6 +29,7 @@ import {
   untilToMs,
 } from '../core/rules/index.ts'
 import { classifySource } from '../core/sourcetype.ts'
+import { BUNDLED_LIST_KINDS, builtinDefaultProfile, bundledLists } from '../lists/bundled/index.ts'
 import { type LoadedRules, loadRulesYaml } from '../lists/yaml.ts'
 import { isSearchHoleError, SearchHoleError } from '../shared/errors.ts'
 import type {
@@ -268,7 +270,7 @@ export class RulesService {
    * Kind of each enabled list, for source typing. Empty until list subscriptions ship (P6):
    * then typed lists (`official`, `content-farm`, `clone`) feed `classifySource` here.
    */
-  private readonly listKinds = new Map<string, ListKind>()
+  private readonly listKinds = new Map<string, ListKind>(BUNDLED_LIST_KINDS)
 
   constructor(private readonly ctx: AppContext) {}
 
@@ -471,8 +473,13 @@ export class RulesService {
       session.map((r) => `${r.id}:${r.until ?? ''}`),
     ])
     let ruleSet = this.compiled.get(key)
+    // The built-in default profile prefers official docs unless the user defines their own.
+    const defaultName = this.ctx.settings.settings.profiles_default
+    if (!resolved.profiles.some((p) => p.name === defaultName)) {
+      resolved.profiles.push(builtinDefaultProfile(defaultName))
+    }
     if (!ruleSet) {
-      ruleSet = compileRuleSet({ rules: userRules, profiles: resolved.profiles })
+      ruleSet = compileRuleSet({ rules: userRules, lists: bundledLists(), profiles: resolved.profiles })
       if (this.compiled.size > 64) this.compiled.clear()
       this.compiled.set(key, ruleSet)
     }

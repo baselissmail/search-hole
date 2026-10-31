@@ -244,6 +244,10 @@ export function planRecord(input: RecordSearchInput, createdAt: number): RecordP
 export function planBuiltinRecord(input: RecordBuiltinInput, createdAt: number): RecordPlan {
   let kept = 0
   let hidden = 0
+  // Built-in results are the user's own Claude Code session data, already on this machine: keep
+  // title and URL for the local log under normal retention (ADR-0018 amendment, 2026-10-31).
+  const capDays = input.retentionDays ?? DEFAULT_RETENTION_DAYS
+  const expiresAt = capDays > 0 ? createdAt + capDays * 24 * HOUR_MS : undefined
   const results: ResultRow[] = input.results.map((r) => {
     const isHidden = r.visibility === 'hidden'
     if (isHidden) hidden++
@@ -256,7 +260,7 @@ export function planBuiltinRecord(input: RecordBuiltinInput, createdAt: number):
       engine: BUILTIN_ENGINE,
       rawRank: rank,
       positionsJson: JSON.stringify({ [BUILTIN_ENGINE]: rank }),
-      canonicalKey: null,
+      canonicalKey: key === null || key === undefined ? null : clip(key, MAX_URL),
       urlHash: urlHash(key ?? r.url),
       registrableDomain: clip(host === '' ? '' : registrableDomain(host), MAX_DOMAIN),
       decision: r.visibility,
@@ -274,7 +278,18 @@ export function planBuiltinRecord(input: RecordBuiltinInput, createdAt: number):
       outRank: isHidden ? null : (r.outRank ?? null),
       fused: 0,
       adjusted: 0,
-      payloads: [],
+      payloads:
+        expiresAt === undefined
+          ? []
+          : [
+              {
+                engine: BUILTIN_ENGINE,
+                title: clip(r.title ?? '', MAX_TITLE),
+                snippet: '',
+                url: clip(r.url, MAX_URL),
+                expiresAt,
+              },
+            ],
     }
   })
   const latencyMs = Math.max(0, Math.round(input.latencyMs))

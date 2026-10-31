@@ -388,6 +388,8 @@ export type CheckpointMode = 'PASSIVE' | 'FULL' | 'RESTART' | 'TRUNCATE'
  */
 export interface BuiltinRecordedResult {
   readonly url: string
+  /** Title as the built-in search returned it (stored for the user's own log, ADR-0018). */
+  readonly title?: string
   /** 1-based position in the built-in result list. */
   readonly rank: number
   readonly visibility: Visibility
@@ -408,6 +410,8 @@ export interface RecordBuiltinInput {
   readonly latencyMs: number
   readonly toolUseId?: string
   readonly results: readonly BuiltinRecordedResult[]
+  /** Days to keep titles and URLs (settings retention for result payloads); default 90. */
+  readonly retentionDays?: number
   /** Epoch ms; defaults to the store clock. */
   readonly createdAt?: number
 }

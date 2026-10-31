@@ -69,7 +69,7 @@ rules:
     expect(domains[0]).toBe('spam0.example.net')
   })
 
-  it('filters results: hidden dropped, pins first, then raise/lower; logs decisions only', async () => {
+  it('filters results: hidden dropped, pins first, then raise/lower; logs URLs and titles for the local log', async () => {
     const h = await setup({ rules: RULES })
     const out = await h.app.filterBuiltinResults('react hooks', RESULTS, {
       ...hookSession(),
@@ -95,20 +95,21 @@ rules:
     expect(entry).toMatchObject({ mode: 'builtin', kept: 5, hidden: 3, query: 'react hooks', engines: [] })
     const detail = await h.app.log.detail(entry?.searchId ?? 0)
     expect(detail?.results).toHaveLength(8)
+    // Built-in results are the user's own session data: the local log keeps URL and title (ADR-0018).
     for (const r of detail?.results ?? []) {
       expect(r.engine).toBe('builtin')
-      expect(r.title).toBeUndefined()
-      expect(r.url).toBeUndefined()
+      expect(r.url).toMatch(/^https:\/\//)
     }
+    expect(detail?.results[0]?.url).toBe('https://developer.mozilla.org/en-US/docs/Web')
     expect(detail?.results[0]).toMatchObject({ decision: 'pinned', domain: 'mozilla.org', rank: 1 })
     expect(detail?.results.filter((r) => r.decision === 'hidden').map((r) => r.domain)).toEqual([
       'pinterest.com',
       'example.com',
       'mirror.dev',
     ])
-    // No title or URL reached the database.
-    const db = readFileSync(join(h.home, 'searchhole.db'))
-    expect(db.includes('Pinterest board')).toBe(false)
+    // Titles are kept too, hidden results included, so the user can see what a rule removed.
+    const pinterest = detail?.results.find((r) => r.domain === 'pinterest.com')
+    expect(pinterest?.title).toContain('Pinterest board')
   })
 
   it('nothing hidden: removedPostSearch is false', async () => {

@@ -77,3 +77,9 @@ The table compares the two behaviours `auto` switches between:
 - The `blocked_domains` cap (and the behaviour when exceeded). The precedence: a user `allow` must remove that domain from `blocked_domains` even when a list blocks it.
 - Shape validation: a malformed `updatedToolOutput` is silently ignored by Claude Code. Tests must catch shape drift across Claude Code versions (a contract test on the recorded shape).
 - Plugin evals: blocked domains never reach the model; pins come first; zero-config install works.
+
+## Amendment (2026-10-31): the local log keeps built-in titles and URLs
+
+The first version stored only the domain, URL hash and decision for built-in results, out of caution about the search provider's terms. Dogfooding showed that makes the log useless for its main job: you can't tell which page Claude used. Built-in results are the user's own Claude Code session data, already delivered to this machine, so `filterBuiltinResults` now stores each result's title and URL in `result_payloads` (engine `builtin`) under the normal retention (`retention` → result payloads, default 90 days). Engine results keep their per-engine policies (ADR-0009 point 9): Brave, Kagi and Exa stay decisions-only.
+
+Also added: a bundled `official-docs` list (CC0-1.0, `packages/search-hole/src/lists/bundled/official-docs.ts`). It is annotation-only, so it types results as `official` and never hides anything. The built-in default profile prefers it (×1.45, the same lift as `raise 3`) unless the user defines their own `default` profile.

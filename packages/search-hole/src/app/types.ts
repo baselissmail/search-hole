@@ -118,6 +118,8 @@ export interface EngineStatus {
   keySource?: string
   suspendedUntil?: string
   attribution?: string
+  /** Doctor only: false when the engine's endpoint did not answer (e.g. SearXNG not running). */
+  reachable?: boolean
 }
 
 /** One built-in WebSearch result as Claude Code returns it (spikes §6). */

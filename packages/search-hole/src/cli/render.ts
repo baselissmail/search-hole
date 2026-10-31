@@ -472,7 +472,12 @@ export function renderMode(
 // ── doctor ───────────────────────────────────────────────────────────────
 
 function engineStatusRow(s: EngineStatus, style: Style): string[] {
-  const state = s.active ? style.green('active') : style.dim('inactive')
+  const state =
+    s.reachable === false
+      ? style.dim('not running')
+      : s.active
+        ? style.green('active')
+        : style.dim('inactive')
   const why = [
     ...new Set(
       [
@@ -519,13 +524,18 @@ export function renderDoctor(report: DoctorReport, { style }: RenderOpts): strin
   )
   const fails = report.checks.filter((c) => c.status === 'fail').length
   const warns = report.checks.filter((c) => c.status === 'warn').length
+  const usable = report.engines.some((e) => e.active && e.reachable !== false && e.health !== 'unhealthy')
   lines.push(
     '',
     fails > 0
       ? style.red(`${plural(fails, 'problem')} to fix${warns > 0 ? `, ${plural(warns, 'warning')}` : ''}.`)
       : warns > 0
         ? style.yellow(`No problems; ${plural(warns, 'warning')}.`)
-        : style.green('Everything looks good.'),
+        : usable
+          ? style.green('Everything looks good.')
+          : style.green(
+              'Ready, with no engine: in Claude Code your rules filter its built-in search. Optional: add an engine for snippets, dates and better ranking (`searchhole searxng up`, or a free Tavily key).',
+            ),
   )
   return lines.join('\n')
 }

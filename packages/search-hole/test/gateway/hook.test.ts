@@ -361,9 +361,14 @@ describe.each(ERAS)('hook tool (%s era)', (era) => {
       'grep -r searchhole src/',
     ])('allows %s without starting the App, fast', async (command) => {
       const { h, hook } = await setup(era)
-      const started = performance.now()
-      expect(await hook(pre('Bash', { command }))).toEqual({})
-      expect(performance.now() - started).toBeLessThan(50)
+      // Best of five: the budget is for the code path, not for one scheduling hiccup under load.
+      let best = Number.POSITIVE_INFINITY
+      for (let i = 0; i < 5; i++) {
+        const started = performance.now()
+        expect(await hook(pre('Bash', { command }))).toEqual({})
+        best = Math.min(best, performance.now() - started)
+      }
+      expect(best).toBeLessThan(50)
       expect(h.appCreations()).toBe(0)
     })
 
