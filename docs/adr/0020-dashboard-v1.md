@@ -42,6 +42,8 @@ P4 ships the first dashboard. ADR-0004 fixed the process model: an on-demand `se
 
 - `pnpm build` builds the dashboard before the package, and the plugin ships `dist/ui/`.
 - The dashboard works offline, with no external requests: fonts and icons are bundled.
+- **Stream: one cursor per client, not a shared tailer.** ADR-0004 point 5 describes a single 250 ms tailer fanning out through bounded queues. v1 polls per stream instead, with each client keeping its own cursor. It is simpler, and a local single-user dashboard has one or two tabs, so 4–8 sub-millisecond keyset queries a second. Writes are awaited, which gives backpressure without a queue to overflow. A shared tailer comes back if a remote (v2) dashboard needs many viewers.
+- The UI process is started only by the user (`searchhole ui`, `/search-hole:dashboard`). Gateways never start it, and no MCP output contains a login code or token (ADR-0004 point 3).
 
 ## Validate early
 
