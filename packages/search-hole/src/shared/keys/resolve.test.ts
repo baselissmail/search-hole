@@ -298,6 +298,38 @@ describe('cache (60 s, injected clock)', () => {
     expect(await resolveKey('exa', d)).toMatchObject({ key: 'pasted' })
   })
 
+  it('stale-while-revalidate: an expired key is served at once and refreshed in the background', async () => {
+    let now = 0
+    const { store, state } = fakeStore('keychain', { exa: 'one' })
+    const cache = createKeyCache(() => now)
+    const d = deps({ store, cache, staleWhileRevalidate: true })
+    expect(await resolveKey('exa', d)).toMatchObject({ key: 'one' })
+    state.entries.exa = 'two'
+    now += 61_000
+    // Concurrent callers share one store read and get the stale value without waiting.
+    const [a, b] = await Promise.all([resolveKey('exa', d), resolveKey('exa', d)])
+    expect([a.key, b.key]).toEqual(['one', 'one'])
+    await new Promise((r) => setImmediate(r))
+    expect(state.reads).toBe(2)
+    expect(await resolveKey('exa', d)).toMatchObject({ key: 'two' })
+    expect(state.reads).toBe(2)
+  })
+
+  it('clear() during a background refresh: the old value is not written back', async () => {
+    let now = 0
+    const { store, state } = fakeStore('keychain', { exa: 'old' })
+    const cache = createKeyCache(() => now)
+    const d = deps({ store, cache, staleWhileRevalidate: true })
+    await resolveKey('exa', d)
+    now += 61_000
+    const pending = resolveKey('exa', d)
+    cache.clear('exa')
+    state.entries.exa = 'new'
+    expect((await pending).key).toBe('old')
+    await new Promise((r) => setImmediate(r))
+    expect(await resolveKey('exa', d)).toMatchObject({ key: 'new' })
+  })
+
   it('keeps engines apart and does not cache thrown errors', async () => {
     const cache = createKeyCache(() => 0)
     const env = { TAVILY_API_KEY: 'a', TAVILY_API_KEY_FILE: '/f' }

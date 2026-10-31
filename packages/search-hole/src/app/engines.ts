@@ -219,6 +219,11 @@ export class Engines {
     return this.stores
   }
 
+  /** Looks every key up in the background, so the first hook that needs one doesn't wait. */
+  warmKeys(): void {
+    for (const slot of this.slots) void this.key(slot.id)
+  }
+
   /** Forgets cached keys (after `keys set/remove`). */
   forgetKey(engine?: EngineId): void {
     this.keyCache.clear(engine)
@@ -230,7 +235,7 @@ export class Engines {
       return await resolveKey(engine, {
         env: this.ctx.env,
         store: this.keyStores().read,
-        ...(cached ? { cache: this.keyCache } : {}),
+        ...(cached ? { cache: this.keyCache, staleWhileRevalidate: true } : {}),
       })
     } catch (e) {
       return { key: null, source: 'missing', detail: isSearchHoleError(e) ? e.why : 'key lookup failed' }

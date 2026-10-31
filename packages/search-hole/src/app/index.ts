@@ -46,6 +46,7 @@ const HEARTBEAT_MS = 30_000
 export const createApp: CreateApp = async (opts: AppOptions): Promise<App> => {
   const ctx: AppContext = createContext(opts)
   const engines = new Engines(ctx)
+  if (ctx.host !== 'cli') engines.warmKeys()
   const rules = new RulesService(ctx)
   const receipts = new Receipts(ctx)
   const fetcher = lazyFetcher(ctx)

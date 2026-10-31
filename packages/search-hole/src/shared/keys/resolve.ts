@@ -30,6 +30,8 @@ export const KEY_CACHE_TTL_MS = 60_000
 
 export interface KeyCache {
   get(engine: EngineId): KeyResolution | undefined
+  /** The last value even after it expired (until `clear`), for stale-while-revalidate. */
+  stale(engine: EngineId): KeyResolution | undefined
   set(engine: EngineId, value: KeyResolution): void
   /** Forgets one engine, or all. Call after `keys set` in the same process. */
   clear(engine?: EngineId): void
@@ -37,25 +39,32 @@ export interface KeyCache {
 
 /** A per-process cache with a time-to-live and an injected clock (ADR-0007: 60 s). */
 export function createKeyCache(now: () => number, ttlMs: number = KEY_CACHE_TTL_MS): KeyCache {
+  // Expired entries stay (one per engine) so `stale` can serve them while a lookup runs.
   const entries = new Map<EngineId, { value: KeyResolution; expiresAt: number }>()
-  return {
+  const cache: KeyCache = {
     get(engine) {
       const hit = entries.get(engine)
-      if (hit === undefined) return undefined
-      if (now() >= hit.expiresAt) {
-        entries.delete(engine)
-        return undefined
-      }
+      if (hit === undefined || now() >= hit.expiresAt) return undefined
       return hit.value
+    },
+    stale(engine) {
+      return entries.get(engine)?.value
     },
     set(engine, value) {
       entries.set(engine, { value, expiresAt: now() + ttlMs })
     },
     clear(engine) {
-      if (engine === undefined) entries.clear()
-      else entries.delete(engine)
+      // A lookup already running must not write back the value being forgotten.
+      if (engine === undefined) {
+        entries.clear()
+        inflight.delete(cache)
+      } else {
+        entries.delete(engine)
+        inflight.get(cache)?.delete(engine)
+      }
     },
   }
+  return cache
 }
 
 export interface KeyDeps {
@@ -66,6 +75,12 @@ export interface KeyDeps {
   readFile?: (path: string) => Promise<string>
   /** When given, results are cached (and served from the cache) per engine. */
   cache?: KeyCache
+  /**
+   * With `cache`: once an entry expires, return it at once and look the key up in the
+   * background. Keeps OS key-store calls (macOS `security` takes ~50 ms, longer when the
+   * keychain is locked) off latency-sensitive paths such as hooks.
+   */
+  staleWhileRevalidate?: boolean
 }
 
 const asList = (store: KeyDeps['store']): readonly SecretStore[] =>
@@ -145,11 +160,38 @@ async function resolveUncached(engine: EngineId, deps: KeyDeps): Promise<KeyReso
  * wherever it appears, and is never logged by this module.
  */
 export async function resolveKey(engine: EngineId, deps: KeyDeps): Promise<KeyResolution> {
-  const cached = deps.cache?.get(engine)
+  const cache = deps.cache
+  if (cache === undefined) return lookup(engine, deps)
+  const cached = cache.get(engine)
   if (cached !== undefined) return cached
+  let running = inflight.get(cache)?.get(engine)
+  if (running === undefined) {
+    const current: Promise<KeyResolution> = lookup(engine, deps)
+      .then((result) => {
+        if (inflight.get(cache)?.get(engine) === current) cache.set(engine, result)
+        return result
+      })
+      .finally(() => {
+        if (inflight.get(cache)?.get(engine) === current) inflight.get(cache)?.delete(engine)
+      })
+    running = current
+    let byEngine = inflight.get(cache)
+    if (byEngine === undefined) inflight.set(cache, (byEngine = new Map()))
+    byEngine.set(engine, running)
+  }
+  const stale = deps.staleWhileRevalidate === true ? cache.stale(engine) : undefined
+  if (stale === undefined) return running
+  // A failed refresh keeps the stale value; the next call tries again.
+  running.catch(() => undefined)
+  return stale
+}
+
+/** Lookups in progress per cache, so concurrent callers share one store call. */
+const inflight = new WeakMap<KeyCache, Map<EngineId, Promise<KeyResolution>>>()
+
+async function lookup(engine: EngineId, deps: KeyDeps): Promise<KeyResolution> {
   const result = await resolveUncached(engine, deps)
   if (result.key !== null) registerSecret(result.key)
-  deps.cache?.set(engine, result)
   return result
 }
 
