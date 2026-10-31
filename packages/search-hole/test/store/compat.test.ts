@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
+
 import { describe, expect, it } from 'vitest'
 import type { Warning } from '../../src/shared/types.ts'
 import { decideMode } from '../../src/store/compat.ts'
 import { openDb } from '../../src/store/driver.ts'
+import { LATEST_SCHEMA_VERSION as L } from '../../src/store/migrations/index.ts'
 import type { MetaRow } from '../../src/store/queries/meta.ts'
 import { encodeUserVersion } from '../../src/store/version.ts'
 import { clock, open, searchInput, tempDir, V2, V4 } from './helpers.ts'
@@ -69,25 +71,29 @@ describe('two versions sharing one database (ADR-0006 validate: two-version test
     const warnings: Warning[] = []
     // v0.1.0 knows only schema 1.
     const old = await open(dir, t, { appVersion: '0.1.0', onWarning: (w) => warnings.push(w) })
-    expect(old.status()).toMatchObject({ mode: 'read-write', schemaVersion: 1 })
+    expect(old.status()).toMatchObject({ mode: 'read-write', schemaVersion: L })
 
     // v0.2.0 ships an additive migration: min_writer_version is unchanged.
     const middle = await open(dir, t, { appVersion: '0.2.0', migrations: V2 })
     expect(middle.status()).toMatchObject({
       mode: 'read-write',
       migration: 'migrated',
-      schemaVersion: 2,
+      schemaVersion: L + 1,
       minWriterVersion: '0.0.0',
     })
     // The old binary keeps writing, with explicit column lists that ignore the new column.
     expect(old.recordSearch(searchInput({ receiptId: 'from-old' })).status).toBe('recorded')
     // And a freshly started old binary sees a newer schema but is still read-write.
     const oldAgain = await open(dir, t, { appVersion: '0.1.0' })
-    expect(oldAgain.status()).toMatchObject({ mode: 'read-write', reason: 'ok', schemaVersion: 2 })
+    expect(oldAgain.status()).toMatchObject({ mode: 'read-write', reason: 'ok', schemaVersion: L + 1 })
 
     // v0.4.0 contracts: min_writer_version becomes 0.3.0 and user_version follows.
     const newest = await open(dir, t, { appVersion: '0.4.0', migrations: V4 })
-    expect(newest.status()).toMatchObject({ mode: 'read-write', schemaVersion: 4, minWriterVersion: '0.3.0' })
+    expect(newest.status()).toMatchObject({
+      mode: 'read-write',
+      schemaVersion: L + 3,
+      minWriterVersion: '0.3.0',
+    })
     const raw = await openDb({ path: `${dir}/searchhole.db`, busyTimeoutMs: 100 })
     expect(raw.prepare<{ user_version: number }>('PRAGMA user_version').get()?.user_version).toBe(
       encodeUserVersion('0.3.0'),

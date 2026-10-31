@@ -125,6 +125,7 @@ export function createContext(opts: AppOptions): AppContext {
     appVersion: opts.version,
     now,
     busyTimeoutMs: seams.storeBusyTimeoutMs ?? (opts.host === 'cli' ? 5000 : 100),
+    migrateOnRead: opts.host === 'cli',
     logger,
   })
   return {

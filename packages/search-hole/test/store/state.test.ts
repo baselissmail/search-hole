@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
+
 import { describe, expect, it } from 'vitest'
 import { openDb } from '../../src/store/driver.ts'
 import type { AcquireResult, EngineHealthWrite, JobOwner, Lease } from '../../src/store/index.ts'
 import { SHARED_KEY_FP } from '../../src/store/index.ts'
+import { LATEST_SCHEMA_VERSION as L } from '../../src/store/migrations/index.ts'
 import { clock, open, recorded, searchInput, tempDir } from './helpers.ts'
 
 const DAY = 24 * 3_600_000
@@ -344,7 +346,7 @@ describe('meta', () => {
   it('exposes the protocol row and the data epoch', async () => {
     const store = await open(tempDir(), clock())
     expect(store.meta.snapshot()).toEqual({
-      schemaVersion: 1,
+      schemaVersion: L,
       minReaderVersion: '0.0.0',
       minWriterVersion: '0.0.0',
       lastMigratedBy: '0.1.0',

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { AddRuleInput, RequestCtx, SearchArgs } from '../../src/app/types.ts'
 import { exitCodeFor } from '../../src/cli/errors.ts'
@@ -23,9 +24,20 @@ describe('help and version', () => {
     expect((await run([])).out).toContain('Usage: searchhole <command>')
     const ver = await run(['version'])
     expect(ver.out).toBe(`${VERSION}\n`)
-    expect(VERSION).toBe('0.1.0')
-    expect(JSON.parse((await run(['version', '--json'])).out)).toMatchObject({ version: '0.1.0' })
-    expect((await run(['--version'])).out).toBe('0.1.0\n')
+    // One version everywhere: the CLI constant, package.json and the plugin manifest.
+    const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as {
+      version: string
+    }
+    const plugin = JSON.parse(
+      readFileSync(
+        new URL('../../../../distribution/claude-plugin/.claude-plugin/plugin.json', import.meta.url),
+        'utf8',
+      ),
+    ) as { version: string }
+    expect(VERSION).toBe(pkg.version)
+    expect(plugin.version).toBe(pkg.version)
+    expect(JSON.parse((await run(['version', '--json'])).out)).toMatchObject({ version: VERSION })
+    expect((await run(['--version'])).out).toBe(`${VERSION}\n`)
     expect(ver.app.opened).toHaveLength(0)
   })
 
@@ -94,8 +106,8 @@ describe('search', () => {
       maxAgeDays: 90,
       limit: 7,
     })
-    expect(ctx).toEqual({ projectDir: '/work/project', client: { name: 'searchhole-cli', version: '0.1.0' } })
-    expect(r.app.opened).toEqual([{ host: 'cli', version: '0.1.0', env: {}, cwd: '/work/project' }])
+    expect(ctx).toEqual({ projectDir: '/work/project', client: { name: 'searchhole-cli', version: VERSION } })
+    expect(r.app.opened).toEqual([{ host: 'cli', version: VERSION, env: {}, cwd: '/work/project' }])
     expect(r.app.closed).toBe(1)
   })
 
@@ -392,7 +404,7 @@ describe('read-only commands', () => {
     )
     expect(fine.code).toBe(0)
     expect(call(fine.app.calls, 'doctor').args).toEqual([undefined])
-    expect(JSON.parse(fine.out).version).toBe('0.1.0')
+    expect(JSON.parse(fine.out).version).toBe('0.1.0') // the fake report's own version
   })
 
   it('keys status shows presence and source only', async () => {
@@ -466,7 +478,7 @@ describe('mcp', () => {
     expect(r.keepAlive).toBe(false)
     expect(r.out).toBe('')
     expect(r.err).toBe('')
-    expect(seen).toEqual([{ host: 'claude-code', version: '0.1.0', env: { A: '1' }, cwd: '/w' }])
+    expect(seen).toEqual([{ host: 'claude-code', version: VERSION, env: { A: '1' }, cwd: '/w' }])
     expect(r.app.opened).toHaveLength(0)
   })
 

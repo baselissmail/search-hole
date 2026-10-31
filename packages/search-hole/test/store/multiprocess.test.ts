@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
+
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { openDb } from '../../src/store/driver.ts'
 import { openStore } from '../../src/store/index.ts'
+import { LATEST_SCHEMA_VERSION as L } from '../../src/store/migrations/index.ts'
 import { clock, searchInput, tempDir } from './helpers.ts'
 import { runWorkers } from './workers.ts'
 
@@ -28,12 +30,12 @@ describe('migration race (ADR-0006 validate: 20 processes at once)', () => {
       expect(outputs).toHaveLength(20)
       expect(outputs.filter((o) => o.status.migration === 'migrated')).toHaveLength(1)
       for (const o of outputs) {
-        expect(o.status, `pid ${o.pid}`).toMatchObject({ mode: 'read-write', reason: 'ok', schemaVersion: 1 })
+        expect(o.status, `pid ${o.pid}`).toMatchObject({ mode: 'read-write', reason: 'ok', schemaVersion: L })
         expect(['migrated', 'waited', 'current']).toContain(o.status.migration)
       }
       expect(await query(dir, 'PRAGMA integrity_check')).toEqual([{ integrity_check: 'ok' }])
       expect(await query(dir, 'SELECT schema_version, migrating_pid, migrating_until FROM meta')).toEqual([
-        { schema_version: 1, migrating_pid: null, migrating_until: null },
+        { schema_version: L, migrating_pid: null, migrating_until: null },
       ])
       expect(existsSync(join(dir, 'backups'))).toBe(false) // nothing to back up
       // Whoever created the file set auto_vacuum before the first table existed.
@@ -65,11 +67,11 @@ describe('migration race (ADR-0006 validate: 20 processes at once)', () => {
       })
       expect(outputs.filter((o) => o.status.migration === 'migrated')).toHaveLength(1)
       for (const o of outputs)
-        expect(o.status, `pid ${o.pid}`).toMatchObject({ mode: 'read-write', schemaVersion: 2 })
+        expect(o.status, `pid ${o.pid}`).toMatchObject({ mode: 'read-write', schemaVersion: L + 1 })
 
       const backups = readdirSync(join(dir, 'backups'))
       expect(backups).toHaveLength(1)
-      expect(backups[0]).toMatch(/^searchhole-v1-/)
+      expect(backups[0]).toMatch(new RegExp(`^searchhole-v${L}-`))
       expect(
         await query(dir, "SELECT name FROM pragma_table_info('searches') WHERE name = 'note'"),
       ).toHaveLength(1)

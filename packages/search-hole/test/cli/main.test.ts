@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
+
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { VERSION } from '../../src/cli/version.ts'
 
 const MAIN = join(import.meta.dirname, '../../src/cli/main.ts')
 const dirs: string[] = []
@@ -26,7 +28,7 @@ function cli(args: string[], opts: { input?: string; env?: Record<string, string
 
 describe('the real entry point', () => {
   it('prints the version and help with exit 0', () => {
-    expect(cli(['version'])).toMatchObject({ code: 0, out: '0.1.0\n', err: '' })
+    expect(cli(['version'])).toMatchObject({ code: 0, out: `${VERSION}\n`, err: '' })
     const help = cli(['help'])
     expect(help.code).toBe(0)
     expect(help.out).toContain('Usage: searchhole <command>')
@@ -91,6 +93,6 @@ describe('the real entry point', () => {
     const reply = JSON.parse(lines[0] ?? '{}') as {
       result?: { serverInfo?: { name?: string; version?: string } }
     }
-    expect(reply.result?.serverInfo).toMatchObject({ name: 'search-hole', version: '0.1.0' })
+    expect(reply.result?.serverInfo).toMatchObject({ name: 'search-hole', version: VERSION })
   })
 })

@@ -529,6 +529,8 @@ export class Receipts {
         .filter((f) => f.decision === 'opened')
         .map((f) => {
           const url =
+            f.finalUrl ??
+            f.url ??
             this.urls.get(f.finalUrlHash ?? f.urlHash) ??
             this.urls.get(f.urlHash) ??
             (f.host ? `https://${f.host}/` : 'about:blank')

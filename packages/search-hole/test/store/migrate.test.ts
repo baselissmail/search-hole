@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
+
 import { existsSync, readdirSync, statSync, utimesSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { openDb } from '../../src/store/driver.ts'
 import { openStore } from '../../src/store/index.ts'
 import { backupDatabase } from '../../src/store/migrate.ts'
-import { MIGRATIONS } from '../../src/store/migrations/index.ts'
+import { LATEST_SCHEMA_VERSION as L, MIGRATIONS } from '../../src/store/migrations/index.ts'
 import { META_SQL } from '../../src/store/migrations/meta-sql.ts'
 import {
   ADDITIVE,
@@ -65,7 +66,7 @@ describe('migration 0001 on a fresh database', () => {
       mode: 'read-write',
       reason: 'ok',
       migration: 'migrated',
-      schemaVersion: 1,
+      schemaVersion: L,
     })
     const names = (
       await rawQuery<{ name: string }>(dir, "SELECT name FROM sqlite_master WHERE type = 'table'")
@@ -73,7 +74,7 @@ describe('migration 0001 on a fresh database', () => {
     for (const t of TABLES) expect(names, t).toContain(t)
     const [meta] = await rawQuery<Record<string, unknown>>(dir, 'SELECT * FROM meta')
     expect(meta).toMatchObject({
-      schema_version: 1,
+      schema_version: L,
       min_reader_version: '0.0.0',
       min_writer_version: '0.0.0',
       last_migrated_by: APP,
@@ -139,10 +140,14 @@ describe('upgrading an existing database', () => {
     v1.close()
 
     const v2 = await open(dir, t, { appVersion: '0.2.0', migrations: V2, pid: 4242 })
-    expect(v2.status()).toMatchObject({ migration: 'migrated', schemaVersion: 2, lastMigratedBy: '0.2.0' })
+    expect(v2.status()).toMatchObject({
+      migration: 'migrated',
+      schemaVersion: L + 1,
+      lastMigratedBy: '0.2.0',
+    })
     const files = backups(dir)
     expect(files).toHaveLength(1)
-    expect(files[0]).toMatch(/^searchhole-v1-\d{8}T\d{9}Z-4242\.db$/)
+    expect(files[0]).toMatch(new RegExp(`^searchhole-v${L}-\\d{8}T\\d{9}Z-4242\\.db$`))
     if (process.platform !== 'win32')
       expect((statSync(join(dir, 'backups', files[0] ?? '')).mode & 0o777).toString(8)).toBe('600')
     // The backup is a complete copy of the pre-migration database.
@@ -207,7 +212,7 @@ describe('upgrading an existing database', () => {
     v1.close()
 
     const v3 = await open(dir, t, { appVersion: '0.3.0', migrations: V3 })
-    expect(v3.status()).toMatchObject({ migration: 'migrated', schemaVersion: 3 })
+    expect(v3.status()).toMatchObject({ migration: 'migrated', schemaVersion: L + 2 })
     expect({
       searches: await count('searches'),
       results: await count('results'),
@@ -256,13 +261,13 @@ describe('upgrading an existing database', () => {
     })
     expect(broken.recordSearch(searchInput()).status).toBe('skipped')
     const [meta] = await rawQuery<Record<string, unknown>>(dir, 'SELECT * FROM meta')
-    expect(meta).toMatchObject({ schema_version: 1, migrating_pid: null, migrating_until: null })
+    expect(meta).toMatchObject({ schema_version: L, migrating_pid: null, migrating_until: null })
     expect(await rawQuery(dir, "SELECT name FROM sqlite_master WHERE name = 'probe_half'")).toEqual([])
     expect(backups(dir)).toHaveLength(1)
 
     // A fixed binary then migrates normally.
     const fixed = await open(dir, t, { appVersion: '0.2.0', migrations: V2 })
-    expect(fixed.status()).toMatchObject({ mode: 'read-write', schemaVersion: 2 })
+    expect(fixed.status()).toMatchObject({ mode: 'read-write', schemaVersion: L + 1 })
     expect(fixed.getSearch(1)).toBeDefined()
   })
 
@@ -272,7 +277,7 @@ describe('upgrading an existing database', () => {
     const v1 = await openStore({ dataDir: dir, appVersion: '0.1.0', now: t })
     v1.close()
     const store = await open(dir, t, { appVersion: '0.2.0', migrations: [...MIGRATIONS, FK_VIOLATION] })
-    expect(store.status()).toMatchObject({ reason: 'migration_failed', schemaVersion: 1 })
+    expect(store.status()).toMatchObject({ reason: 'migration_failed', schemaVersion: L })
     expect(store.status().message).toMatch(/foreign keys/)
     expect(await rawQuery(dir, 'SELECT count(*) AS n FROM results')).toEqual([{ n: 0 }])
   })
@@ -303,14 +308,14 @@ describe('election and waiting', () => {
     // The "other process" completes: schema applied, claim cleared.
     const other = await openDb({ path: dbFile(dir), busyTimeoutMs: 1000 })
     other.tx('exclusive', () => {
-      other.exec(MIGRATIONS[0]?.sql ?? '')
+      for (const m of MIGRATIONS) other.exec(m.sql)
       other.exec(
-        "UPDATE meta SET schema_version = 1, last_migrated_by = '0.1.0', migrating_pid = NULL, migrating_until = NULL",
+        `UPDATE meta SET schema_version = ${L}, last_migrated_by = '0.1.0', migrating_pid = NULL, migrating_until = NULL`,
       )
     })
     other.close()
     const store = await opening
-    expect(store.status()).toMatchObject({ mode: 'read-write', migration: 'waited', schemaVersion: 1 })
+    expect(store.status()).toMatchObject({ mode: 'read-write', migration: 'waited', schemaVersion: L })
   })
 
   it('gives up waiting for a live claim and degrades to no-history instead of throwing', async () => {

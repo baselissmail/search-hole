@@ -8,6 +8,7 @@ import type { Db } from '../driver.ts'
 import type { FetchRow, FetchWrite, StoredDate } from '../types.ts'
 
 const MAX_TITLE = 500
+const MAX_URL = 2048
 const MAX_TEXT = 200
 
 const fetchRow = z.object({
@@ -17,6 +18,9 @@ const fetchRow = z.object({
   tool_use_id: z.string().nullable(),
   url_hash: z.string(),
   final_url_hash: z.string().nullable(),
+  // Added by migration 0002; absent on rows read through an older select list.
+  url: z.string().nullable().optional(),
+  final_url: z.string().nullable().optional(),
   host: z.string().nullable(),
   registrable_domain: z.string().nullable(),
   status: z.number().int().nullable(),
@@ -51,12 +55,12 @@ const clip = (s: string | undefined, max: number): string | null =>
 export function insertFetch(db: Db, w: FetchWrite, now: number): number {
   const id = db
     .prepare(
-      `INSERT INTO fetches (receipt_id, session_id, tool_use_id, url_hash, final_url_hash, host, registrable_domain,
-                            status, content_type, bytes, title, decision, reason, rule_id, dates_json,
-                            effective_date, effective_kind, effective_confidence, latency_ms, created_at)
-       VALUES ($receiptId, $sessionId, $toolUseId, $urlHash, $finalUrlHash, $host, $domain, $status, $contentType,
-               $bytes, $title, $decision, $reason, $ruleId, $dates, $effDate, $effKind, $effConfidence, $latency,
-               $now)`,
+      `INSERT INTO fetches (receipt_id, session_id, tool_use_id, url_hash, final_url_hash, url, final_url, host,
+                            registrable_domain, status, content_type, bytes, title, decision, reason, rule_id,
+                            dates_json, effective_date, effective_kind, effective_confidence, latency_ms, created_at)
+       VALUES ($receiptId, $sessionId, $toolUseId, $urlHash, $finalUrlHash, $url, $finalUrl, $host, $domain, $status,
+               $contentType, $bytes, $title, $decision, $reason, $ruleId, $dates, $effDate, $effKind, $effConfidence,
+               $latency, $now)`,
     )
     .run({
       receiptId: w.receiptId,
@@ -64,6 +68,8 @@ export function insertFetch(db: Db, w: FetchWrite, now: number): number {
       toolUseId: w.toolUseId ?? null,
       urlHash: w.urlHash,
       finalUrlHash: w.finalUrlHash ?? null,
+      url: clip(w.url, MAX_URL),
+      finalUrl: clip(w.finalUrl, MAX_URL),
       host: clip(w.host, 253),
       domain: clip(w.registrableDomain, 253),
       status: w.status ?? null,
@@ -112,6 +118,8 @@ export function listFetchesByReceipt(db: Db, receiptId: string): FetchRow[] {
         toolUseId: r.tool_use_id,
         urlHash: r.url_hash,
         finalUrlHash: r.final_url_hash,
+        url: r.url ?? null,
+        finalUrl: r.final_url ?? null,
         host: r.host,
         registrableDomain: r.registrable_domain,
         status: r.status,

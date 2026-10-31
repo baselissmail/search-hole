@@ -224,6 +224,7 @@ export async function recordBuiltinFetch(d: BuiltinDeps, url: string, rctx: Requ
         ...(rctx.session ? { sessionId: rctx.session.key } : {}),
         ...(rctx.toolUseId === undefined ? {} : { toolUseId: rctx.toolUseId }),
         urlHash: hash,
+        url: normalized,
         ...(host === null ? {} : { host, registrableDomain: registrableDomain(host) }),
         decision: 'opened',
         reason: 'builtin_webfetch',

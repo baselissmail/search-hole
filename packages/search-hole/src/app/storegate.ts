@@ -23,6 +23,11 @@ export interface StoreGateOptions {
   now: () => number
   busyTimeoutMs: number
   logger: Logger
+  /**
+   * Reads may run a pending migration (CLI only: a terminal command is an explicit user
+   * request). Hosts keep reads side-effect free; their first write migrates (ADR-0006 point 6).
+   */
+  readonly migrateOnRead?: boolean
 }
 
 /** Opens the store on first need and remembers why it is unavailable. */
@@ -47,9 +52,10 @@ export class StoreGate {
 
   /** For reads: the store if it exists or is already open; never creates the file, never migrates. */
   async read(): Promise<Store | null> {
-    if (this.store) return this.store
-    if (!existsSync(this.o.dbPath)) return null
-    return this.open()
+    if (!this.store && !existsSync(this.o.dbPath)) return null
+    // Without this, an older (compatible) database reads as empty until the first write.
+    if (this.o.migrateOnRead === true) return this.write()
+    return this.store ?? this.open()
   }
 
   /** For writes: opens (creating the file) and runs a pending migration first. */

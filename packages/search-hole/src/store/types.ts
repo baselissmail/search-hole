@@ -492,13 +492,17 @@ export interface GatewayRow {
 
 // ── Fetches ──────────────────────────────────────────────────────────────
 
-/** One opened (or refused) page. URLs are stored only as hashes; page text never. */
+/** One opened (or refused) page. Page text is never stored (ADR-0015). */
 export interface FetchWrite {
   readonly receiptId: string
   readonly sessionId?: string
   readonly toolUseId?: string
   readonly urlHash: string
   readonly finalUrlHash?: string
+  /** The page URL as requested (migration 0002). */
+  readonly url?: string
+  /** The URL after redirects, when it differs. */
+  readonly finalUrl?: string
   readonly host?: string
   readonly registrableDomain?: string
   readonly status?: number
@@ -522,6 +526,8 @@ export interface FetchRow {
   readonly toolUseId: string | null
   readonly urlHash: string
   readonly finalUrlHash: string | null
+  readonly url: string | null
+  readonly finalUrl: string | null
   readonly host: string | null
   readonly registrableDomain: string | null
   readonly status: number | null

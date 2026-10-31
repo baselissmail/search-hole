@@ -7,6 +7,7 @@
 import { createHash } from 'node:crypto'
 import { compareSemver, parseSemver } from '../version.ts'
 import { sql as sql0001 } from './0001_init.ts'
+import { sql as sql0002 } from './0002_fetch_urls.ts'
 
 export interface Migration {
   /** Contiguous from 1. The schema version after applying it. */
@@ -27,6 +28,14 @@ export const MIGRATIONS: readonly Migration[] = [
     name: '0001_init',
     sql: sql0001,
     introducedIn: '0.1.0',
+    minWriterVersion: '0.0.0',
+    minReaderVersion: '0.0.0',
+  },
+  {
+    id: 2,
+    name: '0002_fetch_urls',
+    sql: sql0002,
+    introducedIn: '0.1.1',
     minWriterVersion: '0.0.0',
     minReaderVersion: '0.0.0',
   },

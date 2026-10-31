@@ -68,7 +68,7 @@ const plugin = PluginJson.parse(readJson(PLUGIN_DIR, '.claude-plugin', 'plugin.j
 describe('plugin.json', () => {
   it('has the required identity fields', () => {
     expect(plugin.name).toBe('search-hole')
-    expect(plugin.version).toBe('0.1.0')
+    expect(plugin.version).toMatch(/^\d+\.\d+\.\d+$/)
     expect(plugin.license).toBe('Apache-2.0')
     expect(plugin.author.name).toBe('Basel Issmail')
     expect(plugin.homepage).toBe('https://github.com/baselissmail/search-hole')

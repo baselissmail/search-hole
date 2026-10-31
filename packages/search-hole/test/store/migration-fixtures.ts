@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
-// Migrations used to exercise upgrades (the real list has only 0001). No vitest import: the
+// Migrations used to exercise upgrades, numbered after the real list. No vitest import: the
 // child-process worker loads this file too.
 import type { Migration } from '../../src/store/migrations/index.ts'
-import { MIGRATIONS } from '../../src/store/migrations/index.ts'
+import { LATEST_SCHEMA_VERSION, MIGRATIONS } from '../../src/store/migrations/index.ts'
+
+/** Fixture migrations are numbered after the real ones. */
+const N = LATEST_SCHEMA_VERSION
 
 /** Additive: new column and table. Leaves both minimums alone. */
 export const ADDITIVE: Migration = {
-  id: 2,
+  id: N + 1,
   name: '0002_additive',
   introducedIn: '0.2.0',
   minWriterVersion: '0.0.0',
@@ -19,7 +22,7 @@ export const ADDITIVE: Migration = {
 
 /** Rebuilds `searches` (the parent of results) the way SQLite documents: new, copy, drop, rename. */
 export const REBUILD_PARENT: Migration = {
-  id: 3,
+  id: N + 2,
   name: '0003_rebuild_searches',
   introducedIn: '0.3.0',
   minWriterVersion: '0.0.0',
@@ -57,7 +60,7 @@ export const REBUILD_PARENT: Migration = {
 
 /** Writer-breaking: older writers (< 0.3.0) must go read-only. */
 export const WRITER_BREAKING: Migration = {
-  id: 4,
+  id: N + 3,
   name: '0004_contract',
   introducedIn: '0.4.0',
   minWriterVersion: '0.3.0',
@@ -67,7 +70,7 @@ export const WRITER_BREAKING: Migration = {
 
 /** A migration that fails halfway, after creating a table. */
 export const BROKEN: Migration = {
-  id: 2,
+  id: N + 1,
   name: '0002_broken',
   introducedIn: '0.2.0',
   minWriterVersion: '0.0.0',
@@ -77,7 +80,7 @@ export const BROKEN: Migration = {
 
 /** A migration that leaves a dangling foreign key (rolled back by foreign_key_check). */
 export const FK_VIOLATION: Migration = {
-  id: 2,
+  id: N + 1,
   name: '0002_fk_violation',
   introducedIn: '0.2.0',
   minWriterVersion: '0.0.0',

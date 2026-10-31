@@ -108,6 +108,7 @@ export async function runFetch(d: FetchDeps, input: FetchArgs, rctx: RequestCtx)
     record(ctx, store, {
       ...base,
       urlHash: hashOf(args.url),
+      url: args.url,
       ...(host === null ? {} : { host, registrableDomain: registrableDomain(host) }),
       decision: 'refused',
       reason: code ?? reason,
@@ -162,6 +163,8 @@ export async function runFetch(d: FetchDeps, input: FetchArgs, rctx: RequestCtx)
     ...base,
     urlHash: hashOf(args.url),
     finalUrlHash: finalHash,
+    url: args.url,
+    ...(page.finalUrl === args.url ? {} : { finalUrl: page.finalUrl }),
     ...(finalHost === null ? {} : { host: finalHost, registrableDomain: registrableDomain(finalHost) }),
     status: page.status,
     contentType: page.contentType,
