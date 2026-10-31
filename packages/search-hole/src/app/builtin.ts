@@ -15,6 +15,7 @@ import type { HiddenReason, ResultFlag, RuleDecision, RuleRef } from '../shared/
 import { type BuiltinRecordedResult, type Store, urlHash } from '../store/index.ts'
 import { type AppContext, configuredMode } from './context.ts'
 import type { Engines } from './engines.ts'
+import { type LoopGuard, searchKey } from './loopguard.ts'
 import type { Receipts } from './receipts.ts'
 import { type RuleContext, type RulesService, safeBlockHosts } from './rules.ts'
 import type { BuiltinFilterResult, BuiltinResult, RequestCtx, SearchMode } from './types.ts'
@@ -30,6 +31,20 @@ export interface BuiltinDeps {
   engines: Engines
   rules: RulesService
   receipts: Receipts
+  loop: LoopGuard
+}
+
+/** The loop-guard key of a built-in search (kept apart from our `search` of the same words). */
+const builtinKey = (query: string): string => searchKey(query, ['builtin'])
+
+/** ADR-0019: whether one more built-in WebSearch fits this session's limits. */
+export function searchBudget(
+  d: BuiltinDeps,
+  query: string,
+  rctx: RequestCtx,
+): { allowed: true } | { allowed: false; message: string } {
+  const stop = d.loop.check(rctx, builtinKey(query), d.ctx.settings.settings.limits)
+  return stop === null ? { allowed: true } : { allowed: false, message: stop.toUserText() }
 }
 
 /**
@@ -102,6 +117,7 @@ export async function filterBuiltinResults(
   const rc = d.rules.context(rctx, store)
   const profile = profileFor(d, rc, query)
   const { receiptId } = d.receipts.assign(rctx, undefined, store)
+  d.loop.note(rctx, builtinKey(query))
 
   const items: Decided[] = results.map((result, i) => {
     const url = normalizeOriginal(result.url) ?? result.url

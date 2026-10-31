@@ -37,6 +37,7 @@ import {
 import type { RecordedResult, Store } from '../store/index.ts'
 import type { AppContext } from './context.ts'
 import type { Engines, ResolvedEngine } from './engines.ts'
+import { type LoopGuard, searchKey } from './loopguard.ts'
 import type { Receipts } from './receipts.ts'
 import { type RuleContext, type RulesService, safeBlockHosts } from './rules.ts'
 import type { RequestCtx, SearchArgs } from './types.ts'
@@ -204,6 +205,7 @@ export interface SearchDeps {
   engines: Engines
   rules: RulesService
   receipts: Receipts
+  loop: LoopGuard
 }
 
 /** Effective freshness: the profile's, with a model argument that can only tighten it (ADR-0008). */
@@ -228,7 +230,7 @@ function retentionOf(resolved: readonly ResolvedEngine[]): Partial<Record<Engine
 /** Runs one search. Throws `invalid_argument`, `query_blocked` or `no_healthy_engine`. */
 export async function runSearch(d: SearchDeps, input: SearchArgs, rctx: RequestCtx): Promise<SearchOutcome> {
   const started = performance.now()
-  const { ctx, engines, rules, receipts } = d
+  const { ctx, engines, rules, receipts, loop } = d
   const args = parseSearchArgs(input)
   const settings = ctx.settings.settings
 
@@ -241,6 +243,13 @@ export async function runSearch(d: SearchDeps, input: SearchArgs, rctx: RequestC
   })
   if (hygiene.action === 'block') throw queryBlockedError(hygiene.findings)
   const query = hygiene.query
+
+  // Loop guard (ADR-0019). The terminal is the user's own command, so the CLI is exempt.
+  const loopKey = searchKey(query, [args.depth, args.profile, args.engines?.join(',')])
+  if (ctx.host !== 'cli') {
+    const stop = loop.check(rctx, loopKey, settings.limits)
+    if (stop !== null) throw stop
+  }
 
   // 2. Rules and profile.
   const store = await ctx.store.write()
@@ -424,6 +433,7 @@ export async function runSearch(d: SearchDeps, input: SearchArgs, rctx: RequestC
     hidden: hidden.length,
     hiddenByReason: byReason,
   })
+  if (fan.runs.some((r) => r.status === 'ok' || r.status === 'empty')) loop.note(rctx, loopKey)
   return outcome
 }
 

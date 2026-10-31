@@ -13,6 +13,7 @@ import {
   checkUrl,
   filterBuiltinResults,
   recordBuiltinFetch,
+  searchBudget,
   searchMode,
 } from './builtin.ts'
 import {
@@ -26,6 +27,7 @@ import { runDoctor } from './doctor.ts'
 import { Engines } from './engines.ts'
 import { lazyFetcher, runFetch } from './fetch.ts'
 import { logDetail, recentLog } from './logview.ts'
+import { LoopGuard } from './loopguard.ts'
 import { Receipts } from './receipts.ts'
 import { RulesService } from './rules.ts'
 import { runSearch } from './search.ts'
@@ -47,6 +49,7 @@ export const createApp: CreateApp = async (opts: AppOptions): Promise<App> => {
   const ctx: AppContext = createContext(opts)
   const engines = new Engines(ctx)
   if (ctx.host !== 'cli') engines.warmKeys()
+  const loop = new LoopGuard(ctx.now)
   const rules = new RulesService(ctx)
   const receipts = new Receipts(ctx)
   const fetcher = lazyFetcher(ctx)
@@ -82,7 +85,7 @@ export const createApp: CreateApp = async (opts: AppOptions): Promise<App> => {
 
   const builtinDeps = () => {
     freshSettings()
-    return { ctx, engines, rules, receipts }
+    return { ctx, engines, rules, receipts, loop }
   }
   const freshnessDefaults = async () =>
     rules.context(undefined, await ctx.store.read()).defaults.freshness ?? {}
@@ -93,7 +96,7 @@ export const createApp: CreateApp = async (opts: AppOptions): Promise<App> => {
 
     async search(args, rctx) {
       freshSettings()
-      const out = await runSearch({ ctx, engines, rules, receipts }, args, rctx)
+      const out = await runSearch({ ctx, engines, rules, receipts, loop }, args, rctx)
       await heartbeat()
       return out
     },
@@ -117,6 +120,7 @@ export const createApp: CreateApp = async (opts: AppOptions): Promise<App> => {
     filterBuiltinResults: (query, results, rctx) => filterBuiltinResults(builtinDeps(), query, results, rctx),
     checkUrl: (url, rctx) => checkUrl(builtinDeps(), url, rctx),
     recordBuiltinFetch: (url, rctx) => recordBuiltinFetch(builtinDeps(), url, rctx),
+    searchBudget: async (query, rctx) => searchBudget(builtinDeps(), query, rctx),
 
     checkQuery(query) {
       freshSettings()
@@ -143,6 +147,7 @@ export const createApp: CreateApp = async (opts: AppOptions): Promise<App> => {
     },
 
     async openTurn(rctx) {
+      if (rctx.session !== undefined) loop.newTurn(rctx.session.key)
       return receipts.openTurn(rctx, await ctx.store.read())
     },
 

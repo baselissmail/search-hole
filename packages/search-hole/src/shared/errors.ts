@@ -12,6 +12,7 @@ export type ErrorCode =
   | 'no_healthy_engine'
   | 'engine_failed'
   | 'query_blocked'
+  | 'search_limit'
   | 'fetch_blocked'
   | 'fetch_failed'
   | 'store_unavailable'

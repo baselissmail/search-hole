@@ -282,6 +282,14 @@ export interface App {
   ): Promise<{ allowed: true } | { allowed: false; message: string; rule?: RuleRef }>
   /** Record a page the model opened with the built-in WebFetch (for the receipt). */
   recordBuiltinFetch(url: string, ctx: RequestCtx): Promise<void>
+  /**
+   * Whether one more built-in WebSearch fits the session's loop-guard limits (ADR-0019).
+   * Optional so that existing fakes stay valid; `createApp` always provides it.
+   */
+  searchBudget?(
+    query: string,
+    ctx: RequestCtx,
+  ): Promise<{ allowed: true } | { allowed: false; message: string }>
   /** Query hygiene verdict (ADR-0015 point 4) without searching. */
   checkQuery(query: string): { action: 'ok' | 'block' | 'redact'; query: string; classes: string[] }
 

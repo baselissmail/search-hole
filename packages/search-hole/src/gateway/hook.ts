@@ -248,6 +248,8 @@ async function preWebSearch(input: HookInput, ctx: RequestCtx, deps: HookDeps): 
     )
   }
   const effectiveQuery = hygiene.action === 'redact' ? hygiene.query : (toolInput.query ?? query)
+  const budget = await app.searchBudget?.(effectiveQuery, ctx)
+  if (budget !== undefined && !budget.allowed) return deny(budget.message)
   const sessionId = nonEmpty(input.sessionId) ?? ctx.session?.key ?? ''
   const agentType = input.agentType ?? ''
   const notes: string[] = []

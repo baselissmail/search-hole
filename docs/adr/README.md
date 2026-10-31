@@ -24,5 +24,6 @@ Status values: **Proposed**, **Accepted**, **Superseded by ADR-NNNN**. To change
 | [0016](0016-licensing.md) | Apache-2.0 for code and docs, CC0-1.0 for first-party lists, DCO for contributions | Accepted |
 | [0018](0018-claude-code-builtin-search-mode.md) | Claude Code default: filter Claude's own WebSearch via hooks (blocked_domains + output rewrite); engines optional there | Accepted |
 | [0017](0017-first-run-and-default-engines.md) | No scraping and no shared keys: SearXNG via Docker (asks once), otherwise a guided free Tavily key; P1 adapters SearXNG, Brave, Tavily | Accepted |
+| [0019](0019-loop-guard.md) | Per-session loop guard: searches per turn and per hour, and repeated searches, refused with a clear error; built-in and engine searches count together | Accepted |
 
 The ADRs were revised on 2026-10-30 after a three-lens adversarial review (facts, consistency, red team; 90 findings). Where an ADR writes `~/.searchhole/`, read it as the root that ADR-0015 resolves.

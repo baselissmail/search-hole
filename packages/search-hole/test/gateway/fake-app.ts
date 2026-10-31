@@ -79,6 +79,8 @@ export function searchOutcome(n: number, over: Partial<SearchOutcome> = {}): Sea
 /** Fake App options; everything has a default. */
 export interface FakeAppOptions {
   mode?: { configured: SearchMode; effective: 'engines' | 'builtin' }
+  /** A loop-guard refusal for every built-in WebSearch (ADR-0019). */
+  overBudget?: string
   /** Domains the user blocks (used by builtinBlockedDomains, filterBuiltinResults, checkUrl). */
   blockedDomains?: string[]
   /** Domains blocked by a path/regex rule: hidden only after the search (removedPostSearch). */
@@ -253,6 +255,16 @@ export class FakeApp implements App {
 
   async recordBuiltinFetch(url: string, ctx: RequestCtx): Promise<void> {
     this.record('recordBuiltinFetch', [url], ctx)
+  }
+
+  async searchBudget(
+    query: string,
+    ctx: RequestCtx,
+  ): Promise<{ allowed: true } | { allowed: false; message: string }> {
+    this.record('searchBudget', [query], ctx)
+    return this.opts.overBudget === undefined
+      ? { allowed: true }
+      : { allowed: false, message: this.opts.overBudget }
   }
 
   checkQuery(query: string): { action: 'ok' | 'block' | 'redact'; query: string; classes: string[] } {

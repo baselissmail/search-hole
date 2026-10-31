@@ -259,6 +259,20 @@ export const settingsSchema = z.strictObject({
   privacy: z
     .strictObject({ wayback: z.boolean().default(false), sitemap: z.boolean().default(false) })
     .prefault({}),
+  /** The per-session loop guard (ADR-0019); 0 turns a limit off. */
+  limits: z
+    .strictObject({
+      searchesPerTurn: z.number().int().min(0).max(1000).default(40),
+      searchesPerHour: z.number().int().min(0).max(10_000).default(120),
+      repeatQuery: z
+        .number()
+        .int()
+        .min(0)
+        .max(100)
+        .refine((n) => n !== 1, '1 would refuse every search; use 0 (off) or 2 and up')
+        .default(3),
+    })
+    .prefault({}),
   searxng: z
     .strictObject({
       managed: z.boolean().default(true),
@@ -407,6 +421,24 @@ function buildEnvBindings(): EnvBinding[] {
   add('SEARCHHOLE_PRIVACY_WAYBACK', 'privacy.wayback', 'Allow Wayback date lookups', parseBool)
   add('SEARCHHOLE_PRIVACY_SITEMAP', 'privacy.sitemap', 'Allow sitemap lastmod lookups', parseBool)
   add(
+    'SEARCHHOLE_LIMIT_SEARCHES_PER_TURN',
+    'limits.searchesPerTurn',
+    'Most searches in one Claude Code turn (0 = no limit)',
+    parseInt_(0, 1000),
+  )
+  add(
+    'SEARCHHOLE_LIMIT_SEARCHES_PER_HOUR',
+    'limits.searchesPerHour',
+    'Most searches per session per hour (0 = no limit)',
+    parseInt_(0, 10_000),
+  )
+  add(
+    'SEARCHHOLE_LIMIT_REPEAT_QUERY',
+    'limits.repeatQuery',
+    'Refuse the same search after this many runs in 10 minutes (0 = off)',
+    parseInt_(0, 100),
+  )
+  add(
     'SEARCHHOLE_SEARXNG_MANAGED',
     'searxng.managed',
     'Let search-hole manage the SearXNG container',
@@ -543,6 +575,7 @@ const SECTION_PATHS: readonly (readonly string[])[] = [
   ['hooks'],
   ['queryHygiene'],
   ['privacy'],
+  ['limits'],
   ['searxng'],
   ...ENGINE_IDS.flatMap(
     (id) =>

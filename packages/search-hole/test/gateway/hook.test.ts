@@ -186,6 +186,15 @@ describe.each(ERAS)('hook tool (%s era)', (era) => {
       expect(h.app()?.callsTo('searchMode').length).toBe(3)
     })
 
+    test('the loop guard denies a WebSearch over budget, in any mode', async () => {
+      const message =
+        'search-hole stopped this search: this turn already ran 40 searches → answer with what you have'
+      for (const effective of ['builtin', 'engines'] as const) {
+        const { hook } = await setup(era, { mode: { configured: 'auto', effective }, overBudget: message })
+        expect(denyOf(await hook(pre('WebSearch', { query: 'react compiler' })))).toBe(message)
+      }
+    })
+
     test('a search that fails does not reset the breaker (engines down: no deny loop)', async () => {
       const { client, hook } = await setup(era, {
         mode: { configured: 'engines', effective: 'engines' },
