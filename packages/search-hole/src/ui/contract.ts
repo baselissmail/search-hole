@@ -34,7 +34,11 @@ export const ROUTES = {
   session: '/session',
   /** GET `Overview`. Query: `days` (1..90, default 7). */
   overview: '/api/overview',
-  /** GET `SearchPage`, newest first. Query: `before` (id, exclusive), `limit` (1..200, default 100), `hidden=1`. */
+  /**
+   * GET `SearchPage`, newest first. Query: `before` (id, exclusive) pages back in time;
+   * `after` (id, exclusive) returns only newer searches (the polling fallback when the stream
+   * fails, every 2 s); `limit` (1..200, default 100); `hidden=1` keeps searches that hid results.
+   */
   searches: '/api/searches',
   /** GET `LogDetail`. */
   search: (id: number) => `/api/searches/${id}`,
