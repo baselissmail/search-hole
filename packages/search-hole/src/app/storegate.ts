@@ -38,7 +38,11 @@ export class StoreGate {
   private failedAt: number | null = null
   private failure: string | null = null
 
-  constructor(private readonly o: StoreGateOptions) {}
+  private readonly o: StoreGateOptions
+
+  constructor(o: StoreGateOptions) {
+    this.o = o
+  }
 
   /** Why the store is unavailable, if it is. */
   get unavailableReason(): string | null {

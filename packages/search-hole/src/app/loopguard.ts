@@ -45,7 +45,11 @@ export function searchKey(query: string, options: readonly (string | undefined)[
 export class LoopGuard {
   private readonly sessions = new Map<string, SessionBudget>()
 
-  constructor(private readonly now: () => number) {}
+  private readonly now: () => number
+
+  constructor(now: () => number) {
+    this.now = now
+  }
 
   private budget(key: string): SessionBudget {
     let b = this.sessions.get(key)

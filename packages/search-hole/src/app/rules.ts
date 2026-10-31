@@ -274,7 +274,11 @@ export class RulesService {
    */
   private readonly listKinds = new Map<string, ListKind>(BUNDLED_LIST_KINDS)
 
-  constructor(private readonly ctx: AppContext) {}
+  private readonly ctx: AppContext
+
+  constructor(ctx: AppContext) {
+    this.ctx = ctx
+  }
 
   /** Source type for a URL: typed-list membership (`listMemberships`), then URL patterns. */
   sourceTypeOf(rc: RuleContext, profile: string, now: number): (url: string) => SourceType {

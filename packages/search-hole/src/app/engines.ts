@@ -174,7 +174,10 @@ export class Engines {
   private readonly memHealth = new Map<string, EngineHealth>()
   private readonly semaphores = new Map<EngineId, Semaphore>()
 
-  constructor(private readonly ctx: AppContext) {
+  private readonly ctx: AppContext
+
+  constructor(ctx: AppContext) {
+    this.ctx = ctx
     this.keyCache = createKeyCache(ctx.now)
     this.slots = this.buildSlots()
   }

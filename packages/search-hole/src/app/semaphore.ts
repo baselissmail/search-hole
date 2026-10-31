@@ -6,7 +6,11 @@ export class Semaphore {
   private active = 0
   private readonly waiting: Array<() => void> = []
 
-  constructor(private readonly max: number) {}
+  private readonly max: number
+
+  constructor(max: number) {
+    this.max = max
+  }
 
   /** Calls in flight right now. */
   get inFlight(): number {

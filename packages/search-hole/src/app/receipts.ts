@@ -164,7 +164,11 @@ export class Receipts {
   private readonly sessions = new Map<string, MemSession>()
   private readonly urls = new Map<string, string>()
 
-  constructor(private readonly ctx: AppContext) {}
+  private readonly ctx: AppContext
+
+  constructor(ctx: AppContext) {
+    this.ctx = ctx
+  }
 
   private remember(r: MemReceipt): MemReceipt {
     this.receipts.delete(r.id)
