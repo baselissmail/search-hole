@@ -79,6 +79,7 @@ All of these are user-only: Claude cannot run them. A `<match>` is a domain (`ex
 | `/search-hole:doctor` | Check Node, hooks, engines and keys |
 | `/search-hole:status` | Quick health check (`doctor --probe`) |
 | `/search-hole:dashboard` | Open the dashboard in your browser |
+| `/search-hole:lists [catalog\|add\|update\|enforce\|audit\|disable…]` | See and manage block lists and their effect |
 | `/search-hole:searxng up --yes` / `status` / `down` | Manage the private SearXNG engine (`--yes` allows the first download, since there is no terminal to ask) |
 
 The plugin also ships a `research` skill that Claude loads when it searches: when to use `search` or `fetch`, how deep to go, citing with dates, and saying "opened" rather than "cited". Claude can only suggest rules (`suggest_rule`); you approve them.
@@ -95,6 +96,24 @@ searchhole searxng up                           # start the private engine (Dock
 ```
 
 Data lives in `~/.searchhole/` on macOS (XDG directories on Linux, AppData on Windows; `SEARCHHOLE_HOME` overrides): a SQLite log plus your `rules.yaml` and `settings.yaml`.
+
+## Other apps
+
+The same bundle works in other MCP clients. `searchhole setup <app>` adds it to the app's MCP config: it previews the change, keeps your other servers and comments, and saves a backup first. Apps: `vscode`, `cursor`, `codex`, `windsurf`, `zed`, `goose`, `claude-desktop`, or `generic`, which prints a snippet. Codex and Cursor also have plugin folders (`node scripts/build-plugin.mjs --target codex|cursor`). Each app has a 60-second guide in [docs/clients/](docs/clients/). Outside Claude Code, search-hole is the search tool itself, so it needs an engine: a free Tavily key (`searchhole keys set tavily`) or `searchhole searxng up`.
+
+## Lists
+
+Lists hide or label whole sets of sites. They come in three groups:
+- **Built in, CC0:** `official-docs` and `official-health`, which label official sources and rank them higher; `github-clones`, which hides sites that copy GitHub and Stack Overflow; and `ai-content-farms`, which starts in audit mode.
+- **Starter lists:** five community lists, shipped with the install and working offline.
+- **Your own:** anything you subscribe to from the catalog or by URL.
+
+`searchhole lists` shows each list's effect ("hid 312 results this week"). `lists catalog` shows what else is available, with licences. `lists add <id|https-url>` subscribes, and `lists audit <id>` lets you trial a list first: it records what it *would* hide without hiding it. Lists refresh about weekly in the background, with checks on every update:
+- HTTPS only, to public hosts;
+- an optional sha256 pin;
+- a guard that keeps the old copy if a list suddenly shrinks by more than half.
+
+Set `lists: { autoUpdate: false }` in `settings.yaml` to keep everything offline. Your own rules always win over any list. See [docs/rules.md](docs/rules.md#lists).
 
 ## Dashboard
 
@@ -115,11 +134,11 @@ Recommended: SearXNG plus a free Tavily key, so SearXNG's upstream rate limits d
 ## Honest limits
 
 - **Built-in mode has no snippets or dates.** Claude's WebSearch returns titles and URLs only. Freshness rules can use only dates from pages Claude opens. If a result is removed only after the search, the summary is withheld because it may mention it.
-- **Other hosts need an engine.** Claude Desktop, claude.ai, ChatGPT, VS Code and Zed offer no way to filter their built-in search, so search-hole would be their search tool. They are not part of this test build.
+- **Other hosts need an engine.** Claude Desktop, claude.ai, ChatGPT, VS Code, Cursor, Codex and Zed offer no way to filter their built-in search, so there search-hole is the search tool and needs an engine. claude.ai on the web needs the remote connector (v2).
 - **WebFetch filtering is blocking only.** A blocked domain is denied; nothing is ranked or rewritten.
 - **Hooks fail open.** If the gateway is not running, WebSearch runs unfiltered, and the receipt line says so when it can.
 - **The guard on rule changes is defence in depth.** A hook denies Claude's attempts to run `searchhole` rule commands or edit rule files, but a model with a shell can always try. The slash commands and your own terminal are the supported ways to change rules.
-- **Not yet tested on Windows.** SearXNG also slows down under heavy agent use; that is why a second engine helps.
+- **Windows is covered by CI, not yet by daily use.** Known risks are listed in [docs/release.md](docs/release.md#windows). SearXNG also slows down under heavy agent use; that is why a second engine helps.
 
 ## Troubleshooting
 
@@ -134,7 +153,7 @@ claude plugin uninstall search-hole@search-hole-local
 claude plugin marketplace remove search-hole-local
 ```
 
-Removing the marketplace also deletes the plugin's saved options and keys. Your log, rules and any keys stored with `searchhole keys set` stay in `~/.searchhole/` and the OS keychain until you delete them.
+Removing the marketplace also deletes the plugin's saved options and keys. To delete search-hole's own data too (log, rules, lists, backups and the keys stored with `searchhole keys set`), run `searchhole uninstall` to see the list, then `searchhole uninstall --purge`. It deletes known files by name, never a whole folder, and asks first. Remove the Claude Desktop extension from Settings → Extensions, and the entries `searchhole setup` added from each app's MCP config. setup left a `.bak` copy next to each file it changed.
 
 ## Licence
 
