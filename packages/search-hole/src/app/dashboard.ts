@@ -64,12 +64,17 @@ export function createDashboardApi(d: DashboardDeps): DashboardApi {
       const store = await ctx.store.read()
       if (!store) return { items: [], nextBefore: null, maxId: 0 }
       const limit = clampInt(opts.limit, 1, PAGE_MAX, PAGE_DEFAULT)
-      const rows = store.searchLog.recent({
-        limit,
-        hiddenOnly: opts.hiddenOnly === true,
-        ...(opts.before === undefined ? {} : { beforeId: opts.before }),
-        ...(opts.after === undefined ? {} : { afterId: opts.after }),
-      })
+      // `after` (the polling fallback) takes the oldest `limit` newer rows, so a client that
+      // moves its cursor to the newest one it got never skips a gap; shown newest first.
+      const rows =
+        opts.after !== undefined && opts.hiddenOnly !== true
+          ? store.searchLog.after(opts.after, limit).reverse()
+          : store.searchLog.recent({
+              limit,
+              hiddenOnly: opts.hiddenOnly === true,
+              ...(opts.before === undefined ? {} : { beforeId: opts.before }),
+              ...(opts.after === undefined ? {} : { afterId: opts.after }),
+            })
       const last = rows.at(-1)
       return {
         items: rows.map(entryOf),

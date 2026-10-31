@@ -48,8 +48,10 @@ export const ROUTES = {
   overview: '/api/overview',
   /**
    * GET `SearchPage`, newest first. Query: `before` (id, exclusive) pages back in time;
-   * `after` (id, exclusive) returns only newer searches (the polling fallback when the stream
-   * fails, every 2 s); `limit` (1..200, default 100); `hidden=1` keeps searches that hid results.
+   * `after` (id, exclusive) returns only newer searches, the oldest `limit` of them (the
+   * polling fallback when the stream fails, every 2 s; move the cursor to the newest id you got);
+   * `limit` (1..200, default 100); `hidden=1` keeps searches that hid results. `maxId` is
+   * always the newest id overall.
    */
   searches: '/api/searches',
   /** GET `LogDetail`. */

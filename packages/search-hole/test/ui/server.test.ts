@@ -130,6 +130,11 @@ describe('API', () => {
       items: Array<{ query: string }>
     }
     expect(newer.items.map((i) => i.query)).toEqual(['three'])
+    // More newer rows than `limit`: the oldest ones come first, so polling never skips a gap.
+    const gap = (await (await api('/api/searches?after=0&limit=2', token)).json()) as {
+      items: Array<{ query: string }>
+    }
+    expect(gap.items.map((i) => i.query)).toEqual(['two', 'one'])
     const detail = (await (await api('/api/searches/1', token)).json()) as {
       results: Array<{ title?: string }>
     }
