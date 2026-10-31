@@ -196,6 +196,22 @@ describe.each(ERAS)('tool calls (%s era)', (era) => {
     )
   })
 
+  test('receipt points to the dashboard: the bare URL when it runs, else how to start it; never a code', async () => {
+    const running = await connected(
+      era,
+      harness({ host: 'claude-code', fake: { receipts: [RECEIPT], dashboardUrl: 'http://127.0.0.1:7341/' } }),
+    )
+    const a = textOf(await running.client.callTool({ name: 'receipt', arguments: {} }))
+    expect(a).toContain('Full log: http://127.0.0.1:7341/ (the user signs in with /search-hole:dashboard).')
+    expect(a).not.toMatch(/#c=|token/i)
+    const stopped = await connected(
+      era,
+      harness({ host: 'cursor', fake: { receipts: [RECEIPT], dashboardUrl: null } }),
+    )
+    const b = textOf(await stopped.client.callTool({ name: 'receipt', arguments: {} }))
+    expect(b).toContain('Full log: the user can run `searchhole ui --open` in a terminal.')
+  })
+
   test("receipt with no ids shows the session's latest; unknown ids are an error", async () => {
     const { client } = await connected(era, harness({ host: 'generic', fake: { receipts: [RECEIPT] } }))
     const latest = await client.callTool({ name: 'receipt', arguments: {} })

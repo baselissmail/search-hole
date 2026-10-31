@@ -4,6 +4,7 @@
  * gateway call only this. Construction resolves the roots and reads settings.yaml; nothing
  * else happens until a method needs it (the store opens on first use, ADR-0006/0013).
  */
+import { readFileSync } from 'node:fs'
 import { checkQuery as scanQuery } from '../core/hygiene.ts'
 import { SearchHoleError } from '../shared/errors.ts'
 import { setSettingsFileValue } from '../shared/settings.ts'
@@ -267,6 +268,17 @@ export const createApp: CreateApp = async (opts: AppOptions): Promise<App> => {
     doctor(o) {
       freshSettings()
       return runDoctor({ ctx, engines, rules, searchMode: () => searchMode(builtinDeps()) }, o)
+    },
+
+    async dashboardUrl() {
+      try {
+        const info = JSON.parse(readFileSync(ctx.layout.uiJson, 'utf8')) as { port?: unknown; pid?: unknown }
+        if (typeof info.port !== 'number' || typeof info.pid !== 'number') return null
+        process.kill(info.pid, 0)
+        return `http://127.0.0.1:${info.port}/`
+      } catch {
+        return null
+      }
     },
 
     dashboard: createDashboardApi({

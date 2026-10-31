@@ -403,6 +403,11 @@ export interface App {
   doctor(opts?: { probe?: boolean }): Promise<DoctorReport>
   /** Optional so that existing fakes stay valid; `createApp` always provides it. */
   dashboard?: DashboardApi
+  /**
+   * The running dashboard's bare URL (no code or token, ADR-0004 point 3), from `ui.json` and
+   * a live pid; null when none runs. Optional for the same reason as `dashboard`.
+   */
+  dashboardUrl?(): Promise<string | null>
   close(): Promise<void>
 }
 

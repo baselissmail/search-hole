@@ -64,6 +64,7 @@ All of these are user-only: Claude cannot run them. A `<match>` is a domain (`ex
 | `/search-hole:mode [auto\|builtin\|engines]` | Show or set the mode |
 | `/search-hole:doctor` | Check Node, hooks, engines and keys |
 | `/search-hole:status` | Quick health check (`doctor --probe`) |
+| `/search-hole:dashboard` | Open the dashboard in your browser |
 | `/search-hole:searxng up --yes` / `status` / `down` | Manage the private SearXNG engine (`--yes` allows the first download, since there is no terminal to ask) |
 
 The plugin also ships a `research` skill that Claude loads when it searches: when to use `search` or `fetch`, how deep to go, citing with dates, and saying "opened" rather than "cited". Claude can only suggest rules (`suggest_rule`); you approve them.
@@ -80,6 +81,12 @@ searchhole searxng up                           # start the private engine (Dock
 ```
 
 Data lives in `~/.searchhole/` on macOS (XDG directories on Linux, AppData on Windows; `SEARCHHOLE_HOME` overrides): a SQLite log plus your `rules.yaml` and `settings.yaml`.
+
+## Dashboard
+
+`/search-hole:dashboard` (or `searchhole ui --open`) opens a local dashboard at `http://127.0.0.1:7341`. It has a live search log you can expand to see every result and the rule that decided it, your rules and Claude's suggestions, engine health, and settings. Keyboard: `⌘K` opens the command palette, `?` shows the shortcuts, and on a selected result `b`, `a`, `p`, `r` and `l` block, allow, pin, raise and lower its site, with Undo.
+
+It runs only when you start it, listens on 127.0.0.1 only, and signs you in with a one-time link that expires after 60 seconds. It exits after 30 minutes with no open tab (`--stay` keeps it running; `ui.port` and `ui.idleMinutes` in `settings.yaml` change the defaults). Nothing loads from the internet.
 
 ## Optional engines
 

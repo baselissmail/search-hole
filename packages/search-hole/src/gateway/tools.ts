@@ -169,8 +169,18 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
             `No receipt with ${args.receiptIds.length === 1 ? 'that id' : 'those ids'} → pass a receiptId from an earlier search result.`,
           )
         }
+        // ADR-0004 point 3: point to the full log; never a login code or token.
+        const url = receipts.length > 0 ? await app.dashboardUrl?.() : undefined
+        const open =
+          deps.host === 'claude-code' ? '/search-hole:dashboard' : '`searchhole ui --open` in a terminal'
+        const pointer =
+          url === undefined
+            ? ''
+            : url === null
+              ? `\nFull log: the user can run ${open}.`
+              : `\nFull log: ${url} (the user signs in with ${open}).`
         return {
-          content: text(renderReceiptText(receipts, args.format ?? 'summary')),
+          content: text(`${renderReceiptText(receipts, args.format ?? 'summary')}${pointer}`),
           ...(structured ? { structuredContent: receiptStructured(receipts) } : {}),
         }
       } catch (err) {

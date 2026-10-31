@@ -81,6 +81,8 @@ export interface FakeAppOptions {
   mode?: { configured: SearchMode; effective: 'engines' | 'builtin' }
   /** A loop-guard refusal for every built-in WebSearch (ADR-0019). */
   overBudget?: string
+  /** What `dashboardUrl` returns (undefined: the method is absent). */
+  dashboardUrl?: string | null
   /** Domains the user blocks (used by builtinBlockedDomains, filterBuiltinResults, checkUrl). */
   blockedDomains?: string[]
   /** Domains blocked by a path/regex rule: hidden only after the search (removedPostSearch). */
@@ -106,9 +108,13 @@ export class FakeApp implements App {
   opts: FakeAppOptions
   turnSearches = 0
 
+  dashboardUrl?: () => Promise<string | null>
+
   constructor(appOpts: AppOptions, opts: FakeAppOptions = {}) {
     this.host = appOpts.host
     this.opts = opts
+    const url = opts.dashboardUrl
+    if (url !== undefined) this.dashboardUrl = async () => url
   }
 
   private record(method: string, args: unknown[], ctx?: RequestCtx): void {
