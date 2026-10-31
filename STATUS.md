@@ -77,6 +77,31 @@ Fixes from the live runs:
 - `suggest_rule` approval text has no runnable command;
 - lean hook inputs for Bash and file tools.
 
-Next for v0.1.x: a bundled `official-docs` list (better source typing and `prefer`); an adversarial review of the app and gateway code; `docs/rules.md`; the per-session loop guard; duplicate-copy detection; storing fetch URLs (migration 0002).
+## v0.1.1 (2026-10-31, 2,075 tests; local plugin rebuilt)
+
+From dogfooding:
+- The built-in log keeps titles and URLs (90-day retention).
+- A bundled `official-docs` list types and lifts official documentation.
+- `doctor` says plainly that no engine is needed.
+- `docs/rules.md` is the rule reference.
+- Fetch rows keep their URLs (migration 0002).
+- The CLI migrates an older database on read, so `log` no longer looks empty after an upgrade.
+
+From an adversarial review of the app and gateway (1 critical, 3 major, 7 minor, all fixed; ADR amendments in 0006, 0007, 0014 and 0018):
+- `engines` mode falls back to filtered built-in when every engine has failed, and the deny-loop breaker counts only successful searches. Before, a down engine trapped the model in a deny loop.
+- The plugin's `search_mode` option is gone: it silently pinned the mode. A running gateway now picks up `settings.yaml` changes, so `/search-hole:mode` works live.
+- The key cache is stale-while-revalidate and is warmed at start, so hooks no longer spawn macOS `security` (90–110 ms) once a minute.
+- Turns: a prompt in a new session (after an interrupt and `/clear`) replaces the open turn. Built-in search after a Stop reopens it. SessionStart re-keys move or drop session rules.
+- Only domain blocks go into `blocked_domains`. The API covers subdomains, so exact-host blocks apply after the search.
+- WebSearch results are parsed per item, and an empty `allowed_domains` is dropped (both lists together are a 400).
+- The Bash guard scans shell words. Commit messages and grep patterns no longer trip it, while `pnpm -C … dev block`, `npx search-hole@x`, `xargs`, `sh -c`, `$(…)` and writes into search-hole files are caught.
+
+New:
+- Per-session loop guard (ADR-0019): 40 searches per turn, 120 per hour, and the third identical search in 10 minutes is refused. Configurable under `limits`.
+- Duplicate-copy guard (ADR-0006 point 11): with two installed copies, one stays quiet each turn, and `doctor` warns.
+
+Open question for Basel (product, not a defect): with the default `queryHygiene.mode: block`, searches that mention a private address such as "192.168.1.1 router admin page" are refused (ADR-0015). Switching the address classes to `redact` would trade a little privacy for fewer refusals.
+
+Next: P4 dashboard (`searchhole ui`, ADR-0004), per MASTER_PLAN §11.
 
 Deferred past v0.1: dashboard (P4), MCP App panel and `.mcpb` (P5), list subscriptions and importers (P6), Cursor/Codex manifests (P7), release engineering (P8).
