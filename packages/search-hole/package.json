@@ -25,12 +25,14 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {
+    "@hono/node-server": "2.1.5",
     "@modelcontextprotocol/client": "2.4.0",
     "@modelcontextprotocol/core": "2.4.0",
     "@modelcontextprotocol/server": "2.4.0",
     "@mozilla/readability": "0.6.0",
     "@types/node": "26.6.6",
     "fast-check": "4.10.2",
+    "hono": "4.13.13",
     "htmlparser2": "12.0.0",
     "ipaddr.js": "2.5.0",
     "linkedom": "0.18.14",
