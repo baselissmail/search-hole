@@ -28,5 +28,7 @@ Status values: **Proposed**, **Accepted**, **Superseded by ADR-NNNN**. To change
 | [0020](0020-dashboard-v1.md) | Dashboard v1: React + TanStack + Tailwind + Base UI app; Hono server bundled in the CLI; contract-typed API; ADR-0004 security | Accepted |
 | [0021](0021-receipt-panel-and-desktop-extension.md) | Receipt panel as a single-file MCP App; app-only, token-gated `apply_rule`; Claude Desktop `.mcpb` with keychain keys | Accepted |
 | [0022](0022-lists-implementation.md) | Lists end to end: four sources in one id space, checksummed artifacts per compiler version, one lease-owned refresh job, HTTPS/SSRF/pin/shrink guards, audit never reaches the model | Accepted |
+| [0023](0023-more-clients-and-setup.md) | Codex and Cursor plugins without hooks; `searchhole setup` merges MCP configs safely; `uninstall --purge` deletes by name | Accepted |
+| [0024](0024-release-engineering.md) | CI on three OSes, signed-tag releases with npm provenance and SBOM, SHA-pinned actions, 14-day minimum release age, Node 22.19 floor | Accepted |
 
 The ADRs were revised on 2026-10-30 after a three-lens adversarial review (facts, consistency, red team; 90 findings). Where an ADR writes `~/.searchhole/`, read it as the root that ADR-0015 resolves.
