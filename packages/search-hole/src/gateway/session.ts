@@ -6,18 +6,18 @@
  *
  * Turn bracketing, as implemented:
  * - `UserPromptSubmit` and `SessionStart(startup|resume|clear|compact)` may open a turn and
- *   re-key the hook session, but a *different* key is accepted only while no turn is open.
+ *   re-key the hook session.
  * - Claude Code does not run Stop after a user interrupt, so a turn can stay open forever.
- *   A turn with no activity (hooks, `search`, `fetch`) for `STALE_TURN_MS` counts as
- *   abandoned and may be replaced. This is defence in depth only: the `hook` tool is hidden
- *   from the model in Claude Code (spikes §1), so forged calls are a future-host concern.
- * - `UserPromptSubmit` with the current key while a turn is open replaces that turn (the
- *   previous one ended without a Stop). `SessionStart` mid-turn (auto-compaction) is a no-op.
+ *   A `UserPromptSubmit` therefore always replaces an open turn, whatever its key (interrupt,
+ *   then `/clear`, then a prompt within seconds). The `hook` tool exists only for Claude Code
+ *   and is hidden from the model (spikes §1), so a prompt event is genuine.
+ * - `SessionStart` with a different key replaces only a turn idle for `STALE_TURN_MS`;
+ *   `SessionStart` with the current key mid-turn (auto-compaction) is a no-op.
  * - `Stop` closes the turn only when its session id is the turn's key.
  */
 import { sessionKeyFromMeta } from './host-keys.ts'
 
-/** A turn idle this long may be replaced by a different session's prompt (see file header). */
+/** A turn idle this long may be replaced by a different session's `SessionStart` (see file header). */
 export const STALE_TURN_MS = 10_000
 /** Fallback sessions start afresh after this idle gap (ADR-0005 source 4). */
 export const FALLBACK_IDLE_MS = 30 * 60_000
@@ -96,9 +96,10 @@ export class GatewaySessions {
     return this.fallback.key
   }
 
-  /** Marks the open turn as active (hooks, `search`, `fetch`). */
-  noteActivity(): void {
-    if (this.turn !== undefined) this.turn.lastActivityAt = this.now()
+  /** Marks the open turn as active (hooks, `search`, `fetch`); a hook from another session doesn't. */
+  noteActivity(sessionId?: string): void {
+    if (this.turn === undefined || (sessionId !== undefined && sessionId !== this.turn.key)) return
+    this.turn.lastActivityAt = this.now()
   }
 
   /** `UserPromptSubmit` / `SessionStart`: may open a turn and re-key (see file header). */
@@ -119,7 +120,7 @@ export class GatewaySessions {
       if (open.key === sessionId) {
         if (event === 'SessionStart') return { kind: 'noop', reason: 'turn_open' }
         replaced = open
-      } else if (stale) {
+      } else if (stale || event === 'UserPromptSubmit') {
         replaced = open
       } else {
         return { kind: 'refused', reason: 'turn_active' }
@@ -149,8 +150,9 @@ export class GatewaySessions {
   }
 
   /**
-   * A `search`/`fetch` after a Stop and before the next prompt marks that Stop as suspect
-   * (ADR-0014 point 1): the turn is reopened. Returns true when it was.
+   * A search or page fetch (ours or built-in) after a Stop and before the next prompt marks
+   * that Stop as suspect (ADR-0014 point 1): the turn is reopened, and the App reopens the
+   * stopped receipt on its next call. Returns true when it was.
    */
   reopenAfterSuspectStop(): boolean {
     if (this.hookKey === undefined || this.turn !== undefined || this.lastStopAt === undefined) return false

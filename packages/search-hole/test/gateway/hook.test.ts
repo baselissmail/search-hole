@@ -5,7 +5,6 @@ import { afterEach, describe, expect, test } from 'vitest'
 import { SUMMARY_WITHHELD } from '../../src/gateway/builtin.ts'
 import { GUARD_DENY_REASON } from '../../src/gateway/guard.ts'
 import { LOOP_BREAK_NOTE, STEER_REASON } from '../../src/gateway/hook.ts'
-import { STALE_TURN_MS } from '../../src/gateway/session.ts'
 import { SearchHoleError } from '../../src/shared/errors.ts'
 import type { FakeAppOptions } from './fake-app.ts'
 import { type Connected, callHook, connect, ERAS, type Era, harness } from './helpers.ts'
@@ -82,18 +81,25 @@ describe.each(ERAS)('hook tool (%s era)', (era) => {
       expect(h.appCreations()).toBe(0)
     })
 
-    test('a different key cannot re-key an active turn; an abandoned turn can be replaced', async () => {
+    test('SessionStart cannot re-key an active turn; a prompt in a new session replaces it at once', async () => {
       const { h, hook } = await setup(era)
       await hook({ event: 'UserPromptSubmit', sessionId: 's1' })
-      expect(await hook({ event: 'UserPromptSubmit', sessionId: 'forged' })).toEqual({})
+      expect(await hook({ event: 'SessionStart', sessionId: 's9', source: 'clear' })).toEqual({})
       expect(h.gateway.sessions.hookKey).toBe('s1')
       expect(h.app()?.callsTo('openTurn').length).toBe(1)
-      // The user interrupted (no Stop) and later sent a prompt in a new session.
-      h.clock.now += STALE_TURN_MS
+      // Interrupt (no Stop), /clear, then a prompt within seconds (review 2026-10-31).
+      h.clock.now += 3_000
       await hook({ event: 'UserPromptSubmit', sessionId: 's2' })
       expect(h.gateway.sessions.hookKey).toBe('s2')
       expect(h.app()?.callsTo('closeTurn')[0]?.ctx?.session?.key).toBe('s1')
       expect(h.app()?.callsTo('openTurn').at(-1)?.ctx?.session?.key).toBe('s2')
+    })
+
+    test('tool hooks act for their own session id', async () => {
+      const { h, hook } = await setup(era)
+      await hook({ event: 'UserPromptSubmit', sessionId: 's1' })
+      await hook(pre('WebFetch', { url: 'https://react.dev/learn' }, { sessionId: 's2' }))
+      expect(h.app()?.callsTo('checkUrl')[0]?.ctx?.session).toEqual({ key: 's2', source: 'hook' })
     })
 
     test('Stop returns only the receipt systemMessage when the turn searched, else {}', async () => {
@@ -117,13 +123,23 @@ describe.each(ERAS)('hook tool (%s era)', (era) => {
       expect(h.gateway.sessions.turn?.key).toBe('s1')
     })
 
-    test('a search after Stop reopens the turn (suspect Stop)', async () => {
+    test('a search after Stop reopens the turn (suspect Stop); the App reopens the receipt', async () => {
       const { h, client, hook } = await setup(era)
       await hook({ event: 'UserPromptSubmit', sessionId: 's1' })
       await hook({ event: 'Stop', sessionId: 's1' })
       await client.callTool({ name: 'search', arguments: { query: 'q' } })
-      expect(h.app()?.callsTo('openTurn').length).toBe(2)
+      expect(h.app()?.callsTo('openTurn').length).toBe(1)
       expect(h.gateway.sessions.turn?.key).toBe('s1')
+    })
+
+    test('a built-in WebSearch after Stop reopens the turn too, so the next Stop closes it', async () => {
+      const { h, hook } = await setup(era)
+      await hook({ event: 'UserPromptSubmit', sessionId: 's1' })
+      await hook({ event: 'Stop', sessionId: 's1' })
+      await hook(pre('WebSearch', { query: 'react compiler' }))
+      expect(h.gateway.sessions.turn?.key).toBe('s1')
+      await hook({ event: 'Stop', sessionId: 's1' })
+      expect(h.app()?.callsTo('closeTurn').length).toBe(2)
     })
   })
 

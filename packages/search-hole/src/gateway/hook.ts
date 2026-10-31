@@ -73,6 +73,8 @@ export interface HookDeps {
 }
 
 const FILE_TOOLS = new Set(Object.keys(FILE_WRITE_TOOLS))
+/** Built-in tools whose use after a Stop reopens the turn (ADR-0014 point 1). */
+const SEARCH_TOOLS: ReadonlySet<string> = new Set(['WebSearch', 'WebFetch'])
 
 const KNOWN_CLASSES: ReadonlySet<string> = new Set<FindingClass>([
   'api_key',
@@ -143,11 +145,21 @@ async function dispatch(input: HookInput, ctx: RequestCtx, deps: HookDeps): Prom
     case 'UserPromptSubmit':
       return beginTurn(input.event, input, ctx, deps)
     case 'PreToolUse':
-      deps.sessions.noteActivity()
-      return preToolUse(input, ctx, deps)
-    case 'PostToolUse':
-      deps.sessions.noteActivity()
-      return postToolUse(input, ctx, deps)
+    case 'PostToolUse': {
+      // The hook's own session id, not the process key: after /clear the two can differ.
+      const key = nonEmpty(input.sessionId)
+      deps.sessions.noteActivity(key)
+      if (SEARCH_TOOLS.has(input.toolName ?? '') && deps.sessions.reopenAfterSuspectStop()) {
+        deps.log.info(
+          { toolName: input.toolName },
+          'built-in search or fetch after Stop: the turn was reopened',
+        )
+      }
+      const hookCtx = key === undefined ? ctx : withSession(ctx, key)
+      return input.event === 'PreToolUse'
+        ? preToolUse(input, hookCtx, deps)
+        : postToolUse(input, hookCtx, deps)
+    }
     case 'Stop':
       return stop(input, ctx, deps)
     default:

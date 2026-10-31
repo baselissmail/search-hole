@@ -83,12 +83,11 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
   const ctxOf = (ctx: HandlerContextLike) =>
     buildRequestCtx(requestContext(ctx, deps.era, legacy), deps.sessions, deps.proc)
 
-  /** A `search`/`fetch` after a Stop reopens the turn (ADR-0014 point 1). */
-  const touchTurn = async (app: App, ctx: ReturnType<typeof ctxOf>): Promise<void> => {
+  /** A `search`/`fetch` after a Stop reopens the turn; the App reopens its receipt (ADR-0014 point 1). */
+  const touchTurn = (): void => {
     deps.sessions.noteActivity()
-    if (!deps.sessions.reopenAfterSuspectStop()) return
-    deps.log.warn('search or fetch after Stop: the turn was reopened')
-    await app.openTurn(ctx).catch((err: unknown) => deps.log.warn({ err }, 'reopening the turn failed'))
+    if (deps.sessions.reopenAfterSuspectStop())
+      deps.log.warn('search or fetch after Stop: the turn was reopened')
   }
 
   server.registerTool(
@@ -104,7 +103,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
       try {
         const rctx = ctxOf(ctx)
         const app = await deps.getApp()
-        await touchTurn(app, rctx)
+        touchTurn()
         const search: SearchArgs = { query: args.query }
         if (args.depth !== undefined) search.depth = args.depth
         if (args.profile !== undefined) search.profile = args.profile
@@ -136,7 +135,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
       try {
         const rctx = ctxOf(ctx)
         const app = await deps.getApp()
-        await touchTurn(app, rctx)
+        touchTurn()
         const fetch: FetchArgs = { url: args.url, maxTokens: fetchTextTokens(args.maxTokens) }
         if (args.cursor !== undefined) fetch.cursor = args.cursor
         if (args.receiptId !== undefined) fetch.receiptId = args.receiptId

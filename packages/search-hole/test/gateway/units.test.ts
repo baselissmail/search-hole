@@ -121,12 +121,25 @@ describe('GatewaySessions', () => {
     expect(s.beginTurn('SessionStart', 'a', 'weird')).toEqual({ kind: 'noop', reason: 'source' })
     expect(s.beginTurn('UserPromptSubmit', 'a')).toMatchObject({ kind: 'open', key: 'a', rekeyed: true })
     expect(s.beginTurn('SessionStart', 'a', 'compact')).toEqual({ kind: 'noop', reason: 'turn_open' })
-    expect(s.beginTurn('UserPromptSubmit', 'b')).toEqual({ kind: 'refused', reason: 'turn_active' })
+    // SessionStart from another session replaces only an idle turn.
+    expect(s.beginTurn('SessionStart', 'b', 'clear')).toEqual({ kind: 'refused', reason: 'turn_active' })
     clock.now += STALE_TURN_MS - 1
     s.noteActivity()
+    s.noteActivity('other-session') // a hook from another session does not keep this turn alive
     clock.now += STALE_TURN_MS - 1
-    expect(s.beginTurn('UserPromptSubmit', 'b').kind).toBe('refused')
+    expect(s.beginTurn('SessionStart', 'b', 'clear').kind).toBe('refused')
     clock.now += 1
+    expect(s.beginTurn('SessionStart', 'b', 'clear')).toMatchObject({
+      kind: 'open',
+      key: 'b',
+      previousKey: 'a',
+    })
+    // A prompt always replaces the open turn, whatever its key (interrupt, /clear, prompt).
+    expect(s.beginTurn('UserPromptSubmit', 'a')).toMatchObject({
+      kind: 'open',
+      key: 'a',
+      replaced: { key: 'b' },
+    })
     expect(s.beginTurn('UserPromptSubmit', 'b')).toMatchObject({ kind: 'open', key: 'b', previousKey: 'a' })
     expect(s.endTurn('a')).toEqual({ kind: 'mismatch' })
     expect(s.endTurn('b').kind).toBe('close')

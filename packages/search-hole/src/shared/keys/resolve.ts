@@ -176,7 +176,10 @@ export async function resolveKey(engine: EngineId, deps: KeyDeps): Promise<KeyRe
       })
     running = current
     let byEngine = inflight.get(cache)
-    if (byEngine === undefined) inflight.set(cache, (byEngine = new Map()))
+    if (byEngine === undefined) {
+      byEngine = new Map()
+      inflight.set(cache, byEngine)
+    }
     byEngine.set(engine, running)
   }
   const stale = deps.staleWhileRevalidate === true ? cache.stale(engine) : undefined
