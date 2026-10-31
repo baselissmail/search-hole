@@ -31,18 +31,24 @@ const HOST_ANCHOR_RE = '^[a-z][a-z0-9+.\\-]*://(?:[^/?#:]*\\.)?'
 const WILDCARD_RE = { scheme: '[a-z0-9+.\\-]*', host: '[^/?#]*', rest: '.*' } as const
 
 export type PatternResult =
-  | { ok: true; source: string; literal: string; hasPath: boolean }
+  | { ok: true; source: string; literal: string; runs: string[]; hasPath: boolean }
   | { ok: false; error: string }
+
+/** A UTF-16 surrogate without its pair (`encodeURIComponent` would throw on it). */
+const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/
 
 const count = (s: string, ch: string): number => s.split(ch).length - 1
 
 /**
  * Translates a URL pattern into an RE2 source (compile it case-insensitively).
  * `literal` is the longest literal run, lower-cased, usable as a cheap substring
- * prefilter before running the regex.
+ * prefilter before running the regex; `runs` lists every literal run (each one
+ * occurs in any URL the pattern matches), lower-cased and percent-encoded as
+ * the URL would be.
  */
 export function urlPatternToRegex(pattern: string): PatternResult {
   if (pattern.length === 0) return { ok: false, error: 'empty URL pattern' }
+  if (LONE_SURROGATE.test(pattern)) return { ok: false, error: 'URL pattern has an unpaired surrogate' }
   if (pattern.length > MAX_PATTERN_LENGTH) {
     return { ok: false, error: `URL pattern is longer than ${MAX_PATTERN_LENGTH} characters` }
   }
@@ -78,6 +84,7 @@ export function urlPatternToRegex(pattern: string): PatternResult {
   let out = head
   let literal = ''
   let run = ''
+  const runs: string[] = []
   let at = 0
   for (const ch of body) {
     if (region === 'scheme' && at >= hostStart) region = 'host'
@@ -85,6 +92,7 @@ export function urlPatternToRegex(pattern: string): PatternResult {
     at += ch.length
     if (ch === '*' || ch === '^') {
       if (run.length > literal.length) literal = run
+      if (run !== '') runs.push(run.toLowerCase())
       run = ''
       out += ch === '^' ? SEPARATOR_RE : WILDCARD_RE[region]
       if (ch === '^' && region === 'host') region = 'rest'
@@ -96,7 +104,8 @@ export function urlPatternToRegex(pattern: string): PatternResult {
     }
   }
   if (run.length > literal.length) literal = run
+  if (run !== '') runs.push(run.toLowerCase())
   out += tail
   const afterScheme = body.replace(/^[a-z*][a-z0-9+.*-]*:\/\//i, '')
-  return { ok: true, source: out, literal: literal.toLowerCase(), hasPath: afterScheme.includes('/') }
+  return { ok: true, source: out, literal: literal.toLowerCase(), runs, hasPath: afterScheme.includes('/') }
 }

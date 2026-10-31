@@ -1,0 +1,55 @@
+{
+  "format": "goggles",
+  "header": {
+    "title": "search-hole golden goggle",
+    "description": "Hand-written for search-hole's importer golden tests (not a real goggle).",
+    "author": "search-hole",
+    "license": "CC0-1.0",
+    "homepage": "https://example.org/goggles"
+  },
+  "stats": {
+    "bytes": 979,
+    "lines": 35,
+    "ignored": 16,
+    "entries": 19,
+    "accepted": 11,
+    "duplicates": 4,
+    "skipped": 4,
+    "rules": 11,
+    "cancel": 0,
+    "regex": 1,
+    "patterns": 4,
+    "companions": 0
+  },
+  "allowlistMode": false,
+  "warnings": [
+    "1 instruction(s) combine a pattern with site=; the pattern is matched in the path and query only (approximate)",
+    "1 strength(s) outside 1–10 were clamped"
+  ],
+  "rules": [
+    "l_gg_9: raise 3 docs.example   <- $boost=3,site=docs.example",
+    "l_gg_13: block pinterest.example   <- $site=pinterest.example,discard",
+    "l_gg_16: lower 1 w3.example   <- $downrank,site=w3.example",
+    "l_gg_19: raise 4 mdn.example   <- $boost=4,site=mdn.example",
+    "l_gg_21: lower 3 blog.example   <- $downrank=3,site=blog.example",
+    "l_gg_22: raise 3 /^[a-z][a-z0-9+.\\-]*:\\/\\/(?:[^\\/?#:]*\\.)?blog\\.example(?::[0-9]+)?(?:\\/engineering\\/|[\\/?].*\\/engineering\\/)/i   <- /engineering/$boost=3,site=blog.example",
+    "l_gg_24: raise 4 */r/rust/   <- /r/rust/$boost=4",
+    "l_gg_25: block /foo.js^   <- /foo.js^$discard",
+    "l_gg_26: lower 2 |https://amp.   <- |https://amp.$downrank=2",
+    "l_gg_28: raise 1 */tutorial/   <- /tutorial/",
+    "l_gg_30: raise 10 big.example   <- $boost=12,site=big.example"
+  ],
+  "cancel": [],
+  "skipReasons": {
+    "generic instruction without a pattern or site= (no effect)": 1,
+    "more than one action": 1,
+    "unknown option $frobnicate": 1,
+    "unsupported target $intitle": 1
+  },
+  "skipped": [
+    "32: unsupported target $intitle",
+    "33: more than one action",
+    "34: unknown option $frobnicate",
+    "35: generic instruction without a pattern or site= (no effect)"
+  ]
+}

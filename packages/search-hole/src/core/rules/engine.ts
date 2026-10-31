@@ -40,6 +40,7 @@ import type {
 import { isWeighted, ruleText } from './ids.ts'
 import { type ParsedMatch, parseMatch, pathHasPrefix, specificity, testMatch } from './match.ts'
 import { type NormalizedUrl, normalizeUrl } from './normalize.ts'
+import { PatternIndex, type PrefilterStats } from './prefilter.ts'
 import { untilToMs } from './time.ts'
 
 /** One compiled list as the engine consumes it (ADR-0008 Lists). */
@@ -113,6 +114,8 @@ export interface CompiledRuleSet {
   /** Rules that could not be compiled and were skipped. */
   readonly issues: readonly CompileIssue[]
   readonly size: { user: number; list: number }
+  /** How the URL-pattern and regex rules were bucketed by the prefilter (host / gram / linear rest). */
+  readonly prefilter: PrefilterStats
 }
 
 /** Default profile `prefer` multiplier: the same as `raise 3` (ADR-0008, ADR-0010). */
@@ -152,8 +155,9 @@ const cmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
 const isVisibilityAction = (a: RuleAction): boolean => a === 'allow' || a === 'block' || a === 'pin'
 const isWeightAction = (a: RuleAction): boolean => a === 'raise' || a === 'lower' || a === 'normal'
 
+/** `$badfilter` key: one flag character, the action, a space, then the canonical match (unambiguous). */
 const cancelKeyOf = (canonical: string, action: RuleAction, listImportant: boolean): string =>
-  JSON.stringify([canonical, action, listImportant])
+  `${listImportant ? '1' : '0'}${action} ${canonical}`
 
 function userTier(rule: Rule): { tier: number; ignoredImportant: boolean } {
   switch (rule.scope) {
@@ -168,12 +172,21 @@ function userTier(rule: Rule): { tier: number; ignoredImportant: boolean } {
   }
 }
 
-/** Host-label hash maps plus a linear pattern list (ADR-0008 "Compiled matcher"). */
+/**
+ * Host-label hash maps (exact host, domain suffix, host + path prefix) plus a
+ * prefiltered pattern index for URL patterns and regex (ADR-0008 "Compiled
+ * matcher"; see `prefilter.ts`). Lookups cost O(labels) for host rules and touch
+ * only the pattern entries whose required host or literal occurs in the URL.
+ */
 class MatchIndex {
   private readonly domain = new Map<string, Entry[]>()
   private readonly exact = new Map<string, Entry[]>()
   private readonly hostPath = new Map<string, Entry[]>()
-  private readonly patterns: Entry[] = []
+  private readonly patterns = new PatternIndex<Entry>()
+
+  get patternStats(): PrefilterStats {
+    return this.patterns.stats
+  }
 
   add(e: Entry): void {
     const m = e.match
@@ -185,7 +198,7 @@ class MatchIndex {
     if (m.kind === 'domain') put(this.domain, m.host)
     else if (m.kind === 'exact_host') put(this.exact, m.host)
     else if (m.kind === 'host_path') put(this.hostPath, m.host)
-    else this.patterns.push(e)
+    else this.patterns.add(e)
   }
 
   /** All entries whose expression matches, sorted by `seq`. */
@@ -206,9 +219,9 @@ class MatchIndex {
       const dot = suffix.indexOf('.')
       suffix = dot === -1 ? null : suffix.slice(dot + 1)
     }
-    if (this.patterns.length > 0) {
+    if (this.patterns.size > 0) {
       const lower = url.href.toLowerCase()
-      for (const e of this.patterns) if (testMatch(e.match, url, lower)) out.push(e)
+      this.patterns.collect(url, lower, (e) => testMatch(e.match, url, lower), out)
     }
     return out.sort((a, b) => a.seq - b.seq)
   }
@@ -438,6 +451,7 @@ export function compileRuleSet(input: RuleSetInput): CompiledRuleSet {
   return {
     issues,
     size: { user: userCount, list: listCount },
+    prefilter: index.patternStats,
 
     decide(url, opts) {
       const active = lookup(url).filter((e) => applies(e, opts))

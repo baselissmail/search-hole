@@ -39,6 +39,7 @@ export {
   MAX_PATTERN_WILDCARDS,
   urlPatternToRegex,
 } from './pattern.ts'
+export { PatternIndex, type PrefilterStats, patternHostKey, requiredLiterals } from './prefilter.ts'
 export {
   DEFAULT_PROFILE,
   hasKeyword,

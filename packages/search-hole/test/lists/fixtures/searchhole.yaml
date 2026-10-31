@@ -1,0 +1,11 @@
+version: 1
+# search-hole golden list in search-hole's own format (hand-written)
+rules:
+  - { match: pinterest.example, action: block }
+  - { match: "|https://*.example.*/amp/^", action: block }
+  - { match: docs.example, action: raise, weight: 2 }
+  - { match: w3.example, action: lower, weight: 4 }
+  - { match: good.pinterest.example, action: allow }
+  - { match: shady.example, action: block, important: true }
+  - { match: pinned.example, action: pin }
+  - { match: spam.example, action: block, profile: coding }

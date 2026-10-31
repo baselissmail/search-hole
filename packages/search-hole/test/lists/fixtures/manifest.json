@@ -1,0 +1,380 @@
+{
+  "$comment": "Golden import fixtures (ADR-0008 import mapping). 'lists' are imported with importList; each has a checked-in snapshot <id>.expected.json (regenerate with UPDATE_GOLDEN=1, review the diff, then run biome format --write). 'scenarios' are hand-written expected decisions and are never regenerated. weight = expected pass-3 factor: raise N = 1 + 0.15N, lower N = 1 / (1 + 0.15N).",
+  "lists": [
+    { "id": "ub", "file": "ublacklist.txt", "format": "auto", "kind": "block", "detect": "ublacklist" },
+    { "id": "abp", "file": "abp.txt", "format": "auto", "kind": "block", "detect": "abp" },
+    { "id": "agh", "file": "adguard.txt", "format": "auto", "kind": "block", "detect": "adguard" },
+    { "id": "hosts", "file": "hosts.txt", "format": "auto", "kind": "block", "detect": "hosts" },
+    { "id": "dom", "file": "domains.txt", "format": "auto", "kind": "block", "detect": "domains" },
+    { "id": "official", "file": "domains.txt", "format": "domains", "kind": "official" },
+    { "id": "allowed", "file": "domains.txt", "format": "domains", "kind": "allow" },
+    { "id": "gg", "file": "goggles.goggle", "format": "auto", "kind": "block", "detect": "goggles" },
+    {
+      "id": "ggal",
+      "file": "goggles-allowlist.goggle",
+      "format": "auto",
+      "kind": "block",
+      "detect": "goggles"
+    },
+    { "id": "sh", "file": "searchhole.yaml", "format": "auto", "kind": "block", "detect": "searchhole" }
+  ],
+  "scenarios": [
+    {
+      "name": "uBlacklist mapping",
+      "lists": ["ub"],
+      "cases": [
+        {
+          "url": "https://pinterest.com/",
+          "visibility": "hidden",
+          "note": "ADR-0008 golden: *://*.pinterest.com/* blocks the apex"
+        },
+        {
+          "url": "https://www.pinterest.com/pin/1",
+          "visibility": "hidden",
+          "note": "ADR-0008 golden: and www."
+        },
+        { "url": "https://notpinterest.com/", "visibility": "kept", "note": "label boundary" },
+        {
+          "url": "https://help.pinterest.com/article",
+          "visibility": "kept",
+          "note": "@ exception beats a list block"
+        },
+        {
+          "url": "https://www.quora.example/q",
+          "visibility": "hidden",
+          "note": "non-wildcard subdomain: exact host"
+        },
+        { "url": "https://quora.example/q", "visibility": "kept", "note": "exact host excludes the apex" },
+        { "url": "https://www.example.com/amp/story", "visibility": "hidden", "note": "host + path prefix" },
+        {
+          "url": "https://www.example.com/amplify",
+          "visibility": "kept",
+          "note": "path prefix /amp/ needs the slash"
+        },
+        {
+          "url": "https://medium.example/tag/js",
+          "visibility": "hidden",
+          "note": "exact host + path prefix"
+        },
+        {
+          "url": "https://www.medium.example/tag/js",
+          "visibility": "kept",
+          "note": "exact host + path prefix excludes subdomains"
+        },
+        {
+          "url": "https://a.foo.example/bar",
+          "visibility": "hidden",
+          "note": "match-pattern path without * is the whole path"
+        },
+        {
+          "url": "https://foo.example/bar?x=1",
+          "visibility": "kept",
+          "note": "uBlacklist paths include the query"
+        },
+        { "url": "https://news.example/a", "visibility": "hidden", "note": "https-only pattern" },
+        {
+          "url": "http://news.example/a",
+          "visibility": "kept",
+          "note": "https-only pattern does not match http"
+        },
+        { "url": "http://old.example/x", "visibility": "hidden", "note": "http://*.d/* includes the apex" },
+        { "url": "https://old.example/x", "visibility": "kept", "note": "http-only pattern" },
+        {
+          "url": "https://any.example/clickbait-top-10/x",
+          "visibility": "hidden",
+          "note": "any host, path wildcard"
+        },
+        {
+          "url": "https://www.spam.example/x",
+          "visibility": "hidden",
+          "note": "ADR-0008 golden: uBlacklist ^https?://www\\. regex"
+        },
+        {
+          "url": "https://spam.example/x",
+          "visibility": "kept",
+          "note": "the www regex keeps www. (lossless normalisation)"
+        },
+        { "url": "https://pinterest.example.org/a/USER/b", "visibility": "hidden", "note": "regex /i flag" },
+        { "url": "https://site.xyz/lite/page", "visibility": "hidden", "note": "url/…/ is a regex rule" },
+        { "url": "https://a.farm.example/", "visibility": "kept", "note": "the lookahead rule was skipped" },
+        { "url": "https://docs.rs/std", "visibility": "kept", "weight": 1.45, "note": "@3 → raise 3" },
+        {
+          "url": "https://www.rust-lang.example/",
+          "visibility": "kept",
+          "weight": 2.5,
+          "note": "@11 → raise 10 (clamped)"
+        },
+        { "url": "https://dup.example/", "visibility": "hidden" },
+        {
+          "url": "https://cancelled.example/",
+          "visibility": "hidden",
+          "note": "no $badfilter in this scenario"
+        }
+      ]
+    },
+    {
+      "name": "ABP network rules",
+      "lists": ["abp"],
+      "cases": [
+        { "url": "https://www.pinterest.example/", "visibility": "hidden", "note": "||d^ → domain" },
+        { "url": "https://cdn.pinterest.example/x", "visibility": "kept", "note": "@@ beats a block" },
+        { "url": "https://ads.example/", "visibility": "hidden", "note": "$important beats @@" },
+        {
+          "url": "https://safe.example/",
+          "visibility": "kept",
+          "note": "an important exception beats an important block"
+        },
+        {
+          "url": "https://example.net/x",
+          "visibility": "hidden",
+          "note": "a bare hostname is a domain rule"
+        },
+        { "url": "https://notexample.net/", "visibility": "kept" },
+        { "url": "https://blog.example/amp/x", "visibility": "hidden" },
+        { "url": "https://blog.example/news", "visibility": "kept" },
+        { "url": "https://news.example.com/amp/", "visibility": "hidden", "note": "ADR-0008 /amp/ example" },
+        {
+          "url": "https://m.example.co.uk/amp/?x=1",
+          "visibility": "hidden",
+          "note": "ADR-0008 /amp/ example, other TLD, query"
+        },
+        {
+          "url": "https://news.example.com/amp/story",
+          "visibility": "kept",
+          "note": "^ needs a separator or the end"
+        },
+        { "url": "http://news.example.com/amp/", "visibility": "kept", "note": "| anchors the scheme" },
+        {
+          "url": "https://x.example/BANNER12.HTML",
+          "visibility": "hidden",
+          "note": "ABP regex is case-insensitive"
+        },
+        { "url": "https://doc.example/", "visibility": "hidden", "note": "$document applies to pages" },
+        { "url": "https://img.example/", "visibility": "kept", "note": "$image rule skipped" },
+        { "url": "https://tracker.example/", "visibility": "kept", "note": "$third-party rule skipped" },
+        { "url": "https://a.wild.example/", "visibility": "hidden" },
+        { "url": "https://wild.example/", "visibility": "kept", "note": "||*.d^ needs a subdomain" },
+        {
+          "url": "https://partial.example.org/",
+          "visibility": "hidden",
+          "note": "||d without ^ is a prefix (ABP semantics)"
+        },
+        {
+          "url": "https://hosts-in-abp.example/",
+          "visibility": "hidden",
+          "note": "hosts syntax inside a filter list"
+        },
+        {
+          "url": "https://www.hosts-in-abp.example/",
+          "visibility": "kept",
+          "note": "hosts entries are exact hosts"
+        }
+      ]
+    },
+    {
+      "name": "$badfilter cancels the identical rule in another list",
+      "lists": ["ub", "abp"],
+      "cases": [
+        {
+          "url": "https://cancelled.example/",
+          "visibility": "kept",
+          "note": "uBlacklist *://*.cancelled.example/* cancelled by ABP ||cancelled.example^$badfilter"
+        },
+        { "url": "https://dup.example/", "visibility": "hidden", "note": "other rules unaffected" }
+      ]
+    },
+    {
+      "name": "AdGuard Home DNS list",
+      "lists": ["agh"],
+      "cases": [
+        { "url": "https://doubleclick.example/x", "visibility": "hidden" },
+        { "url": "https://ads.network.example/", "visibility": "hidden", "note": "||d^| is a domain rule" },
+        { "url": "https://allowed.network.example/", "visibility": "kept" },
+        { "url": "https://phone.example/", "visibility": "kept", "note": "$client rule skipped" },
+        { "url": "https://cdn.example/", "visibility": "kept", "note": "$denyallow rule skipped" },
+        { "url": "https://tracker.example/", "visibility": "hidden" },
+        { "url": "https://x.example/metrics.tracker/", "visibility": "hidden" },
+        { "url": "https://important.example/", "visibility": "hidden" }
+      ]
+    },
+    {
+      "name": "hosts file",
+      "lists": ["hosts"],
+      "cases": [
+        {
+          "url": "https://www.example.com/",
+          "visibility": "hidden",
+          "note": "ADR-0008 golden: hosts www. entry"
+        },
+        {
+          "url": "https://example.com/",
+          "visibility": "kept",
+          "note": "the www. entry does not cover the apex"
+        },
+        { "url": "https://cdn.www.example.com/", "visibility": "kept", "note": "or subdomains" },
+        { "url": "https://ads.example/", "visibility": "hidden" },
+        { "url": "https://tracking.example/", "visibility": "hidden" },
+        { "url": "https://sub.ads.example/", "visibility": "kept" },
+        { "url": "https://telemetry.example/", "visibility": "hidden" },
+        { "url": "https://ipv6-sink.example/", "visibility": "hidden" },
+        { "url": "https://nas.lan/", "visibility": "kept", "note": "a redirect line is not a block" },
+        { "url": "http://localhost/", "visibility": "kept", "note": "reserved names are ignored" }
+      ]
+    },
+    {
+      "name": "plain domains",
+      "lists": ["dom"],
+      "cases": [
+        { "url": "https://www.pinterest.example/", "visibility": "hidden", "note": "domain suffix" },
+        { "url": "https://medium.example/", "visibility": "hidden" },
+        { "url": "https://a.quora.example/", "visibility": "hidden" },
+        { "url": "https://bücher.example/", "visibility": "hidden", "note": "IDN entry, punycode match" },
+        { "url": "https://example.com/", "visibility": "kept", "note": "single-label 'com' skipped" }
+      ]
+    },
+    {
+      "name": "an official list only annotates",
+      "lists": ["official"],
+      "profiles": [{ "name": "docs", "prefer": { "lists": ["official"] } }],
+      "profile": "docs",
+      "cases": [
+        {
+          "url": "https://docs.example/x",
+          "visibility": "kept",
+          "weight": 1,
+          "prefer": 1.45,
+          "note": "membership feeds prefer"
+        },
+        {
+          "url": "https://pinterest.example/",
+          "visibility": "kept",
+          "weight": 1,
+          "prefer": 1.45,
+          "note": "never hides"
+        },
+        { "url": "https://other.example/", "visibility": "kept", "weight": 1, "prefer": 1 }
+      ]
+    },
+    {
+      "name": "an allow list turns entries into exceptions",
+      "lists": ["allowed", "abp"],
+      "cases": [
+        {
+          "url": "https://www.pinterest.example/",
+          "visibility": "kept",
+          "note": "list allow beats list block"
+        },
+        {
+          "url": "https://ads.example/",
+          "visibility": "hidden",
+          "note": "$important still beats a list allow"
+        }
+      ]
+    },
+    {
+      "name": "Goggles precedence",
+      "lists": ["gg"],
+      "cases": [
+        {
+          "url": "https://docs.example/x",
+          "visibility": "kept",
+          "weight": 1.45,
+          "note": "boost beats downrank"
+        },
+        { "url": "https://pinterest.example/", "visibility": "hidden", "note": "discard is final" },
+        {
+          "url": "https://w3.example/",
+          "visibility": "kept",
+          "weight": 0.8696,
+          "note": "the weakest downrank wins"
+        },
+        {
+          "url": "https://mdn.example/",
+          "visibility": "kept",
+          "weight": 1.6,
+          "note": "the largest boost wins"
+        },
+        {
+          "url": "https://blog.example/engineering/post",
+          "visibility": "kept",
+          "weight": 1.45,
+          "note": "path boost 3 beats site downrank 3, no summing"
+        },
+        {
+          "url": "https://blog.example/other",
+          "visibility": "kept",
+          "weight": 0.6897,
+          "note": "site downrank 3 elsewhere"
+        },
+        { "url": "https://www.reddit.example/r/rust/x", "visibility": "kept", "weight": 1.6 },
+        { "url": "https://cdn.example/foo.js?v=1", "visibility": "hidden", "note": "^ separator" },
+        { "url": "https://cdn.example/foo.jsx", "visibility": "kept" },
+        { "url": "https://amp.news.example/", "visibility": "kept", "weight": 0.7692 },
+        {
+          "url": "https://learn.example/tutorial/x",
+          "visibility": "kept",
+          "weight": 1.15,
+          "note": "a bare instruction is boost=1"
+        },
+        {
+          "url": "https://big.example/",
+          "visibility": "kept",
+          "weight": 2.5,
+          "note": "boost=12 clamped to 10"
+        },
+        {
+          "url": "https://x.example/",
+          "visibility": "kept",
+          "weight": 1,
+          "note": "invalid instructions skipped"
+        }
+      ]
+    },
+    {
+      "name": "a user allow beats a goggle discard",
+      "lists": ["gg"],
+      "user": [{ "match": "pinterest.example", "action": "allow" }],
+      "cases": [{ "url": "https://pinterest.example/", "visibility": "kept" }]
+    },
+    {
+      "name": "Goggles allowlist mode",
+      "lists": ["ggal"],
+      "profiles": [{ "name": "only", "defaultAction": "block" }],
+      "profile": "only",
+      "cases": [
+        {
+          "url": "https://docs.example/",
+          "visibility": "kept",
+          "weight": 1.15,
+          "note": "matched by an instruction"
+        },
+        { "url": "https://mdn.example/x", "visibility": "kept", "weight": 1.3 },
+        { "url": "https://docs.example/ads/x", "visibility": "hidden", "note": "discard stays final" },
+        {
+          "url": "https://other.example/",
+          "visibility": "hidden",
+          "note": "not matched: hidden by default: block"
+        }
+      ]
+    },
+    {
+      "name": "Goggles allowlist mode needs the profile",
+      "lists": ["ggal"],
+      "cases": [{ "url": "https://other.example/", "visibility": "kept" }]
+    },
+    {
+      "name": "search-hole YAML list",
+      "lists": ["sh"],
+      "cases": [
+        { "url": "https://pinterest.example/", "visibility": "hidden" },
+        { "url": "https://good.pinterest.example/", "visibility": "kept" },
+        { "url": "https://news.example.com/amp/", "visibility": "hidden" },
+        { "url": "https://docs.example/", "visibility": "kept", "weight": 1.3 },
+        { "url": "https://w3.example/", "visibility": "kept", "weight": 0.625 },
+        { "url": "https://shady.example/", "visibility": "hidden" },
+        { "url": "https://pinned.example/", "visibility": "kept", "note": "lists never pin" },
+        { "url": "https://spam.example/", "visibility": "hidden", "note": "profile dropped in a list" }
+      ]
+    }
+  ]
+}

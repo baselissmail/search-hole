@@ -1,0 +1,7 @@
+! name: search-hole golden allowlist goggle
+! description: Hand-written; a generic $discard keeps only what the goggle matches.
+! license: CC0-1.0
+$discard
+$site=docs.example
+$boost=2,site=mdn.example
+/ads/$discard

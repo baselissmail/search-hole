@@ -1,0 +1,12 @@
+# search-hole golden domains fixture (hand-written, not a real list)
+# License: CC0-1.0
+pinterest.example
+*.medium.example
+.quora.example
+bücher.example
+com
+not a domain
+0.0.0.0 hosts-line.example
+bad_host!.example
+pinterest.example
+docs.example # a trailing comment

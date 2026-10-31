@@ -1,0 +1,36 @@
+---
+name: search-hole golden uBlacklist fixture
+license: CC0-1.0
+homepage: https://example.org/lists/ublacklist
+---
+# Hand-written for search-hole's importer golden tests (not a real list).
+# ADR-0008: an imported *://*.pinterest.com/* blocks pinterest.com and www.pinterest.com.
+*://*.pinterest.com/*
+*://www.quora.example/*
+*://*.example.com/amp/*
+*://medium.example/tag/*
+*://*.foo.example/bar
+https://news.example/*
+http://*.old.example/*
+*://*/clickbait-*/*
+*://*.cancelled.example/*
+# Regex, with the ADR-0008 golden ^https?://www\. case
+/^https?:\/\/www\.spam\.example\//
+/pinterest.+\/user/i
+url/\.xyz\/(?:amp|lite)\//
+# A lookahead RE2 cannot run (one content-farm seed list has one): counted, not imported
+/^https?:\/\/(?!www\.)[^/]+\.farm\.example\//
+# Exceptions and highlights
+@*://*.help.pinterest.com/*
+@3 *://*.docs.rs/*
+@11 *://*.rust-lang.example/*
+# Not supported: counted
+title/Top 10 /
+$site="pinterest"
+*://*.amazon.example/* @if($category="images")
+<all_urls>
+this is not a rule
+ftp://files.example/*
+# Duplicates collapse
+*://*.dup.example/*
+*://*.dup.example/*   # the same rule again

@@ -1,0 +1,36 @@
+{
+  "format": "goggles",
+  "header": {
+    "title": "search-hole golden allowlist goggle",
+    "description": "Hand-written; a generic $discard keeps only what the goggle matches.",
+    "license": "CC0-1.0"
+  },
+  "stats": {
+    "bytes": 215,
+    "lines": 7,
+    "ignored": 4,
+    "entries": 3,
+    "accepted": 3,
+    "duplicates": 0,
+    "skipped": 0,
+    "rules": 5,
+    "cancel": 0,
+    "regex": 0,
+    "patterns": 1,
+    "companions": 2
+  },
+  "allowlistMode": true,
+  "warnings": [
+    "generic $discard: this goggle keeps only what it matches (allowlist mode); apply it with a profile that sets default: block (2 instruction(s) also allow what they match; discards are $important)"
+  ],
+  "rules": [
+    "l_ggal_5: raise 1 docs.example   <- $site=docs.example",
+    "l_ggal_6: raise 2 mdn.example   <- $boost=2,site=mdn.example",
+    "l_ggal_7: block */ads/ $important   <- /ads/$discard",
+    "l_ggal_5_keep: allow docs.example   <- $site=docs.example",
+    "l_ggal_6_keep: allow mdn.example   <- $boost=2,site=mdn.example"
+  ],
+  "cancel": [],
+  "skipReasons": {},
+  "skipped": []
+}

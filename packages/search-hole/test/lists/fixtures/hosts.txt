@@ -1,0 +1,19 @@
+# Title: search-hole golden hosts fixture
+# Homepage: https://example.org/lists/hosts
+# License: CC0-1.0
+# Hand-written for search-hole's importer golden tests (not a real list).
+127.0.0.1 localhost
+127.0.0.1 localhost.localdomain
+::1 localhost ip6-localhost ip6-loopback
+255.255.255.255 broadcasthost
+fe80::1%lo0 localhost
+
+# ADR-0008 golden: a hosts-file www. entry is an exact host
+0.0.0.0 www.example.com
+0.0.0.0 ads.example tracking.example # two names on one line
+127.0.0.1 telemetry.example
+:: ipv6-sink.example
+0.0.0.0 bad_host!.example
+192.168.1.10 nas.lan
+0.0.0.0 www.example.com
+0.0.0.0 0.0.0.0

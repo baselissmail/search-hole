@@ -53,6 +53,23 @@ export function normalizeUrl(raw: string): NormalizedUrl | null {
   return { href: `${scheme}://${host}${port}${pathQuery}`, scheme, host, pathQuery, ip: isIpHost(host) }
 }
 
+const ASCII_HOST = /^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*$/
+const NUMERIC_LABEL = /^(?:\d+|0x[0-9a-f]*)$/
+
+/**
+ * The WHATWG host parser maps a dotted ASCII name to its lower-case form when no
+ * label starts with `xn--` (punycode is validated) and the last label is not a
+ * number (that switches to IPv4 parsing, `1.2.3` → `1.2.0.3`). Those names skip
+ * the URL parser, which dominates list compile time; anything else returns null.
+ */
+function asciiHostFastPath(t: string): string | null {
+  if (!ASCII_HOST.test(t)) return null
+  const lower = t.toLowerCase()
+  if (lower.startsWith('xn--') || lower.includes('.xn--')) return null
+  const last = lower.slice(lower.lastIndexOf('.') + 1)
+  return NUMERIC_LABEL.test(last) ? null : lower
+}
+
 /**
  * Normalises a host written in a rule (`Bücher.DE.` → `xn--bcher-kva.de`).
  * Returns null when the text is not a bare host (ports, paths, wildcards,
@@ -60,7 +77,10 @@ export function normalizeUrl(raw: string): NormalizedUrl | null {
  */
 export function normalizeHost(text: string): string | null {
   const t = text.trim().replace(/\.+$/, '')
-  if (t === '' || t.length > 253 || /[\s/?#@\\*^|=:]/.test(t.replace(/^\[[0-9a-fA-F:.]+\]$/, ''))) return null
+  if (t === '' || t.length > 253) return null
+  const fast = asciiHostFastPath(t)
+  if (fast !== null) return fast
+  if (/[\s/?#@\\*^|=:]/.test(t.replace(/^\[[0-9a-fA-F:.]+\]$/, ''))) return null
   let u: URL
   try {
     u = new URL(`http://${t}/`)
@@ -96,5 +116,7 @@ export function hostMatchesDomain(host: string, domain: string, hostIsIp: boolea
 
 /** Number of DNS labels in a host (`a.b.c` → 3). */
 export function labelCount(host: string): number {
-  return host.split('.').length
+  let n = 1
+  for (let i = 0; i < host.length; i++) if (host.charCodeAt(i) === 46) n++
+  return n
 }

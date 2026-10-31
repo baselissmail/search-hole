@@ -1,0 +1,40 @@
+{
+  "format": "hosts",
+  "header": {
+    "title": "search-hole golden hosts fixture",
+    "homepage": "https://example.org/lists/hosts",
+    "license": "CC0-1.0"
+  },
+  "stats": {
+    "bytes": 606,
+    "lines": 19,
+    "ignored": 12,
+    "entries": 8,
+    "accepted": 5,
+    "duplicates": 1,
+    "skipped": 2,
+    "rules": 5,
+    "cancel": 0,
+    "regex": 0,
+    "patterns": 0,
+    "companions": 0
+  },
+  "allowlistMode": false,
+  "warnings": [],
+  "rules": [
+    "l_hosts_12: block =www.example.com   <- 0.0.0.0 www.example.com",
+    "l_hosts_13: block =ads.example   <- 0.0.0.0 ads.example tracking.example # two names on one line",
+    "l_hosts_13_2: block =tracking.example   <- 0.0.0.0 ads.example tracking.example # two names on one line",
+    "l_hosts_14: block =telemetry.example   <- 127.0.0.1 telemetry.example",
+    "l_hosts_15: block =ipv6-sink.example   <- :: ipv6-sink.example"
+  ],
+  "cancel": [],
+  "skipReasons": {
+    "invalid host name": 1,
+    "maps a name to an address (redirect, not a block)": 1
+  },
+  "skipped": [
+    "16: invalid host name (bad_host!.example)",
+    "17: maps a name to an address (redirect, not a block) (nas.lan → 192.168.1.10)"
+  ]
+}

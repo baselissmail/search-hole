@@ -1,0 +1,35 @@
+! name: search-hole golden goggle
+! description: Hand-written for search-hole's importer golden tests (not a real goggle).
+! public: false
+! author: search-hole
+! license: CC0-1.0
+! homepage: https://example.org/goggles
+
+! Inside one goggle, boost beats downrank
+$boost=3,site=docs.example
+$downrank=2,site=docs.example
+! Discard is final
+$boost=5,site=pinterest.example
+$site=pinterest.example,discard
+! The weakest downrank wins
+$downrank=5,site=w3.example
+$downrank,site=w3.example
+! The largest boost wins
+$boost=2,site=mdn.example
+$boost=4,site=mdn.example
+! A site-wide downrank plus a path boost: boosted, no summing
+$downrank=3,site=blog.example
+/engineering/$boost=3,site=blog.example
+! Patterns
+/r/rust/$boost=4
+/foo.js^$discard
+|https://amp.$downrank=2
+! A bare instruction is boost=1
+/tutorial/
+! Strengths are clamped to 1-10
+$boost=12,site=big.example
+! Not supported: counted
+$intitle,boost=2
+$boost=2,downrank=3,site=x.example
+$frobnicate,site=x.example
+$boost=2

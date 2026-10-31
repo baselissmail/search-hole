@@ -1,0 +1,42 @@
+{
+  "format": "domains",
+  "header": {
+    "license": "CC0-1.0"
+  },
+  "stats": {
+    "bytes": 268,
+    "lines": 12,
+    "ignored": 2,
+    "entries": 10,
+    "accepted": 5,
+    "duplicates": 1,
+    "skipped": 4,
+    "rules": 5,
+    "cancel": 0,
+    "regex": 0,
+    "patterns": 0,
+    "companions": 0
+  },
+  "allowlistMode": false,
+  "warnings": [],
+  "rules": [
+    "l_dom_3: block pinterest.example",
+    "l_dom_4: block medium.example   <- *.medium.example",
+    "l_dom_5: block quora.example   <- .quora.example",
+    "l_dom_6: block xn--bcher-kva.example   <- bücher.example",
+    "l_dom_12: block docs.example   <- docs.example # a trailing comment"
+  ],
+  "cancel": [],
+  "skipReasons": {
+    "hosts-file line in a domains list": 1,
+    "invalid domain name": 1,
+    "not a single domain name": 1,
+    "single-label name (would match a whole TLD)": 1
+  },
+  "skipped": [
+    "7: single-label name (would match a whole TLD)",
+    "8: not a single domain name",
+    "9: hosts-file line in a domains list",
+    "10: invalid domain name"
+  ]
+}

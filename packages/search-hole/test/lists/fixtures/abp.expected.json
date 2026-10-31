@@ -1,0 +1,59 @@
+{
+  "format": "abp",
+  "header": {
+    "title": "search-hole golden ABP fixture",
+    "homepage": "https://example.org/lists/abp",
+    "license": "CC0-1.0",
+    "expires": "4 days (update frequency)",
+    "version": "202610310000"
+  },
+  "stats": {
+    "bytes": 775,
+    "lines": 31,
+    "ignored": 9,
+    "entries": 22,
+    "accepted": 15,
+    "duplicates": 0,
+    "skipped": 7,
+    "rules": 14,
+    "cancel": 1,
+    "regex": 1,
+    "patterns": 4,
+    "companions": 0
+  },
+  "allowlistMode": false,
+  "warnings": ["1 !#include directive(s) were not followed"],
+  "rules": [
+    "l_abp_9: block pinterest.example   <- ||pinterest.example^",
+    "l_abp_10: block ads.example $important   <- ||ads.example^$important",
+    "l_abp_11: allow ads.example   <- @@||ads.example^",
+    "l_abp_12: allow cdn.pinterest.example   <- @@||cdn.pinterest.example^",
+    "l_abp_13: allow safe.example $important   <- @@||safe.example^$important",
+    "l_abp_14: block safe.example $important   <- ||safe.example^$important",
+    "l_abp_15: block example.net",
+    "l_abp_16: block ||blog.example/amp/",
+    "l_abp_17: block |https://*.example.*/amp/^",
+    "l_abp_18: block /banner[0-9]+\\.html/i   <- /banner[0-9]+\\.html/",
+    "l_abp_20: block doc.example   <- ||doc.example^$document",
+    "l_abp_24: block ||*.wild.example^",
+    "l_abp_25: block ||partial.example",
+    "l_abp_31: block =hosts-in-abp.example   <- 0.0.0.0 hosts-in-abp.example"
+  ],
+  "cancel": ["block cancelled.example"],
+  "skipReasons": {
+    "cosmetic filter": 3,
+    "non-linear regex (lookaround or backreference)": 1,
+    "unsupported modifier $domain": 1,
+    "unsupported modifier $image": 1,
+    "unsupported modifier $third-party": 1
+  },
+  "skipped": [
+    "21: unsupported modifier $image",
+    "22: unsupported modifier $third-party",
+    "23: unsupported modifier $domain",
+    "26: cosmetic filter",
+    "27: cosmetic filter",
+    "28: cosmetic filter",
+    "29: non-linear regex (lookaround or backreference) (lookbehind is not supported (linear-time regex only))"
+  ]
+}

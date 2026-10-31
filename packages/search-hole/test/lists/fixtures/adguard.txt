@@ -1,0 +1,16 @@
+! Title: search-hole golden AdGuard Home fixture
+! Description: hand-written DNS-style list for importer golden tests (not a real list)
+! License: CC0-1.0
+# AdGuard Home also reads # comments
+||doubleclick.example^
+||ads.network.example^|
+@@||allowed.network.example^
+||phone.example^$client=192.168.1.5
+||ipv6.example^$dnstype=AAAA
+||cdn.example^$denyallow=a.example|b.example
+||rewrite.example^$dnsrewrite=NOERROR;CNAME;safe.example
+||tagged.example^$ctag=device_phone
+127.0.0.1 localhost
+0.0.0.0 tracker.example
+/metrics\.tracker/
+||important.example^$important

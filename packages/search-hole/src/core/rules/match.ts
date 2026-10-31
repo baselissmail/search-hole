@@ -30,7 +30,15 @@ export type ParsedMatch =
   | { kind: 'domain'; canonical: string; host: string }
   | { kind: 'exact_host'; canonical: string; host: string }
   | { kind: 'host_path'; canonical: string; host: string; exactHost: boolean; path: string }
-  | { kind: 'url_pattern'; canonical: string; re: RE2JS; literal: string; hasPath: boolean }
+  | {
+      kind: 'url_pattern'
+      canonical: string
+      re: RE2JS
+      literal: string
+      /** Every literal run (lower-case); the prefilter files the rule under one of them. */
+      runs: readonly string[]
+      hasPath: boolean
+    }
   | { kind: 'regex'; canonical: string; re: RE2JS }
 
 export type MatchParseResult = { ok: true; match: ParsedMatch } | { ok: false; error: string }
@@ -95,6 +103,7 @@ export function parseMatch(text: string, kind?: MatchKind): MatchParseResult {
           canonical: t.toLowerCase(),
           re: r.re,
           literal: p.literal,
+          runs: p.runs,
           hasPath: p.hasPath,
         },
       }

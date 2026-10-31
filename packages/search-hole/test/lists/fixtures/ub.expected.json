@@ -1,0 +1,63 @@
+{
+  "format": "ublacklist",
+  "header": {
+    "title": "search-hole golden uBlacklist fixture",
+    "license": "CC0-1.0",
+    "homepage": "https://example.org/lists/ublacklist"
+  },
+  "stats": {
+    "bytes": 1110,
+    "lines": 36,
+    "ignored": 12,
+    "entries": 24,
+    "accepted": 16,
+    "duplicates": 1,
+    "skipped": 7,
+    "rules": 16,
+    "cancel": 0,
+    "regex": 5,
+    "patterns": 2,
+    "companions": 0
+  },
+  "allowlistMode": false,
+  "warnings": [
+    "2 highlight rule(s) (@N) imported as raise N: approximate, since uBlacklist colours highlighted results and does not rank them; 1 weight(s) clamped to 1–10"
+  ],
+  "rules": [
+    "l_ub_8: block pinterest.com   <- *://*.pinterest.com/*",
+    "l_ub_9: block =www.quora.example   <- *://www.quora.example/*",
+    "l_ub_10: block example.com/amp/   <- *://*.example.com/amp/*",
+    "l_ub_11: block =medium.example/tag/   <- *://medium.example/tag/*",
+    "l_ub_12: block ||foo.example/bar|   <- *://*.foo.example/bar",
+    "l_ub_13: block |https://news.example/   <- https://news.example/*",
+    "l_ub_14: block /^http:\\/\\/(?:[^/?#:]*\\.)?old\\.example\\//   <- http://*.old.example/*",
+    "l_ub_15: block /^https?:\\/\\/[^/?#]*\\/clickbait-.*\\//   <- *://*/clickbait-*/*",
+    "l_ub_16: block cancelled.example   <- *://*.cancelled.example/*",
+    "l_ub_18: block /^https?:\\/\\/www\\.spam\\.example\\//",
+    "l_ub_19: block /pinterest.+\\/user/i",
+    "l_ub_20: block /\\.xyz\\/(?:amp|lite)\\//   <- url/\\.xyz\\/(?:amp|lite)\\//",
+    "l_ub_24: allow help.pinterest.com   <- @*://*.help.pinterest.com/*",
+    "l_ub_25: raise 3 docs.rs   <- @3 *://*.docs.rs/*",
+    "l_ub_26: raise 10 rust-lang.example   <- @11 *://*.rust-lang.example/*",
+    "l_ub_35: block dup.example   <- *://*.dup.example/*"
+  ],
+  "cancel": [],
+  "skipReasons": {
+    "conditional rule (@if) not supported": 1,
+    "expression rule (not supported)": 1,
+    "matches every URL": 1,
+    "non-linear regex (lookaround or backreference)": 1,
+    "not a uBlacklist rule": 1,
+    "title rule (not supported)": 1,
+    "unsupported scheme (http, https or *)": 1
+  },
+  "skipped": [
+    "22: non-linear regex (lookaround or backreference) (lookahead is not supported (linear-time regex only))",
+    "28: title rule (not supported)",
+    "29: expression rule (not supported)",
+    "30: conditional rule (@if) not supported",
+    "31: matches every URL",
+    "32: not a uBlacklist rule",
+    "33: unsupported scheme (http, https or *)"
+  ]
+}

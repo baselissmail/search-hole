@@ -1,0 +1,31 @@
+[Adblock Plus 2.0]
+! Title: search-hole golden ABP fixture
+! Homepage: https://example.org/lists/abp
+! License: CC0-1.0
+! Expires: 4 days (update frequency)
+! Version: 202610310000
+!
+! Hand-written for search-hole's importer golden tests (not a real list).
+||pinterest.example^
+||ads.example^$important
+@@||ads.example^
+@@||cdn.pinterest.example^
+@@||safe.example^$important
+||safe.example^$important
+example.net
+||blog.example/amp/
+|https://*.example.*/amp/^
+/banner[0-9]+\.html/
+||cancelled.example^$badfilter
+||doc.example^$document
+||img.example^$image
+||tracker.example^$third-party
+||x.example^$domain=a.example
+||*.wild.example^
+||partial.example
+##.ad-banner
+example.org##.sponsored
+example.org#@#.sponsored
+/(?<=x)y/
+!#include extra.txt
+0.0.0.0 hosts-in-abp.example

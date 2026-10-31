@@ -1,0 +1,49 @@
+{
+  "format": "adguard",
+  "header": {
+    "title": "search-hole golden AdGuard Home fixture",
+    "description": "hand-written DNS-style list for importer golden tests (not a real list)",
+    "license": "CC0-1.0"
+  },
+  "stats": {
+    "bytes": 565,
+    "lines": 16,
+    "ignored": 5,
+    "entries": 11,
+    "accepted": 6,
+    "duplicates": 0,
+    "skipped": 5,
+    "rules": 6,
+    "cancel": 0,
+    "regex": 1,
+    "patterns": 0,
+    "companions": 0
+  },
+  "allowlistMode": false,
+  "warnings": [
+    "1 regex rule(s) are matched against the whole URL; AdGuard Home matches them against the host name only"
+  ],
+  "rules": [
+    "l_agh_5: block doubleclick.example   <- ||doubleclick.example^",
+    "l_agh_6: block ads.network.example   <- ||ads.network.example^|",
+    "l_agh_7: allow allowed.network.example   <- @@||allowed.network.example^",
+    "l_agh_14: block =tracker.example   <- 0.0.0.0 tracker.example",
+    "l_agh_15: block /metrics\\.tracker/i   <- /metrics\\.tracker/",
+    "l_agh_16: block important.example $important   <- ||important.example^$important"
+  ],
+  "cancel": [],
+  "skipReasons": {
+    "unsupported modifier $client": 1,
+    "unsupported modifier $ctag": 1,
+    "unsupported modifier $denyallow": 1,
+    "unsupported modifier $dnsrewrite": 1,
+    "unsupported modifier $dnstype": 1
+  },
+  "skipped": [
+    "8: unsupported modifier $client",
+    "9: unsupported modifier $dnstype",
+    "10: unsupported modifier $denyallow",
+    "11: unsupported modifier $dnsrewrite",
+    "12: unsupported modifier $ctag"
+  ]
+}
