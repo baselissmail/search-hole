@@ -23,7 +23,8 @@ P8 needs CI on Linux, macOS and Windows, releases with provenance, and supply-ch
    - **Limits:** top-level `permissions: {}`, and it runs only in `baselissmail/search-hole`.
 3. **Supply chain:**
    - Actions are pinned to commit SHAs.
-   - Renovate pins exact versions with a **14-day minimum release age**. The same two-week rule applies to versions chosen by hand, and pnpm's `minimumReleaseAge` enforces it for transitive dependencies.
+   - Renovate pins exact versions with a **14-day minimum release age**, and the same two-week rule applies to versions chosen by hand.
+   - pnpm's own `minimumReleaseAge` (20160 minutes, covering transitive dependencies too) will also verify the lockfile. It stays off until the current lockfile has aged out: 46 entries, the newest from 2026-10-29, so turn it on from **2026-11-13**. Re-resolving earlier would have downgraded the MCP SDK just before testing.
    - CodeQL (security-extended) and an OpenSSF Scorecard.
 4. **The runtime floor is Node 22.19** (ADR-0002 amendment). The bundled undici 8 needs zlib zstd.
 5. **Notices ship with every artifact.** `LICENSE` and `THIRD_PARTY_NOTICES.md` are copied into `dist/`, so the npm package, the plugin and the `.mcpb` carry them.

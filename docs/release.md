@@ -238,6 +238,10 @@ Paths with spaces are handled throughout:
 
 The one exception is the env prefix in risk 1.
 
+## Turn on pnpm's release-age check (from 2026-11-13)
+
+Add `minimumReleaseAge: 20160` to `pnpm-workspace.yaml`, above `minimumReleaseAgeExclude`. Then `pnpm install --frozen-lockfile` must pass; if it doesn't, the error lists the entries that are still too new. Until then, Renovate's 14-day minimum release age is the gate (ADR-0024).
+
 ## Not automated yet
 
 - **Plugin evals** (`claude plugin eval`, MASTER_PLAN §9.1): none exist in the repository yet, and they need an API key. Once they exist, add a CI job gated on an `ANTHROPIC_API_KEY` secret in a protected environment. Never run it on `pull_request` from forks.
