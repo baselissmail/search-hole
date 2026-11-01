@@ -1,0 +1,17 @@
+# gitleaks: findings checked by hand and confirmed to be test data, not credentials (2026-11-01).
+# Fake keys that test hygiene, key stores and never-logged; PEM templates; an SSH fingerprint; a key fingerprint.
+274e1758198021a005660ecfe2d2a404e223c697:packages/search-hole/test/app/helpers.ts:generic-api-key:33
+274e1758198021a005660ecfe2d2a404e223c697:packages/search-hole/test/app/search.test.ts:github-pat:169
+3d902c4826c96d994406f2a594b9e106c18e0cfd:packages/search-hole/src/shared/settings.test.ts:github-pat:103
+4462648961f2d8d102b1eb69a811598293b44169:packages/search-hole/src/core/fanout.test.ts:generic-api-key:794
+4462648961f2d8d102b1eb69a811598293b44169:packages/search-hole/src/engines/brave.test.ts:generic-api-key:7
+4462648961f2d8d102b1eb69a811598293b44169:packages/search-hole/src/engines/tavily.test.ts:generic-api-key:7
+4462648961f2d8d102b1eb69a811598293b44169:packages/search-hole/src/lists/yaml.test.ts:generic-api-key:323
+4462648961f2d8d102b1eb69a811598293b44169:packages/search-hole/src/shared/keys/never-logged.test.ts:generic-api-key:18
+4462648961f2d8d102b1eb69a811598293b44169:packages/search-hole/src/shared/keys/resolve.test.ts:generic-api-key:20
+4462648961f2d8d102b1eb69a811598293b44169:packages/search-hole/src/shared/keys/stores.test.ts:generic-api-key:17
+4462648961f2d8d102b1eb69a811598293b44169:packages/search-hole/test/fixtures/hygiene/negatives.json:generic-api-key:353
+4462648961f2d8d102b1eb69a811598293b44169:packages/search-hole/test/fixtures/hygiene/positives.json:private-key:137
+4462648961f2d8d102b1eb69a811598293b44169:packages/search-hole/test/fixtures/hygiene/positives.json:private-key:147
+4462648961f2d8d102b1eb69a811598293b44169:packages/search-hole/test/mock-engine/helpers.ts:generic-api-key:32
+4462648961f2d8d102b1eb69a811598293b44169:packages/search-hole/test/store/state.test.ts:generic-api-key:12
