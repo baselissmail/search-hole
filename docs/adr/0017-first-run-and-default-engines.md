@@ -46,3 +46,23 @@
 
 - **P1:** the Tavily adapter against a real free key, if Basel creates one. Otherwise fixtures plus a nightly optional live check.
 - **P3:** a timed first-run test on a clean machine for each path (Docker, Tavily key), with a target of under 2 minutes.
+
+## Amendment (2026-11-01): quenhus dev-filter stays enforced
+
+**Question.** quenhus dev-filter blocks 625 sites. 623 of them are copies of StackOverflow and GitHub. Two are large sites with original content: `csdn.net` and `segmentfault.com`. Both are big Chinese developer sites. Should the list stay enforced, or move to audit?
+
+**Test.** We ran 9 typical developer searches through the same search backend that Claude Code's built-in WebSearch uses: 7 in English (error messages, how-tos) and 2 in Chinese. Then we ran `searchhole explain` on each of the 41 results with only the default lists active.
+
+**Result.** No list matched any of the 41 results, enforced or audited. `csdn.net` and `segmentfault.com` didn't appear at all, not even in the Chinese searches, which returned Tencent Cloud and 51CTO instead. In this sample, the two modes behave the same.
+
+**Decision.** Keep quenhus dev-filter on **enforce**:
+
+- Audit would give up the protection against the 623 clear clones in exchange for two sites that rarely appear.
+- A user who wants csdn.net or segmentfault.com back can add one rule (`searchhole allow csdn.net`) or use Allow in the dashboard. Allow beats every list.
+
+**Follow-up.** The junk that did appear in this sample isn't what the starter lists target. It was:
+
+- the same article repeated in several languages: one site took 5 of 7 results for one query, another took 4 of 7;
+- AI-generated Q&A or tutorial pages, and a scraped copy of a StackOverflow question.
+
+Dogfooding should measure these. Candidate fixes are collapsing translated duplicates of the same article, and entries in `ai-content-farms`, each with evidence.
