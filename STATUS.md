@@ -244,7 +244,8 @@ ADR-0024.
 - `claude plugin validate --strict` passes. All three plugins and `search-hole-0.3.0.mcpb` are rebuilt. The smoke test and `check:release v0.3.0` pass.
 
 **Acceptance (MASTER_PLAN §11 P8), open:**
-- [ ] CI has never run: there's no remote. The Windows job is untested, and so is Windows hardware.
+- [x] CI passes on Linux, macOS and Windows: the private repo `baselissmail/search-hole`, run on 2026-11-01. The first Windows run found one real bug: the guard missed rooted paths without a drive letter. It also found 17 tests that assumed POSIX paths, and a check that still expected Node 22.13. All are fixed.
+- [ ] Real Windows hardware is untested (CI covers the runner only). CodeQL and Scorecard need a public repo, or GitHub Advanced Security, so they fail while the repo is private.
 - [ ] Plugin evals (`claude plugin eval`) don't exist yet and need an API key (docs/release.md, "Not automated yet").
 - [ ] README hero GIF (needs a recording). Per-client quickstarts are in `docs/clients/`.
 - [ ] Dogfood gate: two weeks of daily use with no open P0/P1 in `docs/dogfood.md`.
@@ -261,5 +262,5 @@ ADR-0024.
    - Claude Code: rebuild and reinstall the local plugin.
    - Windows, if you have a machine.
 2. **Starter-set breadth** (quenhus and csdn.net/segmentfault.com): see P6.
-3. **One-time GitHub and npm setup** before the first release: `docs/release.md` step 0 (remote, signing key, npm trusted publishing, environments).
+3. **One-time GitHub and npm setup** before the first release: `docs/release.md` step 0. The private repo and its remote exist (2026-11-01). Still to do: the signing key, npm trusted publishing and the environments.
 4. Publishing, release tags and launch posts are yours.
