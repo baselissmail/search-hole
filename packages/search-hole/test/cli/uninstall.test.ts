@@ -2,7 +2,7 @@
 // `searchhole uninstall --purge` (ADR-0006 point 13): only known entries, never unsafe roots.
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { planUninstall, runUninstall, unsafeRoot } from '../../src/cli/uninstall.ts'
 import { bashChangesRules } from '../../src/gateway/guard.ts'
@@ -35,7 +35,16 @@ describe('uninstall', () => {
       home,
     })
     expect(plan.refused).toEqual([])
-    expect(plan.remove.map((p) => p.slice(root.length + 1)).sort()).toEqual(
+    expect(
+      plan.remove
+        .map((p) =>
+          p
+            .slice(root.length + 1)
+            .split(sep)
+            .join('/'),
+        )
+        .sort(),
+    ).toEqual(
       [
         'lists',
         'rules.yaml',

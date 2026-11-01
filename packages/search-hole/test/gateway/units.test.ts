@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Pure gateway pieces: host refinement, request context, session state, the guard matchers.
+import { resolve } from 'node:path'
 import { describe, expect, test } from 'vitest'
 import { buildRequestCtx, requestContext, resolveProjectDir } from '../../src/gateway/context.ts'
 import { isDevelopmentVersion, protocolModeFromEnv } from '../../src/gateway/gateway.ts'
@@ -73,11 +74,11 @@ describe('requestContext (ADR-0013 point 4)', () => {
       resolveProjectDir({ vendorMeta: { 'codex/sandbox-state': { sandboxCwd: '/p/codex' } } }, proc),
     ).toBe('/p/codex')
     expect(resolveProjectDir({ vendorMeta: { 'agent-working-dir': '/p/goose' } }, proc)).toBe('/p/goose')
-    expect(resolveProjectDir({ vendorMeta: {} }, proc)).toBe('/work/repo')
+    expect(resolveProjectDir({ vendorMeta: {} }, proc)).toBe(resolve('/work/repo'))
     expect(resolveProjectDir({ vendorMeta: {} }, { ...proc, cwd: '/home/u' })).toBeUndefined()
     expect(resolveProjectDir({ vendorMeta: {} }, { ...proc, cwd: '/' })).toBeUndefined()
     expect(resolveProjectDir({ vendorMeta: {} }, { ...proc, env: { CLAUDE_PROJECT_DIR: 'relative' } })).toBe(
-      '/work/repo',
+      resolve('/work/repo'),
     )
   })
 

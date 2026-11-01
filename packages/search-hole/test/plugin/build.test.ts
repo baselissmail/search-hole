@@ -75,7 +75,8 @@ describe('scripts/build-plugin.mjs', () => {
     expect(readText(out, 'dist', 'searchhole.mjs')).toBe('// fake bundle\n')
   })
 
-  it('keeps the preflight executable', () => {
+  // Windows has no executable bit.
+  it.skipIf(process.platform === 'win32')('keeps the preflight executable', () => {
     const out = join(marketplaceDir(), 'search-hole')
     expect(build(['--skip-build', '--dist', fakeDist(), '--out', out]).status).toBe(0)
     expect(statSync(join(out, 'hooks', 'preflight.ps1')).mode & 0o111).not.toBe(0)

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { Semaphore } from '../../src/app/semaphore.ts'
 import { isSearchHoleError } from '../../src/shared/errors.ts'
@@ -124,7 +125,7 @@ describe('doctor', () => {
     expect(byId.get('searxng')?.status).toBe('ok')
     expect(byId.get('claude-code:mode')?.title).toBe('Claude Code mode: auto (now engines)')
     expect(calls).toEqual([['docker', 'info', '--format', '{{.ServerVersion}}']])
-    expect(report.paths).toEqual({ config: h.home, data: h.home, run: `${h.home}/run`, source: 'env' })
+    expect(report.paths).toEqual({ config: h.home, data: h.home, run: join(h.home, 'run'), source: 'env' })
     expect(report.engines.map((e) => e.engine)).toEqual(['searxng', 'brave', 'tavily'])
   })
 

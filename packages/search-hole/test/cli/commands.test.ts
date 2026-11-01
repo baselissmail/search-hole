@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { AddRuleInput, RequestCtx, SearchArgs } from '../../src/app/types.ts'
 import { exitCodeFor } from '../../src/cli/errors.ts'
@@ -427,12 +428,12 @@ describe('approve, reject, trust, mode', () => {
 
   it('trust resolves the directory and defaults to the project', async () => {
     const dflt = await run(['trust'], { tty: true, env: { CLAUDE_PROJECT_DIR: '/projects/app' } })
-    expect(call(dflt.app.calls, 'rules.trust').args).toEqual(['/projects/app'])
-    expect(dflt.out).toContain('Trusted /projects/app/.searchhole.yaml (sha256 aaaaaaaaaaaa…)')
+    expect(call(dflt.app.calls, 'rules.trust').args).toEqual([resolve('/projects/app')])
+    expect(dflt.out).toContain(`Trusted ${resolve('/projects/app')}/.searchhole.yaml (sha256 aaaaaaaaaaaa…)`)
     const rel = await run(['trust', '../other'], { tty: true, cwd: '/work/project' })
-    expect(call(rel.app.calls, 'rules.trust').args).toEqual(['/work/other'])
+    expect(call(rel.app.calls, 'rules.trust').args).toEqual([resolve('/work/other')])
     const cwdOnly = await run(['trust'], { tty: true, cwd: '/work/project' })
-    expect(call(cwdOnly.app.calls, 'rules.trust').args).toEqual(['/work/project'])
+    expect(call(cwdOnly.app.calls, 'rules.trust').args).toEqual([resolve('/work/project')])
   })
 
   it('mode shows or sets the Claude Code mode', async () => {

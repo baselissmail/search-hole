@@ -2,7 +2,6 @@
 // ADR-0007 point 4: a key value never reaches a log line. These tests exercise log.ts
 // against realistic key-bearing log calls; they live here because keys are the reason
 // the redaction exists.
-import { fileURLToPath } from 'node:url'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   createLogger,
@@ -201,7 +200,8 @@ describe('helpers', () => {
 
 describe('stdout stays clean', () => {
   it('writes log lines to stderr and nothing to stdout', async () => {
-    const logModule = fileURLToPath(new URL('../log.ts', import.meta.url))
+    // A file URL: Node can't import a plain Windows path (`D:\…`) in ESM.
+    const logModule = new URL('../log.ts', import.meta.url).href
     const script = `import { createLogger } from ${JSON.stringify(logModule)}; createLogger({ env: { SEARCHHOLE_LOG: 'info' } }).info({ apiKey: 'k-${KEY}' }, 'hello from the gateway')`
     const r = await nodeRunCommand(process.execPath, ['--input-type=module', '-e', script], {
       timeoutMs: 20_000,

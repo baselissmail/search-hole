@@ -21,7 +21,7 @@
  * type it too. It exists so a skill the user invoked can run the CLI through Bash without
  * being denied by its own plugin.
  */
-import { basename, isAbsolute, join, normalize, resolve, sep } from 'node:path'
+import { basename, join, resolve, sep } from 'node:path'
 import { type SimpleCommand, scanShell } from './shellwords.ts'
 
 /** CLI verbs that change rules, keys, lists, trust or settings. */
@@ -356,12 +356,13 @@ const fold = (p: string, ci: boolean): string => (ci ? p.toLowerCase() : p)
 /** True when an Edit/Write target is a search-hole file: `.searchhole.yaml` or under a root. */
 export function fileIsProtected(filePath: string, baseDir: string, roots: ProtectedRoots): boolean {
   if (filePath.trim() === '') return false
-  const abs = normalize(isAbsolute(filePath) ? filePath : resolve(baseDir, filePath))
+  // resolve, not normalize: on Windows it also gives a rooted path (`/Users/u/…`) its drive, like the roots.
+  const abs = resolve(baseDir, filePath)
   const name = fold(basename(abs), roots.caseInsensitive)
   if (OWNED_FILE_NAMES.has(name)) return true
   const target = fold(abs, roots.caseInsensitive)
   return roots.dirs.some((dir) => {
-    const d = fold(normalize(dir), roots.caseInsensitive).replace(/[\\/]+$/, '')
+    const d = fold(resolve(dir), roots.caseInsensitive).replace(/[\\/]+$/, '')
     return d !== '' && (target === d || target.startsWith(`${d}${sep}`))
   })
 }

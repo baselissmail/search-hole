@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { existsSync, readdirSync, statSync, utimesSync } from 'node:fs'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { openDb } from '../../src/store/driver.ts'
 import { openStore } from '../../src/store/index.ts'
@@ -183,7 +183,7 @@ describe('upgrading an existing database', () => {
       expect(left).toEqual(
         made
           .slice(2)
-          .map((p) => p.split('/').pop() ?? '')
+          .map((p) => basename(p))
           .sort(),
       )
     })()

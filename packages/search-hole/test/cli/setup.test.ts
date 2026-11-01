@@ -103,6 +103,10 @@ function put(file: string, text: string): string {
   return file
 }
 
+/** The client's user config file on this machine's platform, where setup will look for it. */
+const userFile = (sb: Sandbox, client: SetupOptions['client']): string =>
+  resolveSetupFile(client, 'user', { platform, home: sb.home, cwd: sb.cwd }) as string
+
 const backupsOf = (file: string): string[] =>
   readdirSync(dirname(file)).filter((n) => n.startsWith(`${file.split(/[\\/]/).at(-1)}.bak-`))
 
@@ -255,13 +259,16 @@ describe('config locations', () => {
 
   it("Windsurf: Devin Desktop's file when it exists, else a pre-rename Windsurf's", () => {
     const home = tempDir()
-    const c = { platform: 'linux' as const, home, cwd: home, env: {} }
-    const devin = join(home, '.config', 'devin', 'mcp_config.json')
+    const c = { platform, home, cwd: home, env: {} }
+    // Devin Desktop keeps its folder in %APPDATA% on Windows and in ~/.config elsewhere.
+    const devinDir =
+      platform === 'win32' ? join(home, 'AppData', 'Roaming', 'devin') : join(home, '.config', 'devin')
+    const devin = join(devinDir, 'mcp_config.json')
     const legacy = join(home, '.codeium', 'windsurf', 'mcp_config.json')
     // Nothing installed: the current location.
     expect(resolveSetupFile('windsurf', 'user', c)).toBe(devin)
     // The Devin CLI's folder alone (config.json, cli/) says nothing about the editor.
-    put(join(home, '.config', 'devin', 'config.json'), '{}')
+    put(join(devinDir, 'config.json'), '{}')
     expect(resolveSetupFile('windsurf', 'user', c)).toBe(devin)
     // A Windsurf from before the rename (its folder, no mcp_config.json yet), next to the Devin CLI.
     mkdirSync(join(home, '.codeium', 'windsurf'), { recursive: true })
@@ -401,8 +408,8 @@ describe('creating files', () => {
 
   it('fills an empty file and a file with only comments', () => {
     const sb = sandbox()
-    const zed = put(join(sb.home, '.config', 'zed', 'settings.json'), '')
-    run(sb, { client: 'zed', platform: 'linux' })
+    const zed = put(userFile(sb, 'zed'), '')
+    run(sb, { client: 'zed' })
     expect(JSON.parse(readFileSync(zed, 'utf8'))).toEqual({
       context_servers: { 'search-hole': { command: 'node', args: args(sb, 'zed') } },
     })
@@ -463,11 +470,8 @@ describe('creating files', () => {
 describe('refusing files it cannot edit safely', () => {
   it('a strict-JSON client refuses comments, and the error carries the entry to paste', () => {
     const sb = sandbox()
-    const file = put(
-      join(sb.home, '.config', 'Claude', 'claude_desktop_config.json'),
-      '{\n  // mine\n  "mcpServers": {}\n}\n',
-    )
-    const e = failure(() => run(sb, { client: 'claude-desktop', platform: 'linux' }))
+    const file = put(userFile(sb, 'claude-desktop'), '{\n  // mine\n  "mcpServers": {}\n}\n')
+    const e = failure(() => run(sb, { client: 'claude-desktop' }))
     expect(e.code).toBe('config_invalid')
     expect(e.why).toContain(file)
     expect(e.why).toContain('left it unchanged')
@@ -519,8 +523,8 @@ describe('Zed (JSONC settings)', () => {
   "agent": { "default_model": { "provider": "zed.dev", "model": "x" } },
 }
 `
-    const file = put(join(sb.home, '.config', 'zed', 'settings.json'), settings)
-    const res = run(sb, { client: 'zed', platform: 'linux', passEnv: ['TAVILY_API_KEY'] })
+    const file = put(userFile(sb, 'zed'), settings)
+    const res = run(sb, { client: 'zed', passEnv: ['TAVILY_API_KEY'] })
     const text = readFileSync(file, 'utf8')
     expect(text).toContain('"theme": "One Dark", // dark')
     expect(text).toContain('// For information on how to configure Zed')
@@ -550,7 +554,7 @@ describe('Windsurf (Devin Desktop)', () => {
   it('merges into mcpServers, with ${env:NAME} pass-through and a generic host', () => {
     const sb = sandbox()
     const file = put(
-      join(sb.home, '.config', 'devin', 'mcp_config.json'),
+      userFile(sb, 'windsurf'),
       `${JSON.stringify({ mcpServers: { github: { command: 'npx', args: [] } } }, null, 2)}\n`,
     )
     run(sb, { client: 'windsurf', passEnv: ['TAVILY_API_KEY'] })
@@ -577,10 +581,10 @@ describe('Claude Desktop', () => {
   it('adds a plain mcpServers entry and mentions the extension', () => {
     const sb = sandbox()
     const file = put(
-      join(sb.home, '.config', 'Claude', 'claude_desktop_config.json'),
+      userFile(sb, 'claude-desktop'),
       '{"mcpServers":{"fs":{"command":"npx","args":["-y","@modelcontextprotocol/server-filesystem"]}},"globalShortcut":"Alt+Space"}',
     )
-    run(sb, { client: 'claude-desktop', platform: 'linux' })
+    run(sb, { client: 'claude-desktop' })
     const parsed = JSON.parse(readFileSync(file, 'utf8'))
     expect(parsed.globalShortcut).toBe('Alt+Space')
     expect(parsed.mcpServers['search-hole']).toEqual({ command: 'node', args: args(sb, 'claude-desktop') })
@@ -776,8 +780,8 @@ extensions:
 
   it('adds an extension and keeps the others, the comments and the sequence style', () => {
     const sb = sandbox()
-    const file = put(join(sb.home, '.config', 'goose', 'config.yaml'), CONFIG)
-    run(sb, { client: 'goose', platform: 'linux' })
+    const file = put(userFile(sb, 'goose'), CONFIG)
+    run(sb, { client: 'goose' })
     const text = readFileSync(file, 'utf8')
     expect(text.startsWith(CONFIG)).toBe(true)
     expect(text).toContain('# my token comes from the keyring')
@@ -798,9 +802,9 @@ extensions:
 
   it('is idempotent; an update re-enables it, adds env_keys and keeps a custom timeout', () => {
     const sb = sandbox()
-    const file = put(join(sb.home, '.config', 'goose', 'config.yaml'), CONFIG)
-    const first = run(sb, { client: 'goose', platform: 'linux' })
-    expect(run(sb, { client: 'goose', platform: 'linux' }).changed).toBe(false)
+    const file = put(userFile(sb, 'goose'), CONFIG)
+    const first = run(sb, { client: 'goose' })
+    expect(run(sb, { client: 'goose' }).changed).toBe(false)
     writeFileSync(
       file,
       first.after
@@ -810,7 +814,7 @@ extensions:
         )
         .replace(/timeout: 300\n$/, 'timeout: 60\n'),
     )
-    const res = run(sb, { client: 'goose', platform: 'linux', passEnv: ['TAVILY_API_KEY'] })
+    const res = run(sb, { client: 'goose', passEnv: ['TAVILY_API_KEY'] })
     const entry = parseYaml(readFileSync(file, 'utf8')).extensions['search-hole']
     expect(entry.enabled).toBe(true)
     expect(entry.timeout).toBe(60)
@@ -820,17 +824,17 @@ extensions:
 
   it('creates a config from nothing', () => {
     const sb = sandbox()
-    run(sb, { client: 'goose', platform: 'linux' })
-    const parsed = parseYaml(readFileSync(join(sb.home, '.config', 'goose', 'config.yaml'), 'utf8'))
+    run(sb, { client: 'goose' })
+    const parsed = parseYaml(readFileSync(userFile(sb, 'goose'), 'utf8'))
     expect(Object.keys(parsed)).toEqual(['extensions'])
   })
 
   it('refuses broken YAML and a non-mapping extensions key', () => {
     const sb = sandbox()
-    const file = join(sb.home, '.config', 'goose', 'config.yaml')
+    const file = userFile(sb, 'goose')
     for (const text of ['extensions: [\n', 'extensions:\n  - a\n', '- just\n- a list\n', 'a: 1\na: 2\n']) {
       put(file, text)
-      const e = failure(() => run(sb, { client: 'goose', platform: 'linux' }))
+      const e = failure(() => run(sb, { client: 'goose' }))
       expect(e.code, text).toBe('config_invalid')
       expect(e.fix, text).toContain('search-hole:')
       expect(readFileSync(file, 'utf8')).toBe(text)
