@@ -53,7 +53,13 @@ const gitBash = ['C:\\Program Files\\Git\\bin\\bash.exe', 'C:\\Program Files (x8
   (p) => existsSync(p),
 )
 
-const MISSING = /"systemMessage":"search-hole needs Node\.js 22\.13 or newer, but node was not found/
+// The floor the preflight names comes from engines.node, so a raised floor can't leave this check behind.
+const floor = JSON.parse(readFileSync(join(REPO, 'packages', 'search-hole', 'package.json'), 'utf8')).engines.node.match(
+  />=\s*(\d+(?:\.\d+)*)/,
+)[1]
+const MISSING = new RegExp(
+  `"systemMessage":"search-hole needs Node\\.js ${floor.replaceAll('.', '\\.')} or newer, but node was not found`,
+)
 const psArgs = ['-NoProfile', '-NonInteractive', '-Command', command]
 const bashArgs = ['-c', command]
 const cases = [

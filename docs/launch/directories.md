@@ -7,7 +7,7 @@ A checklist per directory. Requirements change often: re-read each directory's c
 - [ ] A public release whose install works from the README on macOS, Windows and Linux (docs/release.md step 7).
 - [ ] README: a one-line description, the hero GIF, a 60-second quickstart per client, the privacy model, the limits, and the licence.
 - [ ] PRIVACY.md (MASTER_PLAN §12.5). It doesn't exist yet. Directories that review data handling ask for it.
-- [ ] A square icon. The 512×512 `distribution/claude-desktop/icon.png` can serve as the source.
+- [x] A square icon: `distribution/claude-plugin/.claude-plugin/icon.png`, the same 512×512 icon as the Desktop extension.
 - [ ] Screenshots: the dashboard in light and dark, and the receipt card in Claude Desktop.
 - [ ] Short descriptions, kept consistent:
   - **short:** "A local search gateway for AI assistants: choose the engines and sites your AI searches, see every search, get source receipts."
@@ -23,7 +23,7 @@ A checklist per directory. Requirements change often: re-read each directory's c
 
 `claude plugin validate` prints "plugin directory checks" for the directory's catalog. As of Claude Code 2.1.312 they report one warning for us:
 
-- [ ] **ICON_MISSING.** Add a square PNG, 512 to 2048 px and under 2 MB, at `.claude-plugin/icon.png` in the plugin (copy the Desktop icon into `distribution/claude-plugin/.claude-plugin/`), or set `icon` in plugin.json. The validator warns that the icon may become the listing icon **only once**, the first time the plugin is saved or submitted in the developer portal. Get it right before the first submission.
+- [x] **ICON_MISSING** (fixed: `claude plugin validate --strict` no longer reports it). Add a square PNG, 512 to 2048 px and under 2 MB, at `.claude-plugin/icon.png` in the plugin (copy the Desktop icon into `distribution/claude-plugin/.claude-plugin/`), or set `icon` in plugin.json. The validator warns that the icon may become the listing icon **only once**, the first time the plugin is saved or submitted in the developer portal. Get it right before the first submission.
 - [ ] Re-run `claude plugin validate <assembled plugin> --strict` and read the directory section. The directory also runs a safety scan and a policy review that the CLI does not.
 - [ ] Expect questions about the hooks: what they do, that they fail open, and that the Bash and Edit guard only denies changes to search-hole's own rules. ADR-0014 is the explanation to link.
 - [ ] The plugin has no top-level `bin/`. Keep it that way, because claude.ai and Cowork refuse plugins that have one (ADR-0002).

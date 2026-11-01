@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Smoke test for the built bundle on whatever runtime runs this file (Node 22.13, 24, 26, or Bun):
+ * Smoke test for the built bundle on whatever runtime runs this file (Node 22.19, 24, 26, or Bun):
  *
  *   node .github/scripts/smoke-bundle.mjs [path/to/dist/searchhole.mjs]
  *

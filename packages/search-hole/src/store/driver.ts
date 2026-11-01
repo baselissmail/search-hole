@@ -103,7 +103,7 @@ async function importNative(): Promise<NativeCtor> {
     return ctor
   } catch (cause) {
     throw new SearchHoleError('store_unavailable', 'This Node.js has no built-in SQLite (node:sqlite).', {
-      fix: 'Use Node.js 22.13 or newer.',
+      fix: 'Use Node.js 22.19 or newer.',
       cause,
     })
   } finally {

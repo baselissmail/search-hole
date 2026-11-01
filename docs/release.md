@@ -245,9 +245,4 @@ Add `minimumReleaseAge: 20160` to `pnpm-workspace.yaml`, above `minimumReleaseAg
 ## Not automated yet
 
 - **Plugin evals** (`claude plugin eval`, MASTER_PLAN §9.1): none exist in the repository yet, and they need an API key. Once they exist, add a CI job gated on an `ANTHROPIC_API_KEY` secret in a protected environment. Never run it on `pull_request` from forks.
-- **The runtime floor.** The bundled undici 8.12.3 needs Node ≥ 22.19 (`zlib.createZstdDecompress`). On Node 22.13 to 22.18, every command that loads the app crashes at import. `engines.node` and ADR-0002 say `>=22.13`, so the `node-floor` CI job fails until one of them changes. Several tests also spawn `.ts` files with type stripping, which is unflagged only from 22.18.
-- **Third-party notices in the artifacts.** The bundle inlines MIT, ISC, BSD and Apache code. `THIRD_PARTY_NOTICES.md` must ship in the npm package (`files`), the plugin (`build-plugin.mjs`) and the `.mcpb` (`build-mcpb.mjs`).
-- **SPDX headers** are missing in `packages/search-hole/tsdown.config.ts` and `vitest.config.ts`. The `checks` job fails until they are added.
-- `searchhole uninstall --purge` (P8 acceptance).
 - A `.mcpb` code-signing certificate.
-- An icon for the Claude plugin directory (see [launch/directories.md](launch/directories.md)).

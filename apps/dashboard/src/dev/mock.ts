@@ -710,7 +710,7 @@ export class MockServer {
         source: '~/.claude/plugins/search-hole',
       },
       checks: [
-        { id: 'node', status: 'ok', title: 'Node.js 26.13.0', detail: 'search-hole needs 22.13 or newer.' },
+        { id: 'node', status: 'ok', title: 'Node.js 26.13.0', detail: 'search-hole needs 22.19 or newer.' },
         { id: 'hooks', status: 'ok', title: 'Claude Code hooks are installed' },
         {
           id: 'tavily',
