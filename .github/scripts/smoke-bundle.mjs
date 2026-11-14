@@ -103,6 +103,20 @@ try {
     `${v.status} ${v.stdout}${v.stderr}`,
   )
 
+  // The bundle inlines its libraries, so their licence texts must travel next to it.
+  const licences = join(dirname(bundle), 'THIRD_PARTY_LICENSES.txt')
+  let licenceText = ''
+  try {
+    licenceText = readFileSync(licences, 'utf8')
+  } catch {
+    // Reported by the check below.
+  }
+  check(
+    'third-party licences are next to the bundle (hono, zod, yaml)',
+    ['hono', 'zod', 'yaml'].every((name) => new RegExp(`^${name} \\d`, 'm').test(licenceText)),
+    licences,
+  )
+
   const block = cli(['block', 'example.com', '--yes'])
   check('block example.com --yes', block.status === 0, `${block.status} ${block.stdout}${block.stderr}`)
 

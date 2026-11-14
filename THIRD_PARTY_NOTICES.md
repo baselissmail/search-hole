@@ -29,3 +29,7 @@ Lists in the catalog (`packages/search-hole/src/lists/catalog.ts`) that are not 
 ## Adapted code
 
 Adapted code fragments, with their licence and copyright line, are recorded here alongside the code that adapts them.
+
+## npm libraries inside the built files
+
+The built package has no runtime `node_modules`: its libraries are copied into `dist/` when it is built. Their licence and notice files are not kept in this repository. The build writes them to `dist/THIRD_PARTY_LICENSES.txt` (`scripts/third-party-licenses.mjs`), which ships in the npm package, the plugins and the `.mcpb` next to this file. On 2026-11-14 that was 110 libraries: MIT, BSD-2-Clause, ISC, Apache-2.0, 0BSD, the Unlicense, and the SIL Open Font License for the Geist fonts. None is under a copyleft licence.

@@ -41,3 +41,12 @@
 - The repo gets `LICENSE` (Apache-2.0), `lists/LICENSE` (CC0-1.0) and `THIRD_PARTY_NOTICES.md` at P1 start.
 - `package.json` sets `"license": "Apache-2.0"`.
 - CI adds a DCO check and an SPDX-header check in P8.
+
+## Amendment (2026-11-14): licence texts of the bundled npm libraries ship with every artifact
+
+`THIRD_PARTY_NOTICES.md` covered the bundled lists and adapted code, but not the npm libraries that tsdown and Vite copy into `dist/`. MIT, BSD, ISC and Apache-2.0 all require that copies keep the copyright and licence text, and a single-file bundle keeps almost none of it (one `@license` comment survived).
+
+- The package build now ends with `scripts/third-party-licenses.mjs`, which writes `dist/THIRD_PARTY_LICENSES.txt`: for every library in the SBOM's set (the CLI bundle's source maps, plus each UI app's production dependencies), the licence it declares and the LICENSE, NOTICE and COPYING files from its installed package, unchanged.
+- Every artifact ships `dist/` whole, so the npm package, the plugins and the `.mcpb` all carry it. The bundle smoke test fails when it is missing.
+- A library that is listed but not installed fails the build: a release must not ship without its notices. A UI app that isn't built is left out with a warning, so the CLI still builds alone.
+- The file has no timestamp, so the same inputs give the same bytes.

@@ -42,7 +42,7 @@ const fullName = (c) => (c.group ? `${c.group}/${c.name}` : c.name)
 const key = (name, version) => `${name}@${version}`
 
 /** Runs `pnpm sbom` for one workspace package and returns the parsed BOM. */
-function pnpmSbom(filter, prodOnly) {
+export function pnpmSbom(filter, prodOnly) {
   const pnpm =
     process.env.npm_execpath && existsSync(process.env.npm_execpath) ? process.env.npm_execpath : 'pnpm'
   const args = [

@@ -27,7 +27,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsdown && node scripts/copy-ui-assets.mjs",
+    "build": "tsdown && node scripts/copy-ui-assets.mjs && node ../../scripts/third-party-licenses.mjs",
     "dev": "node --experimental-strip-types src/cli/main.ts",
     "test": "vitest run",
     "test:watch": "vitest",
