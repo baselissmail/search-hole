@@ -142,7 +142,7 @@ describe('runs against a real app', () => {
   it('lists, then changes a mode only with a terminal, --yes or the skill marker (YAML comments kept)', async () => {
     const table = await cli(['lists'])
     expect(table.code).toBe(0)
-    expect(table.out).toMatch(/rjaus-pinterest\s+enforce\s+vendored\s+block\s+50/)
+    expect(table.out).toMatch(/rjaus-pinterest\s+enforce\s+starter\s+block\s+50/)
     expect(table.out).toMatch(/laylavish-huge-ai\s+audit/)
     writeFileSync(join(home, 'rules.yaml'), '# mine\nversion: 1\n')
 

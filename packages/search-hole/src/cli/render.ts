@@ -640,6 +640,14 @@ function listNote(s: ListStatus, style: Style): string {
   return ''
 }
 
+/** Where a list comes from, in the words the docs and the dashboard use (`--json` keeps the codes). */
+const LIST_SOURCE_WORDS: Readonly<Record<ListStatus['source'], string>> = {
+  bundled: 'built in',
+  vendored: 'starter',
+  subscribed: 'subscribed',
+  local: 'imported',
+}
+
 /** `searchhole lists`: one row per list. */
 export function renderLists(lists: readonly ListStatus[], { style, timeZone }: RenderOpts): string {
   const rows: string[][] = [
@@ -664,7 +672,7 @@ export function renderLists(lists: readonly ListStatus[], { style, timeZone }: R
     rows.push([
       s.id,
       modeText(s.mode, style),
-      s.source,
+      LIST_SOURCE_WORDS[s.source],
       s.kind,
       num(s.ruleCount),
       contributionText(s),
@@ -717,7 +725,7 @@ export function renderCatalog(entries: readonly ListCatalogEntry[], { style }: R
 
 /** One list after add, import or a mode change. */
 export function renderListStatus(s: ListStatus, { style }: RenderOpts): string {
-  const head = `${style.green('✓')} ${s.id}: ${modeText(s.mode, style)} · ${num(s.ruleCount)} rules · ${s.source}`
+  const head = `${style.green('✓')} ${s.id}: ${modeText(s.mode, style)} · ${num(s.ruleCount)} rules · ${LIST_SOURCE_WORDS[s.source]}`
   const lines = [head]
   if (s.skipped > 0) lines.push(style.dim(`  ${num(s.skipped)} lines could not be used (${skipText(s)})`))
   if (s.lastError !== null) lines.push(`  ${style.yellow('⚠')} ${s.lastError.message}`)
@@ -759,7 +767,7 @@ export function renderListUpdates(results: readonly ListUpdateResult[], { style 
 
 /** `searchhole lists remove`. */
 export function renderListRemoved(s: ListStatus, { style }: RenderOpts): string {
-  return `${style.green('✓')} removed ${s.id} (${s.source}, ${num(s.ruleCount)} rules)`
+  return `${style.green('✓')} removed ${s.id} (${LIST_SOURCE_WORDS[s.source]}, ${num(s.ruleCount)} rules)`
 }
 
 /** Most lines of a config change shown before asking (`setup`). */
