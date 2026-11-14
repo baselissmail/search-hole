@@ -156,8 +156,9 @@ already running. It prints a one-time sign-in link (valid 60 s); --open opens it
 
 Without --purge: lists what would be deleted (nothing is touched).
 With --purge: deletes search-hole's files (settings, rules, search log, lists, backups, the
-key file) and every key in its own stores (OS keychain), after you confirm. It deletes known
-files by name, never a whole folder, and refuses your home folder or a filesystem root.
+key file) and every key in its own stores (OS keychain), after you confirm. It deletes only
+files search-hole wrote: anything else in its folders stays and is listed. It refuses your
+home folder or a filesystem root.
 Other apps keep what they hold; the listing says how to remove the Claude Code plugin, the
 Claude Desktop extension and configs written by \`searchhole setup\`.`,
   mcp: `Usage: searchhole mcp --host <profile>

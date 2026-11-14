@@ -190,6 +190,10 @@ async function runUninstallCommand(
   if (!cmd.json) {
     line(io, plan.remove.length === 0 ? 'No search-hole files found.' : 'search-hole files:')
     for (const p of plan.remove) line(io, `  ${p}`)
+    if (plan.left.length > 0) {
+      line(io, 'Left in place (search-hole did not create these):')
+      for (const p of plan.left) line(io, `  ${p}`)
+    }
     line(io, `Stored keys (OS keychain and key file) for: ${plan.keys.join(', ')}`)
     for (const r of plan.refused) line(io, style.yellow(`⚠ Not touching ${r.root}: ${r.why}.`))
     line(io, '')
