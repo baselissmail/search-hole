@@ -56,7 +56,9 @@ import {
   readMeta,
   readUserVersion,
 } from './queries/meta.ts'
+import { openedCounts, openedHashes } from './queries/opened.ts'
 import { DEFAULTS, pruneSteps } from './queries/retention.ts'
+import { readDismissed, reviewCandidates, reviewExamples, setDismissed } from './queries/review.ts'
 import {
   clearSessionRules,
   deleteSessionRule,
@@ -603,6 +605,8 @@ export async function openStore(opts: OpenStoreOptions): Promise<Store> {
       get: (id) => read((d) => getSearchLog(d, id), undefined),
       byReceipt: (receiptId) => read((d) => listSearchesByReceipt(d, receiptId), []),
       hiddenReasons: (ids) => read((d) => hiddenReasonCounts(d, ids), new Map()),
+      openedHashes: (ids) => read((d) => openedHashes(d, ids), new Map()),
+      openedCounts: (ids) => read((d) => openedCounts(d, ids), new Map()),
     },
 
     sessions: {
@@ -698,6 +702,34 @@ export async function openStore(opts: OpenStoreOptions): Promise<Store> {
         return r.ok && r.value
       },
       contribution: (since) => read((d) => listContribution(d, since), new Map()),
+    },
+
+    review: {
+      candidates: ({ since, minSearches, limit, exclude }) =>
+        read(
+          (d) =>
+            reviewCandidates(d, {
+              since,
+              minSearches: clampLimit(minSearches, 1000),
+              limit: clampLimit(limit, 1000),
+              exclude: exclude ?? [],
+            }),
+          [],
+        ),
+      examples: ({ domains, since, perDomain }) =>
+        read(
+          (d) => reviewExamples(d, { domains, since, now: now(), perDomain: clampLimit(perDomain, 10) }),
+          new Map(),
+        ),
+      dismissed: () => read((d) => readDismissed(d), new Map()),
+      dismiss: (domain) => {
+        const r = softWrite((d) => setDismissed(d, domain, now(), now()))
+        return r.ok ? r.value : undefined
+      },
+      restore: (domain) => {
+        const r = softWrite((d) => setDismissed(d, domain, null, now()))
+        return r.ok ? r.value : undefined
+      },
     },
 
     dataEpoch: () => read((d) => readDataEpoch(d), 0),

@@ -809,6 +809,60 @@ export interface SearchLogApi {
   byReceipt(receiptId: string): SearchLogRow[]
   /** Hidden-result counts by reason, per search id. */
   hiddenReasons(searchIds: readonly number[]): Map<number, Record<string, number>>
+  /**
+   * Per search id (at most 500): the URL hashes of pages opened in the search's session, or
+   * under its receipt when it has no session (ADR-0025). Searches with nothing opened are absent.
+   */
+  openedHashes(searchIds: readonly number[]): Map<number, ReadonlySet<string>>
+  /** Per search id: how many of its kept results were opened. Zero counts are absent. */
+  openedCounts(searchIds: readonly number[]): Map<number, number>
+}
+
+// ── Review list (ADR-0025) ───────────────────────────────────────────────
+
+/** A site seen in several searches and never opened. */
+export interface ReviewCandidate {
+  readonly domain: string
+  /** Distinct searches that kept at least one of its results. */
+  readonly searches: number
+  /** Kept results in those searches. */
+  readonly results: number
+  /** Epoch ms of its most recent kept result. */
+  readonly lastSeen: number
+  /** Source type code of that most recent result (read tolerantly). */
+  readonly sourceType: string
+}
+
+/** One stored page of a site. `title` is null when only the URL is kept. */
+export interface ReviewExample {
+  readonly url: string
+  readonly title: string | null
+}
+
+export interface ReviewApi {
+  /**
+   * Sites with kept results in at least `minSearches` distinct searches since `since` (epoch
+   * ms) and no opened page in that time, most-seen first. `exclude` drops more domains.
+   * `limit` is clamped to 1..1000.
+   */
+  candidates(opts: {
+    since: number
+    minSearches: number
+    limit: number
+    exclude?: readonly string[]
+  }): ReviewCandidate[]
+  /** Up to `perDomain` (1..10) stored pages per site, in one query. Sites without any are absent. */
+  examples(opts: {
+    domains: readonly string[]
+    since: number
+    perDomain: number
+  }): Map<string, ReviewExample[]>
+  /** Dismissed domains with when (epoch ms). */
+  dismissed(): Map<string, number>
+  /** "This site is fine". True when newly dismissed, false when it already was; undefined when the write was skipped. */
+  dismiss(domain: string): boolean | undefined
+  /** Undoes a dismissal. True when one was removed, false when there was none; undefined when the write was skipped. */
+  restore(domain: string): boolean | undefined
 }
 
 /** Write methods return false when the write was skipped (read-only, no history) or the database was busy. */
@@ -913,6 +967,7 @@ export interface Store {
   readonly rulesLastGood: LastGoodApi
   readonly gateways: GatewaysApi
   readonly lists: ListsApi
+  readonly review: ReviewApi
 
   dataEpoch(): number
   /** Bumps `data_epoch` (any process that deletes in bulk). Undefined when skipped. */
