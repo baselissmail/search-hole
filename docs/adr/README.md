@@ -30,5 +30,6 @@ Status values: **Proposed**, **Accepted**, **Superseded by ADR-NNNN**. To change
 | [0022](0022-lists-implementation.md) | Lists end to end: four sources in one id space, checksummed artifacts per compiler version, one lease-owned refresh job, HTTPS/SSRF/pin/shrink guards, audit never reaches the model | Accepted |
 | [0023](0023-more-clients-and-setup.md) | Codex and Cursor plugins without hooks; `searchhole setup` merges MCP configs safely; `uninstall --purge` deletes by name | Accepted |
 | [0024](0024-release-engineering.md) | CI on three OSes, signed-tag releases with npm provenance and SBOM, SHA-pinned actions, 14-day minimum release age, Node 22.19 floor | Accepted |
+| [0025](0025-review-list-and-opened-labels.md) | Every logged result is Opened, Seen or Hidden (same-session fetch with the same URL hash); a review list of sites seen in 3+ searches and never opened, with Block, Lower and Keep; dismissals in `meta_kv`; no migration | Accepted |
 
 The ADRs were revised on 2026-10-30 after a three-lens adversarial review (facts, consistency, red team; 90 findings). Where an ADR writes `~/.searchhole/`, read it as the root that ADR-0015 resolves.
