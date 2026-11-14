@@ -245,6 +245,8 @@ function makeDetail(entry: LogEntry): LogDetail {
         entry.mode === 'builtin' ? 'builtin' : pick(rand, entry.engines.length ? entry.engines : ['brave']),
       domain,
       decision,
+      // About one kept result in five was opened (no `rand()`: the other fields keep their values).
+      opened: decision !== 'hidden' && (entry.searchId * 31 + rank * 17) % 5 === 0,
     }
     const sourceType = SOURCE[domain]
     if (sourceType) result.sourceType = sourceType
@@ -263,7 +265,7 @@ function makeDetail(entry: LogEntry): LogDetail {
     if (decision === 'pinned') result.rule = { ruleId: 'u_pin1', text: `pin ${domain}`, tier: 'T3' }
     results.push(result)
   }
-  return { ...entry, results }
+  return { ...entry, opened: results.filter((r) => r.opened).length, results }
 }
 
 // ── The fake server ──────────────────────────────────────────────────────

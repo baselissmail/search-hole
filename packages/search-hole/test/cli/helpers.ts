@@ -324,6 +324,7 @@ export function sampleLogDetail(): LogDetail {
         domain: 'react.dev',
         title: 'React Compiler',
         decision: 'pinned',
+        opened: true,
         sourceType: 'official',
       },
       {
@@ -333,10 +334,18 @@ export function sampleLogDetail(): LogDetail {
         domain: 'pinterest.com',
         title: 'Pin 123',
         decision: 'hidden',
+        opened: false,
         reason: 'rule',
         rule: { ruleId: 'r_blk0000002', text: 'pinterest.com', tier: 'T3' },
       },
-      { rank: 3, engine: 'searxng', domain: 'old.example.org', decision: 'hidden', reason: 'stale' },
+      {
+        rank: 3,
+        engine: 'searxng',
+        domain: 'old.example.org',
+        decision: 'hidden',
+        opened: false,
+        reason: 'stale',
+      },
     ],
   }
 }

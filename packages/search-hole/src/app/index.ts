@@ -32,6 +32,7 @@ import { ListsService } from './lists.ts'
 import { logDetail, recentLog } from './logview.ts'
 import { LoopGuard } from './loopguard.ts'
 import { Receipts } from './receipts.ts'
+import { reviewList, setReviewDismissed } from './review.ts'
 import { RulesService } from './rules.ts'
 import { runSearch } from './search.ts'
 import { approveSuggestion, listSuggestions, rejectSuggestion, suggestRule } from './suggestions.ts'
@@ -296,6 +297,12 @@ export const createApp: CreateApp = async (opts: AppOptions): Promise<App> => {
       async detail(searchId) {
         return logDetail(await ctx.store.read(), searchId)
       },
+    },
+
+    review: {
+      list: (o) => reviewList({ ctx, rules }, o),
+      dismiss: (site) => setReviewDismissed({ ctx, rules }, site, true),
+      restore: (site) => setReviewDismissed({ ctx, rules }, site, false),
     },
 
     settings: {

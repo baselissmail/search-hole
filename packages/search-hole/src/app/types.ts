@@ -242,6 +242,12 @@ export interface LogEntry {
   kept: number
   hidden: number
   latencyMs: number
+  /**
+   * Kept results the assistant opened in the search's session (ADR-0025). Set by `log.recent`
+   * and `log.detail`. Absent on dashboard pages and live-tail entries: those are sent when the
+   * search is logged, before any page can have been opened.
+   */
+  opened?: number
 }
 
 export interface LogDetail extends LogEntry {
@@ -252,10 +258,59 @@ export interface LogDetail extends LogEntry {
     domain: string
     title?: string
     decision: 'kept' | 'hidden' | 'pinned'
+    /**
+     * The assistant opened this page: an `opened` fetch in the search's session (the receipt,
+     * for a search without a session) has this result's URL hash. Always false for a hidden result.
+     */
+    opened: boolean
     reason?: HiddenReason
     rule?: Pick<RuleRef, 'ruleId' | 'text' | 'tier'>
     sourceType?: SourceType
   }>
+}
+
+// ── Review list (ADR-0025) ─────────────────────────────────────────────────
+
+/** A site that keeps showing up in results and that the assistant never opens. */
+export interface ReviewSite {
+  /** Registrable domain. */
+  domain: string
+  /** Distinct searches that kept a result from it. */
+  searches: number
+  /** Kept results in those searches. */
+  results: number
+  /** Its most recent kept result (ISO 8601). */
+  lastSeen: string
+  /** Source type of that most recent result. */
+  sourceType: SourceType
+  /** Up to 3 stored pages; empty when the engines that returned the site keep no titles or URLs (ADR-0009 point 9). */
+  examples: Array<{ url: string; title?: string }>
+}
+
+export interface ReviewList {
+  /** The window looked at, in days. */
+  days: number
+  /** A site is listed from this many distinct searches. */
+  minSearches: number
+  /** Most-seen first: by searches, then results. */
+  sites: ReviewSite[]
+  /** Sites to review before `limit` cut the list. */
+  total: number
+  /** Sites the user kept ("this site is fine"), newest first. They are never listed. */
+  dismissed: Array<{ domain: string; at: string }>
+}
+
+/** The review list and its dismissals (CLI, dashboard, slash command; never model-reachable). Local log only, no network. */
+export interface ReviewApi {
+  /** `days` 1..365 (default 30); `limit` 1..500 (default 100). */
+  list(opts?: { days?: number; limit?: number }): Promise<ReviewList>
+  /**
+   * "This site is fine, stop showing it." Takes a domain, host or URL and stores its registrable
+   * domain. `changed` is false when it was dismissed already.
+   */
+  dismiss(site: string): Promise<{ domain: string; changed: boolean }>
+  /** Undoes a dismissal. `changed` is false when the site was not dismissed. */
+  restore(site: string): Promise<{ domain: string; changed: boolean }>
 }
 
 /** The dashboard header (ADR-0020). */
@@ -554,6 +609,8 @@ export interface App {
   dashboard?: DashboardApi
   /** List subscriptions, starter lists and imports (ADR-0022). Optional for the same reason as `dashboard`. */
   lists?: ListsApi
+  /** Sites seen often and never opened (ADR-0025). Optional for the same reason as `dashboard`. */
+  review?: ReviewApi
   /**
    * The running dashboard's bare URL (no code or token, ADR-0004 point 3), from `ui.json` and
    * a live pid; null when none runs. Optional for the same reason as `dashboard`.

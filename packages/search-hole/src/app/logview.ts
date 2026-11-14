@@ -30,6 +30,9 @@ const SOURCE_TYPES: readonly SourceType[] = [
 const pick = <T extends string>(values: readonly T[], v: string | null | undefined): T | undefined =>
   values.find((x) => x === v)
 
+/** A stored source type code as a `SourceType` (`unknown` for a code this version does not know). */
+export const sourceTypeOf = (code: string): SourceType => pick(SOURCE_TYPES, code) ?? 'unknown'
+
 export function entryOf(row: SearchLogRow): LogEntry {
   const entry: LogEntry = {
     searchId: row.id,
@@ -50,15 +53,15 @@ export function entryOf(row: SearchLogRow): LogEntry {
   return entry
 }
 
-/** Newest searches first. */
+/** Newest searches first, each with how many of its kept results were opened (ADR-0025). */
 export function recentLog(
   store: Store | null,
   opts: { limit?: number; hiddenOnly?: boolean } = {},
 ): LogEntry[] {
   if (!store) return []
-  return store.searchLog
-    .recent({ limit: opts.limit ?? 20, hiddenOnly: opts.hiddenOnly === true })
-    .map(entryOf)
+  const rows = store.searchLog.recent({ limit: opts.limit ?? 20, hiddenOnly: opts.hiddenOnly === true })
+  const opened = store.searchLog.openedCounts(rows.map((r) => r.id))
+  return rows.map((row) => ({ ...entryOf(row), opened: opened.get(row.id) ?? 0 }))
 }
 
 /** One search with its results (kept in output order, then hidden by raw rank). */
@@ -67,6 +70,7 @@ export function logDetail(store: Store | null, searchId: number): LogDetail | un
   const row = store.searchLog.get(searchId)
   if (!row) return undefined
   const results: LogDetail['results'] = []
+  const openedHashes = store.searchLog.openedHashes([searchId]).get(searchId)
   for (const r of store.listResults(searchId)) {
     const engine: EngineId | 'builtin' | undefined =
       r.engine === BUILTIN_ENGINE ? 'builtin' : ENGINES.has(r.engine) ? (r.engine as EngineId) : undefined
@@ -78,6 +82,8 @@ export function logDetail(store: Store | null, searchId: number): LogDetail | un
       engine,
       domain: r.registrableDomain,
       decision: hidden ? 'hidden' : r.flags.includes('pinned') ? 'pinned' : 'kept',
+      // A hidden result was never shown to the assistant, so it is "hidden", not "opened".
+      opened: !hidden && openedHashes?.has(r.urlHash) === true,
     }
     const url = payload?.url ?? (r.canonicalKey === null ? undefined : `https:${r.canonicalKey}`)
     if (url !== undefined) item.url = url
@@ -97,5 +103,5 @@ export function logDetail(store: Store | null, searchId: number): LogDetail | un
     const bh = b.decision === 'hidden' ? 1 : 0
     return ah - bh || a.rank - b.rank
   })
-  return { ...entryOf(row), results }
+  return { ...entryOf(row), opened: results.filter((r) => r.opened).length, results }
 }
