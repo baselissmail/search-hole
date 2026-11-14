@@ -10,6 +10,7 @@ Drafts for Basel to edit and post himself (MASTER_PLAN §11 P8). Nothing here is
 | [reddit-localllama.md](reddit-localllama.md) | r/LocalLLaMA |
 | [writeup-outline.md](writeup-outline.md) | Medium and LinkedIn write-up |
 | [directories.md](directories.md) | Plugin and extension directories, awesome lists |
+| [prelaunch-review.md](prelaunch-review.md) | Not a post: the 2026-11-14 review, as a checklist to clear first |
 
 ## Before posting anything
 
