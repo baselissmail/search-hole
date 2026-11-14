@@ -53,24 +53,44 @@ export interface UiPaths {
   uiLock: string
 }
 
-/** The running instance described by `ui.json`, if it answers with the same nonce. */
-export async function findRunningUi(paths: UiPaths): Promise<UiJson | null> {
+/**
+ * What one `/health` request says about the instance in `ui.json`: it answered with our nonce,
+ * something else answered, nothing listens there (`down`), or it did not answer in time (`slow`).
+ */
+async function probe(info: UiJson, timeoutMs: number): Promise<'ours' | 'other' | 'down' | 'slow'> {
+  try {
+    const res = await fetch(`http://127.0.0.1:${info.port}/health`, {
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+    const body = (await res.json()) as { nonce?: unknown }
+    return res.ok && body.nonce === info.nonce ? 'ours' : 'other'
+  } catch (e) {
+    const name = (e as { name?: unknown } | null)?.name
+    return name === 'TimeoutError' || name === 'AbortError' ? 'slow' : 'down'
+  }
+}
+
+/**
+ * The running instance described by `ui.json`, if it answers with the same nonce. A dashboard
+ * that is alive but slow to answer (busy compiling a large list) gets a second, longer try, and
+ * its `ui.json` is never deleted: without the file no later command could find it, and each
+ * would report its port as taken by another program. The file goes only when the process is
+ * gone or something else answers on the port.
+ */
+export async function findRunningUi(
+  paths: UiPaths,
+  timeoutMs: number = HEALTH_TIMEOUT_MS,
+): Promise<UiJson | null> {
   let info: UiJson
   try {
     info = uiJsonSchema.parse(JSON.parse(readFileSync(paths.uiJson, 'utf8')))
   } catch {
     return null
   }
-  try {
-    const res = await fetch(`http://127.0.0.1:${info.port}/health`, {
-      signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS),
-    })
-    const body = (await res.json()) as { nonce?: unknown }
-    if (res.ok && body.nonce === info.nonce) return info
-  } catch {
-    // Not answering: stale.
-  }
-  rmSync(paths.uiJson, { force: true })
+  let answer = await probe(info, timeoutMs)
+  if (answer === 'slow' && pidAlive(info.pid)) answer = await probe(info, timeoutMs * 3)
+  if (answer === 'ours') return info
+  if (answer !== 'slow' || !pidAlive(info.pid)) rmSync(paths.uiJson, { force: true })
   return null
 }
 
@@ -87,7 +107,7 @@ export async function signInUrl(info: UiJson): Promise<string> {
   return `http://127.0.0.1:${info.port}/#c=${code}`
 }
 
-const pidAlive = (pid: number): boolean => {
+function pidAlive(pid: number): boolean {
   try {
     process.kill(pid, 0)
     return true

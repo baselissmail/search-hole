@@ -81,6 +81,38 @@ describe('searchhole ui lifecycle', () => {
     expect(existsSync(uiJson)).toBe(false)
   })
 
+  it('a dashboard that is alive but slow to answer keeps its ui.json', async () => {
+    const run = mkdtempSync(join(tmpdir(), 'searchhole-run-'))
+    const uiJson = join(run, 'ui.json')
+    // Accepts connections and never answers, like a dashboard whose event loop is busy.
+    const sockets = new Set<import('node:net').Socket>()
+    const busy = createServer((socket) => void sockets.add(socket))
+    await new Promise<void>((resolve) => busy.listen(0, '127.0.0.1', resolve))
+    onCleanup(() => {
+      for (const s of sockets) s.destroy()
+      busy.close()
+    })
+    const addr = busy.address()
+    const port = typeof addr === 'object' && addr !== null ? addr.port : 0
+    const info = (pid: number) =>
+      JSON.stringify({
+        port,
+        pid,
+        nonce: 'n'.repeat(22),
+        version: 'x',
+        startedAt: 0,
+        loginSecret: 's'.repeat(43),
+      })
+    const paths = { uiJson, uiLock: join(run, 'ui.lock') }
+    writeFileSync(uiJson, info(process.pid))
+    expect(await findRunningUi(paths, 50)).toBeNull()
+    expect(existsSync(uiJson)).toBe(true)
+    // The same silence from a process that no longer exists is a stale file.
+    writeFileSync(uiJson, info(2 ** 22 + 12345))
+    expect(await findRunningUi(paths, 50)).toBeNull()
+    expect(existsSync(uiJson)).toBe(false)
+  })
+
   it('a port taken by another program is a clear error, never a random port', async () => {
     const port = await freePort()
     const blocker = createServer().listen(port, '127.0.0.1')
