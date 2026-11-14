@@ -37,10 +37,34 @@ One line per day of real use, so the 2-week clock is visible. Fill in a day even
 
 | Date | Version | Clients used | Searches (roughly) | Notes |
 |---|---|---|---|---|
-| YYYY-MM-DD | 0.2.0 | Claude Code (auto) | 20 | — |
+| 2026-11-14 | 0.3.0 | Claude Code (auto, no engine), macOS | 1 | Pre-launch review; see Problems |
+| 2026-11-13 | 0.3.0 | Claude Code (auto, no engine), macOS | 38 | 77 pages opened |
+| 2026-11-12 | 0.3.0 | Claude Code (auto, no engine), macOS | 0 | Used all day, no web search |
+| 2026-11-11 | 0.3.0 | Claude Code (auto, no engine), macOS | 0 | Used, no web search |
+| 2026-11-10 | 0.3.0 | Claude Code (auto, no engine), macOS | 0 | Used all day, no web search |
+| 2026-11-09 | 0.3.0 | Claude Code (auto, no engine), macOS | 1 | — |
+| 2026-11-08 | 0.3.0 | Claude Code (auto, no engine), macOS | 0 | Used, no web search |
+| 2026-11-07 | 0.3.0 | Claude Code (auto, no engine), macOS | 12 | 61 pages opened |
+| 2026-11-06 | 0.3.0 | Claude Code (auto, no engine), macOS | 9 | — |
+| 2026-11-05 | 0.3.0 | Claude Code (auto, no engine), macOS | 6 | — |
+| 2026-11-04 | 0.3.0 | Claude Code (auto, no engine), macOS | 10 | — |
+| 2026-11-03 | 0.3.0 | Claude Code (auto, no engine), macOS | 4 | — |
+| 2026-11-02 | 0.3.0 | Claude Code (auto, no engine), macOS | 0 | Used, no web search |
+| 2026-11-01 | 0.3.0 | Claude Code (auto, no engine), macOS | 14 | 39 pages opened |
+| 2026-10-31 | 0.2.0 | Claude Code (auto, no engine), macOS | 2 | First day |
+
+These rows were filled in afterwards, on 2026-11-14, from the local search log (searches and opened pages per day, counted in local time). Nothing was noted day by day, so the "Notes" are thin. From here on, write the row on the day.
+
+What this period does **not** cover: engines mode (no engine was set up, so ranking, snippets, dates and freshness rules had no real use), every client other than Claude Code, and every OS other than macOS.
 
 ## Problems
 
 | Date | Version | Client | Task | What went wrong | Severity | Status |
 |---|---|---|---|---|---|---|
-| YYYY-MM-DD | 0.2.0 | Claude Code (builtin), macOS | example: "React 19 compiler docs" | example: a Medium copy ranked above react.dev after `pin react.dev` | P2 | open |
+| 2026-11-14 | 0.3.0 | Claude Code (auto, no engine), macOS | Review of two weeks of use | In 96 searches (1,243 results from 538 sites) no rule or list hid anything, and no rule was added or suggested. Several sites appeared in 5 to 10 separate searches and were never opened; nothing in the product points at them. | P2 | open: a review list ("seen often, never opened") and Opened / Seen / Hidden labels are being added |
+| 2026-11-14 | 0.3.0 | Claude Code (auto, no engine), macOS | Any first search in a session | The plugin told Claude to prefer its `search` tool, which always fails with no engine, so sessions began with a failed call and a visible error. Found in dozens of session transcripts. | P2 | fixed in `c827206` |
+| 2026-11-14 | 0.3.0 | Claude Code, macOS | Review | `searchhole ui` was not a guarded command and printed its sign-in link, so Claude could sign in to the dashboard and change rules. | P1 | fixed in `bb141ac` |
+| 2026-11-14 | 0.3.0 | CLI, macOS | Checking a site | `searchhole explain csdn.net` said "kept" for a blocked site; only `https://csdn.net/…` gave the right answer. | P1 | fixed in `26a810d` |
+| 2026-11-14 | 0.3.0 | Claude Code (auto, no engine), macOS | Review of two weeks of use | Only 8 of 40 pages opened through search-hole's `fetch` got a publish date. | P2 | open |
+| 2026-11-14 | 0.3.0 | Claude Code (auto, no engine), macOS | Review of two weeks of use | 767 of 1,243 results had the source type "unknown". | P3 | open |
+| 2026-11-14 | 0.3.0 | Claude Code (auto), macOS | Review of two weeks of use | An audit list (`laylavish-huge-ai`) would have hidden results from huggingface.co. Audit was the right default; it must not be enforced as it is. | P3 | open: report upstream or add an allow to the starter set |
