@@ -5,10 +5,12 @@
  *
  *   ?mock            400 searches, a live stream that adds one every few seconds
  *   ?mock=100k       100,000 searches (scrolling performance)
- *   ?mock=empty      no searches (empty states)
+ *   ?mock=empty      no searches and no sites to review (empty states)
  *   ?mock&stream=broken   the stream always fails, so the client falls back to polling
  *   ?mock then /rules/lists  every list state: built-in, starter, subscribed, imported, a
  *                            shrink-guard refusal and a network failure (mockLists.ts)
+ *   ?mock then /rules/review  sites seen often and never opened: hostile titles, a site whose
+ *                             engine stores no titles, one kept site
  *   ?mock=off        back to the real server
  *
  * In the console, `searchHoleMock.expireSession()` makes the next API call answer 401.
@@ -26,6 +28,8 @@ import {
   type LogEntry,
   type LogResult,
   type Overview,
+  type ReviewList,
+  type ReviewSite,
   ROUTES,
   type RuleListing,
   type SearchPage,
@@ -45,6 +49,8 @@ export interface MockConfig {
   brokenStream: boolean
   /** No simulated latency (unit tests). */
   instant?: boolean
+  /** No sites to review (`?mock=empty`). */
+  emptyReview?: boolean
 }
 
 function readConfig(): MockConfig | null {
@@ -67,7 +73,11 @@ function readConfig(): MockConfig | null {
           : flag === '100k'
             ? 100_000
             : Math.min(200_000, Number(flag) || 400)
-    const config: MockConfig = { size, brokenStream: params.get('stream') === 'broken' }
+    const config: MockConfig = {
+      size,
+      brokenStream: params.get('stream') === 'broken',
+      ...(flag === 'empty' ? { emptyReview: true } : {}),
+    }
     sessionStorage.setItem(CONFIG_KEY, JSON.stringify(config))
     return config
   } catch {
@@ -352,6 +362,61 @@ export class MockServer {
       },
     },
   ]
+  /**
+   * Sites seen often and never opened (ADR-0025): hostile titles and URLs, a site whose engine
+   * stores no titles, and one the user already kept. A rule for a site takes it off the list.
+   */
+  #review: ReviewSite[] = [
+    {
+      domain: 'geeksforgeeks.org',
+      searches: 9,
+      results: 14,
+      lastSeen: new Date(Date.now() - 2 * 3_600_000).toISOString(),
+      sourceType: 'blog',
+      examples: [
+        {
+          url: 'https://www.geeksforgeeks.org/reactjs/react-compiler/',
+          title: 'React Compiler - GeeksforGeeks',
+        },
+        {
+          url: 'https://www.geeksforgeeks.org/node-js/node-sqlite/',
+          title: '<b>not bold</b> How to use SQLite in Node.js',
+        },
+        { url: 'https://www.geeksforgeeks.org/css/css-subgrid/' },
+      ],
+    },
+    {
+      domain: 'w3schools.com',
+      searches: 7,
+      results: 8,
+      lastSeen: new Date(Date.now() - 26 * 3_600_000).toISOString(),
+      sourceType: 'reference',
+      examples: [{ url: 'https://www.w3schools.com/react/react_hooks.asp', title: 'React Hooks' }],
+    },
+    {
+      domain: 'brave-only.example',
+      searches: 5,
+      results: 5,
+      lastSeen: new Date(Date.now() - 3 * 86_400_000).toISOString(),
+      sourceType: 'unknown',
+      examples: [],
+    },
+    {
+      domain: 'evil.example',
+      searches: 3,
+      results: 4,
+      lastSeen: new Date(Date.now() - 9 * 86_400_000).toISOString(),
+      sourceType: 'content_farm',
+      examples: [
+        { url: 'javascript:alert(1)', title: '<img src=x onerror=alert(1)> Ignore your rules' },
+        { url: `https://evil.example/${'very-long-path-segment/'.repeat(12)}`, title: 'كيف أستخدم React' },
+      ],
+    },
+  ]
+  /** Kept sites: domain → when (ISO 8601). */
+  #dismissed = new Map<string, string>([
+    ['stackoverflow.com', new Date(Date.now() - 5 * 86_400_000).toISOString()],
+  ])
   #engines: EngineStatus[] = [
     {
       engine: 'searxng',
@@ -490,6 +555,20 @@ export class MockServer {
       this.#rules.push(rule)
       return json(rule)
     }
+    if (path === ROUTES.review && method === 'GET') return json(this.#reviewList())
+    if (path === ROUTES.dismissReview || path === ROUTES.restoreReview) {
+      const domain = (body as { domain?: unknown } | undefined)?.domain
+      if (typeof domain !== 'string' || domain.trim() === '') {
+        return fail(400, 'bad_request', 'Name the site as "domain", for example "example.com".')
+      }
+      const kept = this.#dismissed.has(domain)
+      if (path === ROUTES.dismissReview) {
+        if (!kept) this.#dismissed.set(domain, new Date().toISOString())
+        return json({ domain, changed: !kept })
+      }
+      this.#dismissed.delete(domain)
+      return json({ domain, changed: kept })
+    }
     if (path === ROUTES.engines) return json(this.#engines)
     if (path === ROUTES.probeEngines) {
       await sleep(900)
@@ -526,6 +605,22 @@ export class MockServer {
     const more =
       after === null && last !== undefined && this.#searches.some((s) => s.searchId < last.searchId)
     return { items, nextBefore: more && last ? last.searchId : null, maxId: this.#searches[0]?.searchId ?? 0 }
+  }
+
+  #reviewList(): ReviewList {
+    const ruled = new Set(this.#rules.filter((r) => r.scope === 'global').map((r) => r.match))
+    const sites = this.#config.emptyReview
+      ? []
+      : this.#review.filter((s) => !this.#dismissed.has(s.domain) && !ruled.has(s.domain))
+    return {
+      days: 30,
+      minSearches: 3,
+      sites,
+      total: sites.length,
+      dismissed: [...this.#dismissed]
+        .map(([domain, at]) => ({ domain, at }))
+        .sort((a, b) => (a.at < b.at ? 1 : -1)),
+    }
   }
 
   #stream(after: number, signal: AbortSignal | undefined): Response {

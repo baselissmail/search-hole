@@ -22,6 +22,9 @@ import {
   type Overview,
   type RemoveListRequest,
   type RemoveRuleRequest,
+  type ReviewList,
+  type ReviewSiteRequest,
+  type ReviewSiteResponse,
   ROUTES,
   type RuleListing,
   type SearchPage,
@@ -167,6 +170,14 @@ export const api = {
   suggestions: (signal?: AbortSignal) => get<SuggestionItem[]>(ROUTES.suggestions, undefined, signal),
   approveSuggestion: (id: number) => post<RuleListing>(ROUTES.approveSuggestion(id)),
   rejectSuggestion: (id: number) => post<{ ok: true }>(ROUTES.rejectSuggestion(id)),
+  /** Sites seen in several searches and never opened (the last 30 days unless `days` says otherwise). */
+  review: (signal?: AbortSignal, days?: number) => get<ReviewList>(ROUTES.review, { days }, signal),
+  /** "This site is fine": stop listing it. */
+  dismissReview: (domain: string) =>
+    post<ReviewSiteResponse>(ROUTES.dismissReview, { domain } satisfies ReviewSiteRequest),
+  /** List a dismissed site again (the Undo of a dismissal). */
+  restoreReview: (domain: string) =>
+    post<ReviewSiteResponse>(ROUTES.restoreReview, { domain } satisfies ReviewSiteRequest),
   engines: (signal?: AbortSignal) => get<EngineStatus[]>(ROUTES.engines, undefined, signal),
   probeEngines: () => post<EngineStatus[]>(ROUTES.probeEngines),
   settings: (signal?: AbortSignal) => get<SettingsView>(ROUTES.settings, undefined, signal),

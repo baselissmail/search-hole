@@ -103,6 +103,7 @@ export function Suggestions() {
           action: { label: 'Undo', onClick: () => void removeRules(queryClient, [rule], label) },
         })
         void queryClient.invalidateQueries({ queryKey: keys.rules })
+        void queryClient.invalidateQueries({ queryKey: keys.review })
       } else {
         await api.rejectSuggestion(item.id)
         toast.success(`Rejected: ${what}`)

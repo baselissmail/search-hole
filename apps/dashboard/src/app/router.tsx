@@ -27,6 +27,12 @@ const listsRoute = createRoute({
   validateSearch: parseListsSearch,
   component: lazyRouteComponent(() => import('../pages/lists/ListsPage.tsx'), 'ListsPage'),
 })
+// So does the review list (ADR-0025): only its count badge is in the initial bundle.
+const reviewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/rules/review',
+  component: lazyRouteComponent(() => import('../pages/rules/ReviewPage.tsx'), 'ReviewPage'),
+})
 const enginesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/engines',
@@ -38,7 +44,14 @@ const settingsRoute = createRoute({
   component: SettingsPage,
 })
 
-const routeTree = rootRoute.addChildren([logRoute, rulesRoute, listsRoute, enginesRoute, settingsRoute])
+const routeTree = rootRoute.addChildren([
+  logRoute,
+  rulesRoute,
+  listsRoute,
+  reviewRoute,
+  enginesRoute,
+  settingsRoute,
+])
 
 export const router = createRouter({ routeTree, defaultPreload: false, scrollRestoration: false })
 

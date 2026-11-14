@@ -11,6 +11,7 @@ export const keys = {
   search: (id: number) => ['search', id] as const,
   rules: ['rules'] as const,
   suggestions: ['suggestions'] as const,
+  review: ['review'] as const,
   engines: ['engines'] as const,
   doctor: ['doctor'] as const,
   settings: ['settings'] as const,
@@ -60,6 +61,11 @@ export function useRules() {
 
 export function useSuggestions() {
   return useQuery({ queryKey: keys.suggestions, queryFn: ({ signal }) => api.suggestions(signal) })
+}
+
+/** Sites seen in several searches and never opened: the Review tab and its count badge. */
+export function useReview() {
+  return useQuery({ queryKey: keys.review, queryFn: ({ signal }) => api.review(signal), staleTime: 30_000 })
 }
 
 export function useEngines() {

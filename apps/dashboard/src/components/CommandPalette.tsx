@@ -6,6 +6,7 @@ import { Command } from 'cmdk'
 import {
   Check,
   CloudDownload,
+  Eye,
   EyeOff,
   Keyboard,
   Library,
@@ -101,6 +102,14 @@ export function CommandPalette({
             >
               <ListChecks aria-hidden="true" className="size-4 text-fg-muted" />
               <span className="flex-1">Lists</span>
+            </Item>
+            <Item
+              value="go review"
+              keywords={['sites', 'never opened', 'seen', 'block', 'lower', 'keep']}
+              onSelect={() => run(() => void navigate({ to: '/rules/review' }))}
+            >
+              <Eye aria-hidden="true" className="size-4 text-fg-muted" />
+              <span className="flex-1">Review sites</span>
             </Item>
           </Command.Group>
           <Command.Group heading="Actions" className={groupClass}>

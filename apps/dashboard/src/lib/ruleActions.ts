@@ -47,6 +47,8 @@ function scopeWord(rule: RuleListing): string {
 
 function refreshRules(qc: QueryClient): void {
   void qc.invalidateQueries({ queryKey: keys.rules })
+  // A rule for a site takes it off the review list, and removing the rule puts it back.
+  void qc.invalidateQueries({ queryKey: keys.review })
 }
 
 /** Remove rules the dashboard just created (the Undo of an add or an approval). */
@@ -93,12 +95,14 @@ export async function addRuleWithUndo(
   return rule
 }
 
-/** A quick verb on a result's domain: `b` blocks it, `p` pins it… */
-export async function applyVerb(qc: QueryClient, verb: QuickVerb, domain: string): Promise<void> {
+/** A quick verb on a result's domain: `b` blocks it, `p` pins it… True when the rule was added. */
+export async function applyVerb(qc: QueryClient, verb: QuickVerb, domain: string): Promise<boolean> {
   try {
     await addRuleWithUndo(qc, { match: domain, action: verb })
+    return true
   } catch (err) {
     toastError(`Couldn't ${verb} ${domain}`, err)
+    return false
   }
 }
 
