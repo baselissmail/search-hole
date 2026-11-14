@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * The results of one search, shown under its row: rank, domain, title and URL, the decision
- * with the reason and the rule that fired, the source type, and one-click rule actions.
+ * with the reason and the rule that fired, whether the assistant opened the page, the source
+ * type, and one-click rule actions.
  * Everything from the web is rendered as text; only http(s) URLs become links.
  */
 import { CircleAlert, RotateCw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { ACTION_ICONS, DecisionChip } from '../../components/status.tsx'
+import { ACTION_ICONS, DecisionChip, OpenedMark } from '../../components/status.tsx'
 import { Button } from '../../components/ui/Button.tsx'
 import { IconButton } from '../../components/ui/IconButton.tsx'
 import { Skeleton } from '../../components/ui/Skeleton.tsx'
@@ -53,6 +54,18 @@ function useCharCapacity() {
     return () => observer.disconnect()
   }, [])
   return [ref, capacity] as const
+}
+
+/** "opened 3 of 19": the results the assistant opened, of those it was shown (hidden ones are neither). */
+export function openedSummary(results: readonly LogResult[]): { opened: number; shown: number } {
+  let opened = 0
+  let shown = 0
+  for (const r of results) {
+    if (r.decision === 'hidden') continue
+    shown++
+    if (r.opened) opened++
+  }
+  return { opened, shown }
 }
 
 function Why({ result }: { result: LogResult }) {
@@ -139,7 +152,10 @@ function ResultRow({
         </div>
       </td>
       <td className="px-2 align-middle">
-        <DecisionChip decision={result.decision} />
+        <div className="flex flex-col items-start gap-0.5">
+          <DecisionChip decision={result.decision} />
+          {result.decision === 'hidden' ? null : <OpenedMark opened={result.opened} />}
+        </div>
       </td>
       <td className="px-2 align-middle">
         <Why result={result} />
@@ -191,6 +207,7 @@ export function ResultsPanel({
   const results = detail.data?.results ?? []
   const pinned = results.filter((r) => r.decision === 'pinned').length
   const hidden = results.filter((r) => r.decision === 'hidden').length
+  const { opened, shown } = openedSummary(results)
   const focusPosition = selectedPosition ?? 1
 
   return (
@@ -201,7 +218,11 @@ export function ResultsPanel({
             <>
               <span className="tabular font-mono text-fg">{formatCount(results.length)}</span> results ·{' '}
               <span className="tabular font-mono text-fg">{formatCount(hidden)}</span> hidden ·{' '}
-              <span className="tabular font-mono text-fg">{formatCount(pinned)}</span> pinned
+              <span className="tabular font-mono text-fg">{formatCount(pinned)}</span> pinned ·{' '}
+              <span title="Results the assistant opened, of those it was shown">
+                opened <span className="tabular font-mono text-fg">{formatCount(opened)}</span> of{' '}
+                <span className="tabular font-mono text-fg">{formatCount(shown)}</span>
+              </span>
             </>
           ) : (
             'Results'

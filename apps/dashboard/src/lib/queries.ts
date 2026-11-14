@@ -4,6 +4,7 @@ import { QueryClient, useQuery } from '@tanstack/react-query'
 import { ApiFailure, api } from './api.ts'
 
 export const OVERVIEW_DAYS = 7
+const DETAIL_REFRESH_MS = 15_000
 
 export const keys = {
   overview: ['overview', OVERVIEW_DAYS] as const,
@@ -45,8 +46,11 @@ export function useSearchDetail(id: number | undefined) {
     queryKey: keys.search(id ?? 0),
     queryFn: ({ signal }) => api.search(id ?? 0, signal),
     enabled: id !== undefined,
-    // A logged search never changes.
-    staleTime: Number.POSITIVE_INFINITY,
+    // The results of a logged search never change, but which of them were opened does: pages
+    // are opened after the search is logged. Refreshed while the row is expanded and the tab
+    // is visible; an unchanged answer keeps the same object, so nothing re-renders.
+    staleTime: DETAIL_REFRESH_MS,
+    refetchInterval: DETAIL_REFRESH_MS,
   })
 }
 

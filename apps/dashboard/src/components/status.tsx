@@ -4,11 +4,13 @@ import {
   ArrowDown,
   ArrowUp,
   Ban,
+  BookOpenCheck,
   CircleAlert,
   CircleCheck,
   CircleHelp,
   CircleX,
   Equal,
+  Eye,
   EyeOff,
   Info,
   type LucideIcon,
@@ -32,6 +34,31 @@ export function DecisionChip({ decision }: { decision: LogResult['decision'] }) 
     <Chip tone={d.tone} icon={d.icon}>
       {d.label}
     </Chip>
+  )
+}
+
+/**
+ * For a result the assistant was shown: did it open the page, or only see it in its results?
+ * (A hidden result was never shown, so its decision chip already says everything.)
+ */
+export function OpenedMark({ opened }: { opened: boolean }) {
+  const Icon = opened ? BookOpenCheck : Eye
+  return (
+    <span
+      title={
+        opened
+          ? 'The assistant opened this page in the same session'
+          : 'In the results the assistant got; it did not open this page'
+      }
+      className={
+        opened
+          ? 'flex items-center gap-1 text-xs font-medium text-fg'
+          : 'flex items-center gap-1 text-xs text-fg-muted'
+      }
+    >
+      <Icon aria-hidden="true" className="size-3 shrink-0" />
+      {opened ? 'Opened' : 'Seen'}
+    </span>
   )
 }
 
