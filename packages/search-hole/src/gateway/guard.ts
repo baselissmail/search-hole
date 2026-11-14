@@ -5,7 +5,7 @@
  * costs well under a millisecond.
  *
  * Bash: denied when search-hole's CLI is the command being run (directly or through `env`,
- * `sudo`, `xargs`, `npx`, `node`, `pnpm -C <dir> dev`, `sh -c`, `eval`, `$(...)`) with a verb
+ * `sudo`, `xargs`, `mise exec --`, `npx`, `node`, `pnpm -C <dir> dev`, `sh -c`, `eval`, `$(...)`) with a verb
  * that changes state, or when the command writes a search-hole file (a redirect, `tee`, `cp`,
  * `sed -i`, ...). Words inside quoted arguments of other commands don't count, so commit
  * messages and grep patterns that mention a verb are fine (review 2026-10-31).
@@ -223,6 +223,13 @@ function invocation(cmd: SimpleCommand, cwdHint: boolean, nested: string[]): Inv
       continue
     }
     if (CLI_NAME.test(name)) return { args: w.slice(i + 1), skill }
+    // `mise exec [tool@version…] -- <command>` (also `mise x`): the command follows the `--`.
+    if (name === 'mise' && (w[i + 1] === 'exec' || w[i + 1] === 'x')) {
+      const dashes = w.indexOf('--', i + 2)
+      if (dashes < 0) return null
+      i = dashes + 1
+      continue
+    }
     if (name === 'eval') {
       nested.push(w.slice(i + 1).join(' '))
       return null

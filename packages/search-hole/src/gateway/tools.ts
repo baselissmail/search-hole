@@ -87,6 +87,8 @@ export interface ToolDeps {
   host: HostProfile
   /** The start-up guess that an engine is set up; false changes what `search` says in Claude Code. */
   engineSetUp: boolean
+  /** True in Claude Code with the plugin's hooks; false means no built-in search is filtered. */
+  filtersBuiltin: boolean
   /** search-hole version (the panel's versioned resource URI). */
   version: string
   /** One-time tokens for the receipt panel's buttons, shared by every server instance. */
@@ -119,6 +121,12 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
   // Claude Code hands a tool's structuredContent (not its text) to the model, as the live E2E on
   // 2026-10-30 showed. It renders no MCP Apps, so it gets the compact, budgeted text only (ADR-0012).
   const structured = deps.host !== 'claude-code'
+  // Whose no-engine advice an error gives: "use the built-in search" only where it is filtered.
+  const guidanceHost: HostProfile = deps.filtersBuiltin
+    ? 'claude-code'
+    : deps.host === 'claude-code'
+      ? 'generic'
+      : deps.host
   const ctxOf = (ctx: HandlerContextLike) =>
     buildRequestCtx(requestContext(ctx, deps.era, legacy), deps.sessions, deps.proc)
 
@@ -171,7 +179,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
     'search',
     {
       description:
-        deps.host === 'claude-code' && !deps.engineSetUp
+        deps.filtersBuiltin && !deps.engineSetUp
           ? TOOL_DESCRIPTIONS.searchNoEngine
           : TOOL_DESCRIPTIONS.search,
       inputSchema: searchInput,
@@ -198,7 +206,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
           ...(structured ? { structuredContent: searchStructured(outcome) } : {}),
         }
       } catch (err) {
-        return toolErrorFrom(err, deps.log, 'search', deps.host)
+        return toolErrorFrom(err, deps.log, 'search', guidanceHost)
       }
     },
   )
@@ -226,7 +234,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
           ...(structured ? { structuredContent: fetchStructured(outcome) } : {}),
         }
       } catch (err) {
-        return toolErrorFrom(err, deps.log, 'fetch', deps.host)
+        return toolErrorFrom(err, deps.log, 'fetch', guidanceHost)
       }
     },
   )
@@ -271,7 +279,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
           ...(panel === undefined ? {} : { _meta: { [PANEL_META_KEY]: panel } }),
         }
       } catch (err) {
-        return toolErrorFrom(err, deps.log, 'receipt', deps.host)
+        return toolErrorFrom(err, deps.log, 'receipt', guidanceHost)
       }
     },
   )
@@ -304,7 +312,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
           ...(structured ? { structuredContent: suggestionStructured(result) } : {}),
         }
       } catch (err) {
-        return toolErrorFrom(err, deps.log, 'suggest_rule', deps.host)
+        return toolErrorFrom(err, deps.log, 'suggest_rule', guidanceHost)
       }
     },
   )
@@ -351,7 +359,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
           const rule = await app.suggestions.approve(Number(args.value))
           return { content: text(`Approved: ${rule.action} ${rule.match} (rule ${rule.id}).`) }
         } catch (err) {
-          return toolErrorFrom(err, deps.log, 'apply_rule', deps.host)
+          return toolErrorFrom(err, deps.log, 'apply_rule', guidanceHost)
         }
       },
     )

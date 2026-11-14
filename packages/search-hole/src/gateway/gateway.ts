@@ -24,7 +24,7 @@ import type { App, CreateApp, HostProfile } from '../app/types.ts'
 import { createLogger, type Logger } from '../shared/log.ts'
 import { resolveRoots } from '../shared/paths.ts'
 import type { ProcessContext } from './context.ts'
-import { engineLikelySetUp } from './engine-hint.ts'
+import { engineLikelySetUp, hooksInstalled } from './engine-hint.ts'
 import { dotDir, type ProtectedRoots } from './guard.ts'
 import { refineHostProfile } from './host.ts'
 import { MAX_INSTRUCTIONS_CHARS, serverInstructions } from './instructions.ts'
@@ -58,6 +58,8 @@ export interface GatewayDeps {
   platform?: NodeJS.Platform
   /** Replaces the start-up guess that an engine is set up (engine-hint.ts). */
   engineSetUp?: () => boolean
+  /** Replaces the check that the plugin's hooks sit next to the bundle (engine-hint.ts). */
+  hooksInstalled?: () => boolean
 }
 
 /** Which eras this process serves (ADR-0013 point 6). */
@@ -87,6 +89,8 @@ export class Gateway {
   readonly protocolMode: ProtocolMode
   /** Guessed once at start, so the instructions and the tool list stay byte-stable. */
   readonly engineSetUp: boolean
+  /** True in Claude Code with the plugin's hooks: only then is the built-in search filtered. */
+  readonly filtersBuiltin: boolean
   /** The server factory for `serveStdio` / `createMcpHandler`. */
   readonly factory: McpServerFactory
 
@@ -113,6 +117,7 @@ export class Gateway {
     this.engineSetUp = (
       deps.engineSetUp ?? (() => engineLikelySetUp({ env: opts.env, home, platform: this.platform }))
     )()
+    this.filtersBuiltin = this.host === 'claude-code' && (deps.hooksInstalled ?? hooksInstalled)()
     this.sessions = new GatewaySessions({
       host: refined.host,
       pid: deps.pid ?? process.pid,
@@ -138,10 +143,11 @@ export class Gateway {
       { name: SERVER_NAME, version: this.version },
       {
         capabilities: { tools: {} },
-        instructions: serverInstructions({ host: this.host, engineSetUp: this.engineSetUp }).slice(
-          0,
-          MAX_INSTRUCTIONS_CHARS,
-        ),
+        instructions: serverInstructions({
+          host: this.host,
+          engineSetUp: this.engineSetUp,
+          hooks: this.filtersBuiltin,
+        }).slice(0, MAX_INSTRUCTIONS_CHARS),
         cacheHints: {
           'tools/list': { ttlMs, cacheScope: 'private' },
           'server/discover': { ttlMs, cacheScope: 'private' },
@@ -151,6 +157,7 @@ export class Gateway {
     registerTools(server, {
       host: this.host,
       engineSetUp: this.engineSetUp,
+      filtersBuiltin: this.filtersBuiltin,
       version: this.version,
       tokens: this.tokens,
       era,

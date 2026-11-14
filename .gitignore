@@ -13,3 +13,6 @@ distribution/out/
 
 # Claude Code local worktrees and settings
 .claude/
+
+# Scratch data folder suggested in CONTRIBUTING.md (it would hold a search log)
+.tmp-home/

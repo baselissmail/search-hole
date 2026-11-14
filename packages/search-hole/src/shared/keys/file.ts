@@ -13,8 +13,8 @@ export interface InsecureFileOptions {
 
 /**
  * The explicit opt-in plaintext store (ADR-0007 point 2): `<data>/secrets/<engine>.key`,
- * file `0600`, folder `0700`. It is written only by `searchhole keys set --insecure-file`;
- * reading it is automatic once the file exists. `doctor` warns about it permanently.
+ * file `0600`, folder `0700`. The CLI has no command that writes it yet (the `--insecure-file`
+ * opt-in of ADR-0007 is not built); reading it is automatic once the file exists. `doctor` warns about it permanently.
  */
 export function createInsecureFileStore(opts: InsecureFileOptions): SecretStore {
   const fs = opts.fs ?? nodeKeyFs

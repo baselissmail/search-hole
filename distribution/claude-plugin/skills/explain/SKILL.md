@@ -1,7 +1,7 @@
 ---
 name: explain
-description: 'Explain why search-hole shows or hides a URL'
-argument-hint: '<url> [--profile name]'
+description: 'Explain why search-hole shows or hides a site or a URL'
+argument-hint: '<site-or-url> [--profile name]'
 disable-model-invocation: true
 allowed-tools:
   - 'Bash(SEARCHHOLE_SKILL=1 node "${CLAUDE_PLUGIN_ROOT}/dist/searchhole.mjs" *)'

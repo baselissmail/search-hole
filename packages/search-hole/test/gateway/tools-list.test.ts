@@ -138,6 +138,18 @@ describe.each(ERAS)('tools/list (%s era)', (era) => {
     }
   })
 
+  test('Claude Code without the plugin hooks is not told its built-in search is filtered', async () => {
+    for (const engineSetUp of [true, false]) {
+      const h = harness({ host: 'claude-code', engineSetUp, hooks: false })
+      const { client } = track(await connect(h.gateway, era))
+      const text = client.getInstructions() ?? ''
+      expect(text).toContain("search-hole can't filter any other web search you have")
+      expect(text).not.toContain('filters it with')
+      const search = (await client.listTools()).tools.find((t) => t.name === 'search')
+      expect(search?.description).toContain('Use it instead of built-in web search')
+    }
+  })
+
   test('search offers only engines that exist', async () => {
     const h = harness()
     const { client } = track(await connect(h.gateway, era))

@@ -75,7 +75,7 @@ Not yet tried in the real app.
 
    It writes `distribution/out/search-hole-<version>.mcpb`.
 2. In Claude Desktop, open Settings → Extensions → Install Extension…, and pick that file. Leave the Brave and Tavily keys empty, or paste a key; Desktop keeps it in your system keychain.
-3. Ask Claude to search, then to show the search-hole receipt. Desktop shows it as a card. "Full receipt" lists what was searched and opened, and "Block a site…" (shown when a page was opened) blocks a site Claude used. Claude can't press these buttons; only you can.
+3. Ask Claude to search, then to show the search-hole receipt. Desktop shows it as a card. "Full receipt" lists what was searched and opened, with a Block button beside each site; "Block a site…" (shown when a page was opened) takes you there. Claude can't press these buttons; only you can.
 
 Desktop has no way to filter its own search, so search-hole is the search tool there and **needs an engine**: a Tavily key in the extension's settings, or `searchhole searxng up` in a terminal.
 

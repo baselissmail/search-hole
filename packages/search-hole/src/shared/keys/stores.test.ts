@@ -215,7 +215,7 @@ describe('Secret Service store (Linux secret-tool)', () => {
       expect(err.code).toBe('store_unavailable')
       expect(err.why).toMatch(reason)
       expect(err.fix).toContain('TAVILY_API_KEY_FILE')
-      expect(err.fix).toContain('--insecure-file')
+      expect(err.fix).toContain('TAVILY_API_KEY_FILE')
       expect(calls.some((c) => c.opts.stdin === KEY)).toBe(false)
     },
   )

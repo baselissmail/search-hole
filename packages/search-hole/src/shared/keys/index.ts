@@ -67,7 +67,7 @@ export function createOsKeyStore(opts: KeyStoreOptions): SecretStore {
 export interface KeyStores {
   /** Where `keys set` writes by default. */
   os: SecretStore
-  /** Written only with `--insecure-file`. */
+  /** The plaintext opt-in store; no CLI command writes it yet (ADR-0007). */
   file: SecretStore
   /** What the gateway reads: the OS store, then the insecure file if one exists. */
   readChain: readonly SecretStore[]

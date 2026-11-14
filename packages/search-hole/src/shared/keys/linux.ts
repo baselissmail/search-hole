@@ -87,7 +87,7 @@ export function createSecretToolStore(opts: SecretToolOptions): SecretStore {
       const ready = await probe()
       if (!ready.ok) {
         throw new SearchHoleError('store_unavailable', `No usable OS key store: ${ready.reason}.`, {
-          fix: 'Set the key as an environment variable (for example TAVILY_API_KEY), point TAVILY_API_KEY_FILE at a file that holds it, or opt in to the plaintext file with --insecure-file.',
+          fix: 'Set the key as an environment variable (for example TAVILY_API_KEY), or point TAVILY_API_KEY_FILE at a file that holds it.',
         })
       }
       const failed = await store(engine, key)

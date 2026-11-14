@@ -17,7 +17,7 @@ Search and rules
   unrule <id|match>     Remove a rule (also: unblock)
   rules                 List your rules
   lists                 Your block lists and starter lists; "lists catalog" for more
-  explain <url>         Say how your rules treat a URL
+  explain <site|url>    Say how your rules treat a site or a URL
   log                   Recent searches; "log show <id>" for one search in full
   review                Sites seen in many searches that your assistant never opened
   suggestions           Rules your assistant proposed, waiting for you
@@ -109,7 +109,7 @@ Block lists hide sites from results, below your own rules (any rule of yours win
 Kinds: block, allow, official (marks sources, never hides), content-farm, clone.
 Formats: auto (default), ublacklist, abp, adguard, hosts, domains, goggles, searchhole.
 Options: --yes confirms a change when there is no terminal; --json prints JSON.`,
-  explain: `Usage: searchhole explain <url> [--profile <name>] [--json]\n\nShows which rules match a URL and what they decide.`,
+  explain: `Usage: searchhole explain <site|url> [--profile <name>] [--json]\n\nShows which rules match a URL and what they decide. A bare site (example.com) is checked as https://example.com.`,
   log: `Usage: searchhole log [--limit <n>] [--hidden] [--json]
        searchhole log show <searchId> [--json]
 
@@ -166,7 +166,8 @@ A private SearXNG search engine in Docker, on 127.0.0.1 only (container "search-
   ui: `Usage: searchhole ui [--open] [--detach] [--stay] [--port <n>]
 
 Runs the dashboard on http://127.0.0.1:7341 (ui.port in settings.yaml), or reuses the one
-already running. It prints a one-time sign-in link (valid 60 s); --open opens it in your browser.
+already running. In a terminal it prints a one-time sign-in link (valid 60 s); --open opens it in
+your browser instead. The link is never printed into a script's or an assistant's output.
   --detach  run it in the background and return (what /search-hole:dashboard does)
   --stay    don't exit after ui.idleMinutes (default 30) with no open tab
   --port    use another port for this run`,

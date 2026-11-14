@@ -3,7 +3,7 @@
 import { resolve } from 'node:path'
 import { describe, expect, test } from 'vitest'
 import { buildRequestCtx, requestContext, resolveProjectDir } from '../../src/gateway/context.ts'
-import { engineLikelySetUp } from '../../src/gateway/engine-hint.ts'
+import { engineLikelySetUp, hooksInstalled } from '../../src/gateway/engine-hint.ts'
 import { NO_ENGINE_GUIDANCE, NO_ENGINE_GUIDANCE_OTHER, toolErrorFrom } from '../../src/gateway/errors.ts'
 import { isDevelopmentVersion, protocolModeFromEnv } from '../../src/gateway/gateway.ts'
 import { bashChangesRules, fileIsProtected } from '../../src/gateway/guard.ts'
@@ -229,6 +229,11 @@ describe('guard matchers', () => {
     ['echo evil.com | xargs searchhole block', true],
     ['env FOO=1 sudo -u me searchhole keys set tavily', true],
     ['timeout 5 searchhole block x', true],
+    ['mise exec -- node ./dist/searchhole.mjs block x', true],
+    ['mise x node@26 -- searchhole lists add y', true],
+    ['mise exec -- pnpm -C packages/search-hole dev rules', true],
+    ['mise exec -- node ./dist/searchhole.mjs log', false],
+    ['mise exec -- pnpm test', false],
     ['pnpm dev block x', false],
     ['node src/cli/main.ts block x', false],
     // The skill marker counts only on the command it prefixes.
@@ -319,6 +324,13 @@ describe('which search the model is told to use (ADR-0012 amendment 2026-11-14)'
     )
     expect(hint({}, { '/home/u/.searchhole/settings.yaml': 'ui:\n  port: 7000\n' })).toBe(false)
     expect(hint({ SEARCHHOLE_HOME: '/data/sh' }, { '/data/sh/secrets/brave.key': 'x' })).toBe(true)
+  })
+
+  test('hooks count as installed only when they sit next to the bundle, as in the plugin', () => {
+    const plugin = (p: string) => p.replaceAll('\\', '/').endsWith('/plugin/hooks/hooks.json')
+    expect(hooksInstalled('/cache/plugin/dist/searchhole.mjs', plugin)).toBe(true)
+    expect(hooksInstalled('/repo/packages/search-hole/dist/searchhole.mjs', plugin)).toBe(false)
+    expect(hooksInstalled(undefined, plugin)).toBe(false)
   })
 
   test('when it cannot tell, it keeps the wording that expects an engine', () => {

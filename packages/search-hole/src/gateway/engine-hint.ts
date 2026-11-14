@@ -12,6 +12,7 @@
  *   built-in search, as before.
  */
 import { existsSync, readFileSync } from 'node:fs'
+import { dirname, join as joinPath } from 'node:path'
 import { CONVENTIONAL_KEY_ENV, hostKeyEnvName } from '../shared/keys/resolve.ts'
 import { envValue } from '../shared/keys/unset.ts'
 import { pathFor, resolveRoots, rootLayout } from '../shared/paths.ts'
@@ -57,4 +58,18 @@ export function engineLikelySetUp(o: EngineHintInput): boolean {
     // No home folder, or an unreadable settings file: keep the wording that expects an engine.
     return true
   }
+}
+
+/**
+ * True when this process was started from a plugin folder that has search-hole's hooks next to
+ * the bundle (`<plugin>/dist/searchhole.mjs` and `<plugin>/hooks/hooks.json`). Only then is
+ * Claude Code's built-in search filtered; a server added by hand with `claude mcp add` has no
+ * hooks, so it must not tell the model that it is.
+ */
+export function hooksInstalled(
+  entry: string | undefined = process.argv[1],
+  exists: (path: string) => boolean = existsSync,
+): boolean {
+  if (entry === undefined || entry === '') return false
+  return exists(joinPath(dirname(entry), '..', 'hooks', 'hooks.json'))
 }
