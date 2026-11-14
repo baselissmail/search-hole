@@ -373,7 +373,16 @@
         { "url": "https://w3.example/", "visibility": "kept", "weight": 0.625 },
         { "url": "https://shady.example/", "visibility": "hidden" },
         { "url": "https://pinned.example/", "visibility": "kept", "note": "lists never pin" },
-        { "url": "https://spam.example/", "visibility": "hidden", "note": "profile dropped in a list" }
+        {
+          "url": "https://spam.example/",
+          "visibility": "kept",
+          "note": "a rule limited to a profile is skipped in a list, never widened"
+        },
+        {
+          "url": "https://expired.example/",
+          "visibility": "kept",
+          "note": "a rule with an end date is skipped in a list"
+        }
       ]
     }
   ]

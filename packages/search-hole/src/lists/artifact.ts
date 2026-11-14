@@ -24,7 +24,7 @@ import type { ListFormat } from './yaml.ts'
  * Bump when the importers' output or this encoding changes: older artifacts are then rebuilt
  * from the stored list text (never deleted while a newer version could still read them).
  */
-export const LIST_COMPILER_VERSION = '1'
+export const LIST_COMPILER_VERSION = '2'
 export const ARTIFACT_MAGIC = 'searchhole-list-artifact'
 /** Skipped-line samples kept in an artifact (the import keeps up to 100). */
 const SKIPPED_IN_ARTIFACT = 20

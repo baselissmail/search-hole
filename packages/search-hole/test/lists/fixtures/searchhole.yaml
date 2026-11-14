@@ -9,3 +9,4 @@ rules:
   - { match: shady.example, action: block, important: true }
   - { match: pinned.example, action: pin }
   - { match: spam.example, action: block, profile: coding }
+  - { match: expired.example, action: block, until: "2020-01-01" }

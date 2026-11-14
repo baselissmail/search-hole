@@ -38,6 +38,28 @@ describe('list kinds (ADR-0008 "List role defines meaning")', () => {
     expect(Object.keys(r.skipReasons)).toEqual(skips)
   })
 
+  it('a line that matches every URL is skipped, however it is written', () => {
+    const cases: Array<[format: ImportOptions['format'], line: string]> = [
+      ['ublacklist', '*://*/*'],
+      ['ublacklist', '/.*/'],
+      ['ublacklist', '/./'],
+      ['ublacklist', '@*://*/*'],
+      ['abp', '://'],
+      ['abp', '|http'],
+      ['abp', '/./'],
+      ['abp', '@@://'],
+      ['goggles', '://$discard'],
+    ]
+    for (const [format, line] of cases) {
+      const r = imp(`${line}\n`, { format })
+      expect([format, line, r.rules.map(ruleText)]).toEqual([format, line, []])
+      expect([format, line, Object.keys(r.skipReasons)]).toEqual([format, line, ['matches every URL']])
+    }
+    // Narrow patterns and regexes are untouched.
+    expect(texts('*://*.a.example/*\n/banner[0-9]+\\.html/\n', { format: 'ublacklist' })).toHaveLength(2)
+    expect(texts('/ads/banner\n||a.example^\n', { format: 'abp' })).toHaveLength(2)
+  })
+
   it('an official list never hides or weights, it only annotates membership', () => {
     const r = imp('||ads.example^$important\n$discard,site=b.example\n', { kind: 'official', format: 'abp' })
     const rules = compileRuleSet({ lists: [toListInput(r)] })

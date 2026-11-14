@@ -29,7 +29,12 @@ export function parseSearchhole(text: string, lines: number, b: ListBuilder): vo
   let i = 0
   for (const r of loaded.rules) {
     i++
-    if (r.profiles?.length || r.until !== undefined) dropped++
+    if (r.profiles?.length || r.until !== undefined) {
+      // A list rule applies to every profile and never expires, so importing this one would widen it.
+      dropped++
+      b.skip(i, r.match, 'limited to a profile or an end date (list rules have neither)')
+      continue
+    }
     if (r.action === 'pin') {
       b.skip(i, r.match, 'pin in a list (lists never pin)')
       continue
@@ -37,7 +42,8 @@ export function parseSearchhole(text: string, lines: number, b: ListBuilder): vo
     b.add(i, r.match, r.match, { type: 'explicit', action: r.action, weight: r.weight }, r.important)
   }
   b.ignoreLines(Math.max(0, lines - b.stats.entries))
-  if (dropped > 0) b.warn(`${dropped} rule(s) set profile or until, which list rules do not use; dropped`)
+  if (dropped > 0)
+    b.warn(`${dropped} rule(s) set profile or until, which list rules do not use; they were skipped`)
   if (loaded.profiles.length > 0 || loaded.subscriptions.length > 0) {
     b.warn('profiles and subscriptions in a list file are ignored')
   }

@@ -2,33 +2,37 @@
   "format": "searchhole",
   "header": {},
   "stats": {
-    "bytes": 517,
-    "lines": 11,
+    "bytes": 584,
+    "lines": 12,
     "ignored": 3,
-    "entries": 8,
-    "accepted": 7,
+    "entries": 9,
+    "accepted": 6,
     "duplicates": 0,
-    "skipped": 1,
-    "rules": 7,
+    "skipped": 3,
+    "rules": 6,
     "cancel": 0,
     "regex": 0,
     "patterns": 1,
     "companions": 0
   },
   "allowlistMode": false,
-  "warnings": ["1 rule(s) set profile or until, which list rules do not use; dropped"],
+  "warnings": ["2 rule(s) set profile or until, which list rules do not use; they were skipped"],
   "rules": [
     "l_sh_1: block pinterest.example",
     "l_sh_2: block |https://*.example.*/amp/^",
     "l_sh_3: raise 2 docs.example",
     "l_sh_4: lower 4 w3.example",
     "l_sh_5: allow good.pinterest.example",
-    "l_sh_6: block shady.example $important",
-    "l_sh_8: block spam.example"
+    "l_sh_6: block shady.example $important"
   ],
   "cancel": [],
   "skipReasons": {
+    "limited to a profile or an end date (list rules have neither)": 2,
     "pin in a list (lists never pin)": 1
   },
-  "skipped": ["7: pin in a list (lists never pin)"]
+  "skipped": [
+    "7: pin in a list (lists never pin)",
+    "8: limited to a profile or an end date (list rules have neither)",
+    "9: limited to a profile or an end date (list rules have neither)"
+  ]
 }

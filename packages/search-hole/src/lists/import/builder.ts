@@ -5,7 +5,8 @@
  * produced compiles), de-duplicates, enforces the per-list caps, and counts.
  */
 import type { CancelEntry } from '../../core/rules/engine.ts'
-import { classifyMatch, parseMatch } from '../../core/rules/match.ts'
+import { classifyMatch, type ParsedMatch, parseMatch, testMatch } from '../../core/rules/match.ts'
+import { type NormalizedUrl, normalizeUrl } from '../../core/rules/normalize.ts'
 import type { ListKind, Rule, RuleAction } from '../../shared/types.ts'
 import {
   type ImportFormat,
@@ -91,6 +92,22 @@ export interface BuilderOptions {
   caps: ListCaps
   /** Goggles: instructions with the same match resolve into one rule instead of counting as duplicates. */
   mergeByMatch?: boolean
+}
+
+// Unrelated URLs. A pattern or regex that matches all of them matches every URL, however it is
+// written ("*://*/*", "/.*/", "://"): one such line would hide everything, or, as an allow,
+// un-hide what every other list blocks. Host matches name a host, so they can't.
+const PROBES: readonly NormalizedUrl[] = [
+  'https://example.com/',
+  'http://a.test/x/y?z=1',
+  'https://sub.domain.example.org/path/page.html',
+  'https://xn--bcher-kva.example/%C3%BC',
+].flatMap((raw) => normalizeUrl(raw) ?? [])
+
+/** True when a pattern or regex match accepts every probe URL. */
+export function matchesEveryUrl(m: ParsedMatch): boolean {
+  if (m.kind !== 'url_pattern' && m.kind !== 'regex') return false
+  return PROBES.every((url) => testMatch(m, url, url.href.toLowerCase()))
 }
 
 export class ListBuilder {
@@ -183,6 +200,10 @@ export class ListBuilder {
       return
     }
     const m = parsed.match
+    if (matchesEveryUrl(m)) {
+      this.skip(line, text, 'matches every URL')
+      return
+    }
     const { action, weight } = mapped
     const key = this.o.mergeByMatch
       ? `${m.kind}\u0000${m.canonical}\u0000${listImportant}`

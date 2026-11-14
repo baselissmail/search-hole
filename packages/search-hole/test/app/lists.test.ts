@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { App, AppSeams, ListStatus } from '../../src/app/types.ts'
 import { createListFetcher, type ListFetcher } from '../../src/fetch/list.ts'
 import { renderSearchText, searchStructured } from '../../src/gateway/render.ts'
-import { decodeArtifact } from '../../src/lists/artifact.ts'
+import { decodeArtifact, LIST_COMPILER_VERSION } from '../../src/lists/artifact.ts'
 import { stripVendorHeader, VENDORED_LISTS } from '../../src/lists/catalog.ts'
 import { isSearchHoleError } from '../../src/shared/errors.ts'
 import { openStore } from '../../src/store/index.ts'
@@ -127,7 +127,7 @@ describe('the starter set (ADR-0017 point 7)', () => {
     // The data folder exists now, so the next load writes the artifacts.
     const again = await h.reopen()
     await again.filterBuiltinResults('q', [PINTEREST], hookSession())
-    const file = join(h.home, 'lists', 'rjaus-pinterest', 'compiled-1.json')
+    const file = join(h.home, 'lists', 'rjaus-pinterest', `compiled-${LIST_COMPILER_VERSION}.json`)
     expect(existsSync(file)).toBe(true)
     expect(decodeArtifact(readFileSync(file, 'utf8'), { listId: 'rjaus-pinterest' }).ok).toBe(true)
     writeFileSync(file, '{"magic":"searchhole-list-artifact"}\nnot json')
