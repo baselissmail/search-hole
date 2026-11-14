@@ -510,8 +510,9 @@ function engineStatusRow(s: EngineStatus, style: Style): string[] {
     ...new Set(
       [
         s.active ? '' : (INACTIVE_WORDS[s.inactiveReason ?? ''] ?? s.inactiveReason ?? ''),
-        s.health === 'unknown' || unset ? '' : s.health,
-        s.lastError === undefined ? '' : `last error ${s.lastError}`,
+        // "not running" already says it: don't add "unhealthy · last error unreachable" to it.
+        s.health === 'unknown' || unset || s.reachable === false ? '' : s.health,
+        s.lastError === undefined || s.reachable === false ? '' : `last error ${s.lastError}`,
         s.keySource === undefined ? '' : `key from ${s.keySource}`,
         s.suspendedUntil === undefined ? '' : `suspended until ${s.suspendedUntil}`,
       ].filter((x) => x !== ''),
