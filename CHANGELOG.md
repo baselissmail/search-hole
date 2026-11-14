@@ -2,9 +2,41 @@
 
 All notable changes to search-hole are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Before 1.0.0, a minor version may change behaviour; the notes say when it does.
 
-Versions 0.1.0 to 0.2.0 were local test builds. They were never published to npm or tagged, so they have no compare links. The entries below were reconstructed from the git history and STATUS.md.
+Versions 0.1.0 to 0.3.0 were local test builds. They were never published to npm or tagged, so they have no compare links. The entries below were reconstructed from the git history and STATUS.md.
 
 ## [Unreleased]
+
+Fixes and corrections from a pre-launch review (`docs/launch/prelaunch-review.md`), after two weeks of real use.
+
+### Changed
+
+- **A new list subscription starts in audit mode**, in the CLI as in the dashboard: it records what it would hide and hides nothing until you run `searchhole lists enforce <id>`. `--mode enforce` skips the trial. Imports of your own files still start enforced.
+- **With no engine set up, Claude Code is told to use its built-in search** (which search-hole filters) and no longer tries search-hole's `search` first. Before, every session began with a failed call. Other apps are told to ask you for an engine, and are no longer told that search-hole filters their built-in search (ADR-0012 amendment).
+- **Only engines that exist are offered:** `searxng`, `brave` and `tavily`. `exa`, `mojeek`, `kagi` and `marginalia` were listed in the `search` tool, `keys status` and help, but have no adapter.
+- **The dashboard adds global rules only.** Its "Project" scope wrote into whichever folder the dashboard was started from. Add a project rule with `searchhole block <site> --project` inside the project.
+- `searchhole setup <app>` shows the lines it will change before it asks, and `--dry-run` shows them too. `setup generic` prints the snippet alone on stdout and the next steps on stderr.
+- `searchhole lists` names where a list comes from as the docs do: built in, starter, subscribed, imported. `--json` keeps the codes.
+- `doctor` calls an optional engine with no key "not set up", not "unhealthy", and reports a private SearXNG that isn't started once, not twice.
+- The no-engine error of `searchhole search` says how to add an engine.
+
+### Added
+
+- `searchhole unblock <id|match>` in a terminal, the same as `unrule` and as the slash command.
+- `explain` names the lift a profile gives a preferred source (×1.45 for official documentation by default).
+
+### Fixed
+
+- **Claude could sign in to the dashboard and change rules.** `searchhole ui` was not a guarded command and printed its sign-in link wherever it ran. It is now guarded, and the link is printed only to a terminal (ADR-0004 amendment).
+- **`explain` gave the wrong answer without `https://`:** `searchhole explain csdn.net` said "kept" for a blocked site. A bare site is now checked as `https://`, and input that is not a site or URL is refused.
+- **A list named `local` deleted every imported list when it was removed,** and one named `generation` broke list updates. Both names are reserved.
+- **`uninstall --purge` could delete folders it never made.** With `SEARCHHOLE_HOME` set to a shared folder, a `backups/` or `secrets/` folder of your own went too. It now deletes only files search-hole wrote and lists what it left. The home-folder check ignores case on macOS and Windows and follows symlinks.
+- **A rule added with `--project` to an untrusted file looked applied.** It now says "Saved, not applied yet" with the trust command, and `rules` marks it "not trusted yet".
+- **Imported lists could carry a match-everything rule** written as `*://*/*`, `/.*/` or `://`. As an allow, one such line un-hid what every other list blocks. Such lines are skipped.
+- **Lists in search-hole's own format applied scoped and expired rules everywhere, forever.** A rule with `profile:` or `until:` is now skipped.
+- A dashboard that was slow to answer once could no longer be found: later `searchhole ui` calls said its port was taken by another program.
+- `setup codex --env NAME` replaced an existing `env_vars` list; it now adds to it. A one-line JSON config no longer loses precision in large numbers that belong to other keys.
+- The dashboard API answers 400, not 500, to a body that is not a JSON object, and a settings path such as `constructor` no longer passes the allowlist.
+- On Windows, the guard that keeps Claude from editing search-hole's files now covers paths written without a drive letter.
 
 ## [0.3.0] - 2026-11-01
 
