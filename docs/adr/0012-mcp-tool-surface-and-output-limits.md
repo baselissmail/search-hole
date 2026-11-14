@@ -197,3 +197,5 @@ The instructions told every model to "prefer search and fetch over built-in web 
 - **Only engines with an adapter are offered.** The `engines` parameter, `keys`, help and the uninstall listing named `exa`, `mojeek`, `kagi` and `marginalia`, which have no adapter. The ids stay reserved (`EngineId`); `AVAILABLE_ENGINES` is what every surface offers.
 
 **Alternatives.** Loading the App during `initialize` to know the engine state exactly: rejected, it makes every probe open the database. Hiding `search` when no engine is set up: rejected, the hook must be able to redirect to it the moment an engine appears. A SessionStart note from the hook: rejected, subagents never see it.
+
+**Addition, same day.** "Claude Code" in the table means Claude Code with the plugin's hooks. The gateway checks at start that `hooks/hooks.json` sits next to its bundle, as it does in the plugin. A server added by hand with `claude mcp add` has no hooks, so nothing filters the built-in search there, and it gets the "every other host" wording.

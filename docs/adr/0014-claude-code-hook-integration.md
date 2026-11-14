@@ -182,3 +182,5 @@ That covers `onFailure` (2.1.295), the 4,096-character `instructions` cap (2.1.2
 
 - `ui` joins the guarded verbs: the dashboard it starts can change every rule, and its output used to carry a sign-in link (ADR-0004 amendment of the same date).
 - `unblock` is now a CLI alias of `unrule` (it was a slash command only, and `searchhole unblock` answered "Did you mean block?"). It is guarded like `unrule`.
+- `review keep` and `review unkeep` are guarded sub-verbs, like `suggestions approve|reject` (ADR-0025). Listing with `review` stays allowed.
+- The guard follows `mise exec -- <command>` and `mise x -- <command>` to the command they run. A reviewer's read-only command went through unseen that way.

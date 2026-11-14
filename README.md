@@ -2,6 +2,8 @@
 
 A local search gateway for AI assistants. It records every web search your assistant runs and which pages it opened, lets you block, pin, raise or lower sites, and gives each answer a receipt of what was searched, hidden and opened. Everything is stored on your machine.
 
+![The dashboard's live log: one search expanded, each result marked Kept, and Opened or Seen](docs/img/dashboard-log.png)
+
 **Status: 0.3.0, a pre-release.** It is not on npm or in a plugin marketplace yet, so you install it from this repository (about five minutes, below). How it works: [ARCHITECTURE.md](ARCHITECTURE.md). Why it is built this way: [docs/adr/](docs/adr/README.md).
 
 What has real use behind it, and what does not:
@@ -59,6 +61,8 @@ With no engine and no key, Claude Code keeps using its own web search, and searc
 - **A log of every search:** the query, each result, and whether a rule hid it. `/search-hole:log`, or the dashboard.
 - **Your rules applied to Claude's search:** blocked sites are left out of the search and removed from its results; pins and raises reorder what is left.
 - **A receipt per turn.**
+- **Opened or seen:** each result in the log is marked with whether Claude opened that page or was only shown it.
+- **A review list:** sites that keep coming back in results and are never opened, each with Block, Lower and Keep. `/search-hole:review`, or the Review tab in the dashboard.
 - **Lists:** shared block lists that work under your own rules (see [Lists](#lists)).
 
 Adding an engine gives snippets, dates, freshness rules and better ranking; see [Optional engines](#optional-engines).
@@ -103,6 +107,7 @@ All of these are user-only: Claude cannot run them. A `<match>` is a domain (`ex
 | `/search-hole:rules` | List your rules |
 | `/search-hole:log [show <id>]` | Recent searches and what was hidden |
 | `/search-hole:explain <site-or-url>` | Why a URL is shown or hidden |
+| `/search-hole:review [keep <site>]` | Sites seen in 3 or more searches and never opened; `keep` takes one off the list |
 | `/search-hole:suggestions` | Rules Claude suggested, waiting for you |
 | `/search-hole:approve <id>` / `reject <id>` | Decide on a suggestion |
 | `/search-hole:mode [auto\|builtin\|engines]` | Show or set the mode |
@@ -120,7 +125,8 @@ The same build is a command line tool (`searchhole`, or `node <repo>/packages/se
 
 ```sh
 searchhole doctor                 # check the setup and get fixes
-searchhole log                    # recent searches
+searchhole log                    # recent searches, with how many results were opened
+searchhole review                 # sites that keep showing up and are never opened
 searchhole block pinterest.com    # hide a site (undo: searchhole unblock pinterest.com)
 searchhole explain pinterest.com  # why a site is shown or hidden
 ```
@@ -155,7 +161,11 @@ In two weeks of the author's own use (96 searches, about 1,200 results), the sta
 
 ## Dashboard
 
-`/search-hole:dashboard` (or `searchhole ui --open`) opens a local dashboard at `http://127.0.0.1:7341`. It has a live search log you can expand to see every result and the rule that decided it, your rules and Claude's suggestions, lists, engine health, and settings. Keyboard: `⌘K` opens the command palette, `?` shows the shortcuts, and on a selected result `b`, `a`, `p`, `r` and `l` block, allow, pin, raise and lower its site, with Undo. A tour of every screen: [docs/dashboard.md](docs/dashboard.md).
+`/search-hole:dashboard` (or `searchhole ui --open`) opens a local dashboard at `http://127.0.0.1:7341`. It has a live search log you can expand to see every result, the rule that decided it and whether Claude opened it; your rules, the review list and Claude's suggestions; lists; engine health; and settings. Keyboard: `⌘K` opens the command palette, `?` shows the shortcuts, and on a selected result `b`, `a`, `p`, `r` and `l` block, allow, pin, raise and lower its site, with Undo. A tour of every screen: [docs/dashboard.md](docs/dashboard.md).
+
+![The Review tab: two sites that appeared in three searches and were never opened, each with Block, Lower and Keep](docs/img/dashboard-review.png)
+
+Both pictures show the test data the browser tests use, not real searches.
 
 It runs only when you start it, listens on 127.0.0.1 only, and signs you in with a one-time link that expires after 60 seconds. The link is printed only to a terminal, never into Claude's context. It exits after 30 minutes with no open tab (`--stay` keeps it running; `ui.port` and `ui.idleMinutes` in `settings.yaml` change the defaults). Nothing loads from the internet.
 

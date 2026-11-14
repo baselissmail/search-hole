@@ -18,7 +18,7 @@ Do these once, in this order. None of the workflows can publish without them.
 
 **The repository**
 
-1. Push the repository to `github.com/baselissmail/search-hole` and make it **public**. npm provenance, artifact attestations on a free plan, and Scorecard's published results all need a public repository.
+1. *(Done 2026-11-14.)* Push the repository to `github.com/baselissmail/search-hole` and make it **public**. npm provenance, artifact attestations on a free plan, and Scorecard's published results all need a public repository.
 2. Add `repository` to `packages/search-hole/package.json`. npm refuses a provenance statement without it, and `check-release.mjs` fails until it is there:
 
    ```json
@@ -26,7 +26,7 @@ Do these once, in this order. None of the workflows can publish without them.
    ```
 
 3. Under **Settings → Code security**:
-   - enable **Private vulnerability reporting** (SECURITY.md points to it);
+   - *(done 2026-11-14, with Dependabot alerts, secret scanning and push protection)* enable **Private vulnerability reporting** (SECURITY.md points to it);
    - enable the **Dependency graph** and **Dependabot alerts**. Renovate reads the alerts for security PRs; don't enable Dependabot version updates.
    - Leave **CodeQL default setup off**. `codeql.yml` is the advanced setup, and the two conflict.
 4. Under **Settings → Actions → General**:
@@ -37,7 +37,7 @@ Do these once, in this order. None of the workflows can publish without them.
 5. Under **Settings → Rules**, add two rulesets:
    - **`main`:** require the status check **"CI result"** (the `ci-ok` job), block force pushes and deletion. Requiring signed commits is optional.
    - **Tags `v*`:** only you may create them; block updates and deletion. A pushed tag is permanent.
-6. Create the labels `dependencies`, `security` and `lists` (Renovate and the issue forms use them). `bug`, `enhancement` and `good first issue` exist by default.
+6. *(Done 2026-11-14.)* Create the labels `dependencies`, `security` and `lists` (Renovate and the issue forms use them). `bug`, `enhancement` and `good first issue` exist by default.
 7. Install the [Renovate GitHub app](https://github.com/apps/renovate) on the repository. `renovate.json` is already there.
 8. Optionally, install the GitHub [DCO app](https://github.com/apps/dco) as well as the `DCO sign-off` CI job. Either one is enough.
 
@@ -92,6 +92,7 @@ Users then install with `/plugin install search-hole@search-hole`. The local tes
 
 - [ ] **Dogfood gate** ([dogfood.md](dogfood.md)): at least 14 days of daily use, and no open P0 or P1 entry.
 - [ ] CI is green on `main` for the commit you'll tag, including Windows and the runtime-floor job.
+- [ ] The repository's **Security** tab is reviewed: no open Dependabot alert for anything search-hole ships, and no open CodeQL alert in shipped code that hasn't been looked at. `pnpm audit --prod` is not enough: the bundled libraries are dev dependencies, so it skips them.
 - [ ] The README quickstart works exactly as written for each client, the hero GIF is current, and the status line is current.
 - [ ] Anything STATUS.md lists as "needs a real host" for this release has been checked. For P5 that means the `.mcpb` in Claude Desktop on macOS and Windows.
 - [ ] `CHANGELOG.md` has everything user-visible under `## [Unreleased]`.
@@ -238,9 +239,9 @@ Paths with spaces are handled throughout:
 
 The one exception is the env prefix in risk 1.
 
-## Turn on pnpm's release-age check (from 2026-11-13)
+## pnpm's release-age check
 
-Add `minimumReleaseAge: 20160` to `pnpm-workspace.yaml`, above `minimumReleaseAgeExclude`. Then `pnpm install --frozen-lockfile` must pass; if it doesn't, the error lists the entries that are still too new. Until then, Renovate's 14-day minimum release age is the gate (ADR-0024).
+On since 2026-11-14: `minimumReleaseAge: 20160` in `pnpm-workspace.yaml` means nothing younger than two weeks installs, transitive dependencies included. A security fix may come sooner, after three days (the same rule Renovate applies): add the exact version to `minimumReleaseAgeExclude` with the advisory it answers, and remove the entry once that version is two weeks old.
 
 ## Not automated yet
 

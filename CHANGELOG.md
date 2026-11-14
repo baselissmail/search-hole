@@ -21,6 +21,8 @@ Fixes and corrections from a pre-launch review (`docs/launch/prelaunch-review.md
 
 ### Added
 
+- **Opened or Seen on every logged result.** The dashboard's results panel, `searchhole log show` and its `--json` say whether the assistant opened each page in the same session after the search. `searchhole log` adds "N opened" per search (ADR-0025).
+- **A review list:** sites that had results in at least 3 searches of the last 30 days and were never opened, most-seen first, with up to three example pages each. Block, Lower or Keep each one: the Review tab on the dashboard's Rules page, `searchhole review` (`keep <site>` and `unkeep <site>`), and `/search-hole:review`. It is read from the local log; no rule changes by itself.
 - `searchhole unblock <id|match>` in a terminal, the same as `unrule` and as the slash command.
 - `explain` names the lift a profile gives a preferred source (×1.45 for official documentation by default).
 - Every artifact now carries `dist/THIRD_PARTY_LICENSES.txt`: the licence and notice files of the npm libraries copied into the bundle (110 on 2026-11-14, none under a copyleft licence). Before, only the block lists' notices shipped (ADR-0016 amendment).
@@ -44,6 +46,8 @@ Fixes and corrections from a pre-launch review (`docs/launch/prelaunch-review.md
 - `setup codex --env NAME` replaced an existing `env_vars` list; it now adds to it. A one-line JSON config no longer loses precision in large numbers that belong to other keys.
 - The dashboard API answers 400, not 500, to a body that is not a JSON object, and a settings path such as `constructor` no longer passes the allowlist.
 - On Windows, the guard that keeps Claude from editing search-hole's files now covers paths written without a drive letter.
+- The guard recognises a command run through `mise exec --`.
+- Claude Code with the server added by hand (no plugin, so no hooks) is no longer told that its built-in search is filtered.
 
 ## [0.3.0] - 2026-11-01
 

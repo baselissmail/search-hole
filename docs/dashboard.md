@@ -89,6 +89,7 @@ Click a row, or press Enter, to see every result of that search.
 |---|---|
 | **Rank, site, title and URL** | What the result was. Only `http` and `https` addresses become links. Web text is shown as plain text, never run as code. One exception: for results from Brave, only the site and the decision are stored, because Brave's terms don't allow keeping titles and URLs. Those rows say "Title not kept". |
 | **Decision:** Kept, Hidden or Pinned | What search-hole did with it. |
+| **Opened or Seen** | Whether Claude opened that page in the same session after the search (**Opened**), or was shown it and did not (**Seen**). The panel's header adds them up: "opened 3 of 19". |
 | **Reason:** Your rule, A list, Too old, No date found, or Not on the allowlist | Why it was hidden. |
 | **The rule that fired** | Hover to see the exact rule and its level (session, project, global or list). This is how you find a wrong rule. |
 | **Source type** | Official, Docs, Forum, and so on. |
@@ -104,7 +105,7 @@ Click a row, or press Enter, to see every result of that search.
 
 A rule added this way is global: it applies to every project. Every action shows an **Undo** for 8 seconds. That's why there are no "Are you sure?" dialogs: mistakes are cheap to reverse.
 
-**Not shown yet:** whether Claude actually *opened* each kept result. You can see what was hidden, but not which kept pages Claude read and which it ignored. (Not built yet.)
+**Why Opened and Seen matter:** a search returns far more than gets read. In two weeks of the author's own use, Claude opened pages from 37 of the 538 sites its searches returned. Seeing which results were opened and which were only listed shows what an answer could rest on. "Opened" means the page was fetched through search-hole's `fetch`, or through Claude Code's own WebFetch, which search-hole sees. A page read some other way, such as a shell command, still reads "Seen". The mark fills in as pages are opened; an expanded search refreshes every 15 seconds.
 
 ## 2. Rules & lists → Rules
 
@@ -133,6 +134,22 @@ A table of every rule: Match, Action, Weight, Scope, Source (the file the rule i
 Enter a site or a URL to see what your rules would do with it and every rule that matched. Nothing is downloaded; only the rules are checked.
 
 **Why:** to answer "why was this hidden?" or "will my new rule catch this?" without waiting for a real search.
+
+### Review
+
+A second tab on the Rules page, with a count on it: **sites that had results in at least 3 searches of the last 30 days and that Claude never opened.** Each site shows how many searches and results it had, when it last appeared, and up to three of its pages.
+
+| Button | What it does |
+|---|---|
+| **Block** | Hides the site from results (a global rule). |
+| **Lower** | Ranks it lower (a global rule). |
+| **Keep** | "This site is fine": it leaves the list and stays out. No rule is added. |
+
+Every button has the 8-second Undo. A site also leaves the list by itself when Claude opens one of its pages, or when one of your global rules already decides it.
+
+**Why:** the log holds thousands of results, and nobody reads it row by row. This list is the part of it worth a decision: sites that keep taking up room in results and never earn a visit. Nothing changes until you press a button. Sites whose results came from Brave are listed without example pages, because their titles and URLs are not stored.
+
+The same list is in a terminal as `searchhole review`, and in Claude Code as `/search-hole:review`.
 
 ### Suggestions
 
@@ -243,7 +260,6 @@ The dashboard can change your rules, and any website open in your browser could 
 
 ## Not built yet
 
-- **Opened vs not opened:** which kept results Claude actually read (see the Live log section).
 - A page per session or receipt, a Sources page, and an Apps page.
 - **Delete all data** from the dashboard. Today: `searchhole uninstall --purge`.
 - The full overview on phones.
