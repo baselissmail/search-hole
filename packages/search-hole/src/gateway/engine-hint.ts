@@ -12,10 +12,9 @@
  *   built-in search, as before.
  */
 import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { CONVENTIONAL_KEY_ENV, hostKeyEnvName } from '../shared/keys/resolve.ts'
 import { envValue } from '../shared/keys/unset.ts'
-import { resolveRoots, rootLayout } from '../shared/paths.ts'
+import { pathFor, resolveRoots, rootLayout } from '../shared/paths.ts'
 import { ENGINE_ID_LIST } from '../shared/types.ts'
 
 type Env = Readonly<Record<string, string | undefined>>
@@ -41,6 +40,8 @@ export function engineLikelySetUp(o: EngineHintInput): boolean {
       if (envValue(o.env, name) !== undefined || envValue(o.env, `${name}_FILE`) !== undefined) return true
     }
   }
+  // The platform's own path rules, as the roots are built with them.
+  const { join } = pathFor(o.platform)
   try {
     const layout = rootLayout(
       resolveRoots({ env: o.env, platform: o.platform, homedir: o.home, exists }),

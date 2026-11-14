@@ -50,7 +50,7 @@ export interface Roots {
 
 type PathApi = typeof posix
 
-const pathFor = (platform: NodeJS.Platform): PathApi => (platform === 'win32' ? win32 : posix)
+export const pathFor = (platform: NodeJS.Platform): PathApi => (platform === 'win32' ? win32 : posix)
 
 const invalid = (why: string, fix: string): SearchHoleError =>
   new SearchHoleError('config_invalid', why, { fix })
