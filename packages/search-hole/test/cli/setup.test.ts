@@ -568,6 +568,21 @@ describe('Windsurf (Devin Desktop)', () => {
     })
   })
 
+  it("a one-line file keeps numbers a re-print would change, in keys that aren't ours", () => {
+    const sb = sandbox()
+    const before =
+      '{"mcpServers":{"github":{"command":"npx","args":[]}},"big":12345678901234567890,"huge":1e400,"ratio":1.0}'
+    const file = put(userFile(sb, 'windsurf'), before)
+    run(sb, { client: 'windsurf' })
+    const after = readFileSync(file, 'utf8')
+    for (const literal of ['12345678901234567890', '1e400', '"ratio":1.0']) expect(after).toContain(literal)
+    expect(Object.keys(JSON.parse(after).mcpServers)).toEqual(['github', 'search-hole'])
+    // A one-line file with ordinary numbers is still printed readably.
+    const plain = put(userFile(sb, 'windsurf'), '{"mcpServers":{},"timeout":30,"ratio":0.5}')
+    run(sb, { client: 'windsurf' })
+    expect(readFileSync(plain, 'utf8')).toContain('\n  "timeout": 30,')
+  })
+
   it('writes the pre-rename location when only that exists, with a note', () => {
     const sb = sandbox()
     mkdirSync(join(sb.home, '.codeium', 'windsurf'), { recursive: true })
@@ -740,6 +755,24 @@ point = { x = 1, y = "two" }
     put(join(sb.home, '.codex', 'config.toml'), text)
     const res = run(sb, { client: 'codex', dryRun: true })
     expect(res.after.startsWith(text)).toBe(true)
+  })
+
+  it("codex: --env adds to the variables the user already passes through, and doesn't repeat one", () => {
+    const sb = sandbox()
+    const table = (envVars: string) =>
+      `[mcp_servers.search-hole]\ncommand = "node"\nargs = [${args(sb, 'codex')
+        .map((a) => tomlString(a))
+        .join(', ')}]\n${envVars}\n`
+    const file = put(join(sb.home, '.codex', 'config.toml'), table('env_vars = ["OLD_KEY", \'HTTPS_PROXY\']'))
+    run(sb, { client: 'codex', passEnv: ['TAVILY_API_KEY'] })
+    expect(readFileSync(file, 'utf8')).toBe(table('env_vars = ["OLD_KEY", "HTTPS_PROXY", "TAVILY_API_KEY"]'))
+    // Running it again changes nothing.
+    run(sb, { client: 'codex', passEnv: ['TAVILY_API_KEY'] })
+    expect(readFileSync(file, 'utf8')).toBe(table('env_vars = ["OLD_KEY", "HTTPS_PROXY", "TAVILY_API_KEY"]'))
+    // A multi-line array is merged too.
+    put(file, table('env_vars = [\n  "A",\n  "B_KEY",\n]'))
+    run(sb, { client: 'codex', passEnv: ['B_KEY', 'C_KEY'] })
+    expect(readFileSync(file, 'utf8')).toBe(table('env_vars = ["A", "B_KEY", "C_KEY"]'))
   })
 
   it('codexSnippet gives the whole table, with env_vars when asked', () => {

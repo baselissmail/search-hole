@@ -818,9 +818,12 @@ function editJsonText(text: string, shape: JsonClientShape): JsonEditResult {
     }
   }
   let after = applyEdits(body, edits)
-  if (!body.trimEnd().includes('\n') && !/\/[/*]/.test(body.replace(/"(?:[^"\\]|\\.)*"/g, '""'))) {
+  const bare = body.replace(/"(?:[^"\\]|\\.)*"/g, '""')
+  if (!body.trimEnd().includes('\n') && !/\/[/*]/.test(bare) && numbersPrintBack(bare)) {
     // A one-line file (minified, or written by a tool) has no layout or comments to keep:
-    // print it readably instead of splicing a pretty entry into a single line.
+    // print it readably instead of splicing a pretty entry into a single line. Only when
+    // every number survives the trip: 12345678901234567890 or 1.0 in someone else's key
+    // would come back changed, so such a file keeps its bytes and gets the entry spliced in.
     const value = toJson(root)
     const top: JsonObjectValue = isPlainObject(value) ? value : {}
     const servers = top[shape.rootKey]
@@ -832,6 +835,11 @@ function editJsonText(text: string, shape: JsonClientShape): JsonEditResult {
   }
   verifyJson(after, shape, entry)
   return { after: `${bom}${after}`, existing, entry }
+}
+
+/** True when every number in a JSON text (strings blanked) prints back exactly as it is written. */
+function numbersPrintBack(bare: string): boolean {
+  return (bare.match(/-?\d[\d.eE+-]*/g) ?? []).every((n) => String(Number(n)) === n)
 }
 
 /** Re-reads the edited text the way the client will and checks the entry landed as intended. */
@@ -1175,6 +1183,16 @@ export function codexSnippet(l: Launch, passEnv: readonly string[] = []): string
 
 const CODEX_COMMENT = '# search-hole, added by `searchhole setup codex`. Delete this table to remove it.'
 
+/** The `env_vars` line with `add` joined to the names an existing statement already lists. */
+function mergedEnvVars(existing: string, add: readonly string[]): string {
+  const value = existing.slice(existing.indexOf('=') + 1)
+  if (value.includes('#')) throw new Refusal('has a comment inside env_vars in [mcp_servers.search-hole]')
+  const names = [...value.matchAll(/"((?:[^"\\]|\\.)*)"|'([^']*)'/g)].map((m) =>
+    m[1] !== undefined ? (JSON.parse(`"${m[1]}"`) as string) : (m[2] ?? ''),
+  )
+  return `env_vars = ${tomlArray([...new Set([...names, ...add])])}`
+}
+
 /** Sets search-hole's keys in its Codex table, or appends the table. Other keys and tables stay. */
 function editCodexToml(text: string, l: Launch, passEnv: readonly string[]): EditOutcome {
   const eol = text.includes('\r\n') ? '\r\n' : '\n'
@@ -1199,15 +1217,21 @@ function editCodexToml(text: string, l: Launch, passEnv: readonly string[]): Edi
   )
   const edits: TextEdit[] = []
   const missing: string[] = []
+  /** What the table must say afterwards (our lines, with the user's own `env_vars` kept). */
+  const result: Array<[string, string]> = []
   let anchor = stmts[loc.header] as TomlStatement
-  for (const [key, line] of wanted) {
+  for (const [key, ownLine] of wanted) {
     const found = body.filter((s) => s.kind === 'keyval' && pathEquals(s.path, [key]))
     if (found.length > 1) throw new Refusal(`sets ${key} twice in [mcp_servers.search-hole]`)
     const s = found[0]
     if (s === undefined) {
-      missing.push(line)
+      missing.push(ownLine)
+      result.push([key, ownLine])
       continue
     }
+    // Variables the user already passes through stay: ours are added to them, like in the other apps.
+    const line = key === 'env_vars' ? mergedEnvVars(text.slice(s.start, s.bodyEnd), passEnv) : ownLine
+    result.push([key, line])
     if (s.start > anchor.start) anchor = s
     const indent = /^[ \t]*/.exec(text.slice(s.start))?.[0] ?? ''
     const from = s.start + indent.length
@@ -1218,7 +1242,7 @@ function editCodexToml(text: string, l: Launch, passEnv: readonly string[]): Edi
     edits.push({ at: anchor.end, remove: 0, insert: `${lead}${missing.map((m) => `${m}${eol}`).join('')}` })
   }
   const after = applyEdits(text, edits)
-  if (after !== text) verifyCodex(after, wanted)
+  if (after !== text) verifyCodex(after, result)
   return { after, existed: true, disabled }
 }
 
