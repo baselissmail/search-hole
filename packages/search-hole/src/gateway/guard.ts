@@ -55,6 +55,12 @@ export const RULE_CHANGING_VERBS: ReadonlySet<string> = new Set([
 /** `suggestions <sub>` sub-verbs that change state (listing stays allowed). */
 const SUGGESTION_WRITE_VERBS: ReadonlySet<string> = new Set(['approve', 'reject'])
 
+/**
+ * `review <sub>` sub-verbs that change state (ADR-0025): they decide which sites the user is
+ * shown for review. Listing with a plain `review` stays allowed.
+ */
+const REVIEW_WRITE_VERBS: ReadonlySet<string> = new Set(['keep', 'unkeep'])
+
 /** Files search-hole owns wherever they are. */
 const OWNED_FILE_NAMES: ReadonlySet<string> = new Set(['.searchhole.yaml'])
 
@@ -271,7 +277,9 @@ function changesRules(args: readonly string[]): boolean {
   const verb = positional[0]?.toLowerCase()
   if (verb === undefined) return false
   if (RULE_CHANGING_VERBS.has(verb)) return true
-  return verb === 'suggestions' && SUGGESTION_WRITE_VERBS.has(positional[1]?.toLowerCase() ?? '')
+  const sub = positional[1]?.toLowerCase() ?? ''
+  if (verb === 'suggestions') return SUGGESTION_WRITE_VERBS.has(sub)
+  return verb === 'review' && REVIEW_WRITE_VERBS.has(sub)
 }
 
 /** Files a simple command writes: redirect targets plus the target arguments of known writers. */

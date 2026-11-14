@@ -176,6 +176,19 @@ describe('guard matchers', () => {
     ['pnpm dlx search-hole lists add x', true],
     ['searchhole --yes mode engines', true],
     ['searchhole suggestions reject 2', true],
+    // Keeping a site off the review list, or undoing that, is the user's call (ADR-0025).
+    ['searchhole review keep a.com', true],
+    ['searchhole review unkeep a.com --yes', true],
+    ['node ./dist/searchhole.mjs review --json KEEP a.com', true],
+    ['echo y | search-hole review -y keep a.com', true],
+    ['bash -c "searchhole review keep a.com"', true],
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the skills' literal Claude Code placeholder
+    ['SEARCHHOLE_SKILL=1 node "${CLAUDE_PLUGIN_ROOT}/dist/searchhole.mjs" review keep a.com', false],
+    // ...while reading the list changes nothing and stays allowed.
+    ['searchhole review', false],
+    ['searchhole review --days 7 --json', false],
+    ['searchhole review --help', false],
+    ['searchhole log show 12', false],
     // The dashboard can change every rule, so starting it (and getting its sign-in link) is guarded.
     ['searchhole ui --detach', true],
     ['node ./dist/searchhole.mjs ui --port 17342', true],

@@ -401,6 +401,8 @@ describe.each(ERAS)('hook tool (%s era)', (era) => {
       'npx search-hole pin react.dev',
       'cd /tmp && searchhole --yes trust .',
       'searchhole suggestions approve 3',
+      'searchhole review keep example.com --yes',
+      'searchhole review unkeep example.com',
     ])('denies %s', async (command) => {
       const { hook } = await setup(era)
       expect(denyOf(await hook(pre('Bash', { command })))).toBe(GUARD_DENY_REASON)
@@ -411,6 +413,7 @@ describe.each(ERAS)('hook tool (%s era)', (era) => {
       'searchhole search --explain "react compiler"',
       'searchhole doctor',
       'searchhole suggestions',
+      'searchhole review --days 7',
       'SEARCHHOLE_SKILL=1 searchhole block example.com',
       'grep -r searchhole src/',
     ])('allows %s without starting the App, fast', async (command) => {
