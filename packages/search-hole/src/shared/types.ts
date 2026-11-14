@@ -23,6 +23,13 @@ export const ENGINE_ID_LIST = [
   'marginalia',
 ] as const satisfies readonly EngineId[]
 
+/**
+ * Engines this build can search with (it ships an adapter for each). The other ids are
+ * reserved for adapters that don't exist yet: settings and stored rows may name them, but no
+ * command, tool or listing offers them.
+ */
+export const AVAILABLE_ENGINES = ['searxng', 'brave', 'tavily'] as const satisfies readonly EngineId[]
+
 export type Depth = 'quick' | 'standard' | 'deep'
 
 /** ADR-0009 error classes. Order is irrelevant; codes are persisted. */

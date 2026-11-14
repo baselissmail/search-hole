@@ -14,6 +14,7 @@ import { canonicalize, hostOf, normalizeOriginal } from '../core/url.ts'
 import { SearchHoleError } from '../shared/errors.ts'
 import { retentionDaysFor } from '../shared/settings.ts'
 import {
+  AVAILABLE_ENGINES,
   type Depth,
   ENGINE_ID_LIST,
   type EngineId,
@@ -63,7 +64,7 @@ const searchArgsSchema = z.object({
   query: z.string().trim().min(1, 'query is empty').max(400, 'query is longer than 400 characters'),
   depth: z.enum(['quick', 'standard', 'deep']).optional(),
   profile: z.string().trim().min(1).max(64).optional(),
-  engines: z.array(z.enum(ENGINE_ID_LIST)).max(ENGINE_ID_LIST.length).optional(),
+  engines: z.array(z.enum(AVAILABLE_ENGINES)).max(AVAILABLE_ENGINES.length).optional(),
   maxAgeDays: z.number().int().min(1).max(36_500).optional(),
   limit: z.number().int().min(1).max(50).optional(),
   receiptId: z.string().max(100).optional(),

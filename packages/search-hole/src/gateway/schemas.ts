@@ -5,7 +5,7 @@
  * Input field descriptions are short: they count against the 1,500-token budget.
  */
 import { z } from 'zod'
-import { ENGINE_ID_LIST } from '../shared/types.ts'
+import { AVAILABLE_ENGINES } from '../shared/types.ts'
 
 const depth = z.enum(['quick', 'standard', 'deep'])
 const receiptId = z.string().min(1).max(64)
@@ -17,7 +17,7 @@ export const searchInput = z.object({
   query: z.string().min(1).max(400).describe('Search terms; site:example.com and -site:example.com work'),
   depth: depth.optional().describe('quick: one fact; standard (default); deep: research'),
   profile: z.string().min(1).max(64).optional().describe("One of the user's profiles (default: by keywords)"),
-  engines: z.array(z.enum(ENGINE_ID_LIST)).min(1).max(ENGINE_ID_LIST.length).optional(),
+  engines: z.array(z.enum(AVAILABLE_ENGINES)).min(1).max(AVAILABLE_ENGINES.length).optional(),
   freshness: z
     .object({ maxAgeDays: z.number().int().min(1).max(36_500) })
     .optional()

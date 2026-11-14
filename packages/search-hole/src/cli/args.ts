@@ -8,7 +8,13 @@ import { parseArgs } from 'node:util'
 import type { HostProfile, ListFormat, ListKind, ListMode, SearchMode } from '../app/types.ts'
 import { parseDuration, ttlToUntil, untilToMs } from '../core/rules/time.ts'
 import { SearchHoleError } from '../shared/errors.ts'
-import { type Depth, ENGINE_ID_LIST, type EngineId, type RuleAction } from '../shared/types.ts'
+import {
+  AVAILABLE_ENGINES,
+  type Depth,
+  ENGINE_ID_LIST,
+  type EngineId,
+  type RuleAction,
+} from '../shared/types.ts'
 import { isSetupClient, SETUP_CLIENT_IDS, type SetupClient } from './setup-clients.ts'
 
 export type ScopeFlag = 'global' | 'project' | 'session'
@@ -236,11 +242,16 @@ function oneOf<T extends string>(command: string, label: string, raw: string, al
   return hit
 }
 
-/** Validates an engine id without echoing a wrong value (it may be a key typed by mistake). */
-function engineId(command: string, raw: string | undefined): EngineId {
-  const hit = ENGINE_ID_LIST.find((e) => e === raw)
+/**
+ * Validates an engine id without echoing a wrong value (it may be a key typed by mistake).
+ * Only engines this build can use are accepted; `any` also takes the reserved ids, so a key
+ * stored for one by an older version can still be removed.
+ */
+function engineId(command: string, raw: string | undefined, any = false): EngineId {
+  const allowed: readonly EngineId[] = any ? ENGINE_ID_LIST : AVAILABLE_ENGINES
+  const hit = allowed.find((e) => e === raw)
   if (hit === undefined) {
-    throw usageError(command, `Name an engine: ${ENGINE_ID_LIST.join(', ')}.`)
+    throw usageError(command, `Name an engine: ${AVAILABLE_ENGINES.join(', ')}.`)
   }
   return hit
 }
@@ -685,7 +696,7 @@ function parseKeys(args: readonly string[]): Command {
   }
   if (sub === 'remove') {
     noExtra('keys', positionals, 2)
-    return { name: 'keys-remove', engine: engineId('keys', positionals[1]), yes: values.yes === true }
+    return { name: 'keys-remove', engine: engineId('keys', positionals[1], true), yes: values.yes === true }
   }
   throw usageError('keys', 'Use keys set <engine>, keys status or keys remove <engine>.')
 }

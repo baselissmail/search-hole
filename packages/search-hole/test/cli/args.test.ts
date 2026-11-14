@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from 'vitest'
 import { COMMAND_NAMES, normalizeUntil, parseCommand, suggestCommand } from '../../src/cli/args.ts'
+import { getAdapter } from '../../src/engines/index.ts'
 import { isSearchHoleError } from '../../src/shared/errors.ts'
+import { AVAILABLE_ENGINES, ENGINE_ID_LIST } from '../../src/shared/types.ts'
 
 const NOW = Date.UTC(2026, 9, 30, 12, 0, 0)
 const parse = (...argv: string[]) => parseCommand(argv, NOW)
@@ -336,6 +338,25 @@ describe('keys', () => {
       engine: 'brave',
       yes: true,
     })
+  })
+
+  it('offers only the engines this build can search with', () => {
+    // Every engine id that is accepted has an adapter, and every adapter is offered.
+    for (const id of ENGINE_ID_LIST) {
+      expect([id, getAdapter(id) !== undefined]).toEqual([
+        id,
+        (AVAILABLE_ENGINES as readonly string[]).includes(id),
+      ])
+    }
+    for (const planned of ['exa', 'mojeek', 'kagi', 'marginalia']) {
+      expect(() => parse('keys', 'set', planned)).toThrow(/Name an engine: searxng, brave, tavily\./)
+      expect(() => parse('search', 'x', '--engine', planned)).toThrow(/Name an engine/)
+      // A key an older version stored for one can still be removed.
+      expect(parse('keys', 'remove', planned, '--yes')).toMatchObject({
+        name: 'keys-remove',
+        engine: planned,
+      })
+    }
   })
 
   it('refuses a key on the command line and never repeats it', () => {

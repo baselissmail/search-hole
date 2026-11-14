@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs'
 import { checkQuery as scanQuery } from '../core/hygiene.ts'
 import { SearchHoleError } from '../shared/errors.ts'
 import { setSettingsFileValue } from '../shared/settings.ts'
-import { ENGINE_ID_LIST, type EngineId } from '../shared/types.ts'
+import { AVAILABLE_ENGINES, type EngineId } from '../shared/types.ts'
 import {
   builtinBlockedDomains,
   checkUrl,
@@ -43,7 +43,8 @@ export type * from './types.ts'
 
 const MODES: readonly SearchMode[] = ['auto', 'builtin', 'engines']
 /** Engines that take an API key (SearXNG never does). */
-const KEYED_ENGINES: readonly EngineId[] = ENGINE_ID_LIST.filter((e) => e !== 'searxng')
+/** Engines a key can be stored for: the ones this build can search with, minus keyless SearXNG. */
+const KEYED_ENGINES: readonly EngineId[] = AVAILABLE_ENGINES.filter((e) => e !== 'searxng')
 /** Gateway heartbeat rows are refreshed at most this often (ADR-0004). */
 const HEARTBEAT_MS = 30_000
 

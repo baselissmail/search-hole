@@ -194,7 +194,7 @@ async function runUninstallCommand(
       line(io, 'Left in place (search-hole did not create these):')
       for (const p of plan.left) line(io, `  ${p}`)
     }
-    line(io, `Stored keys (OS keychain and key file) for: ${plan.keys.join(', ')}`)
+    line(io, 'Every engine key stored by search-hole (OS keychain and key file)')
     for (const r of plan.refused) line(io, style.yellow(`⚠ Not touching ${r.root}: ${r.why}.`))
     line(io, '')
     line(io, 'Not removed by this command:')

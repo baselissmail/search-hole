@@ -138,6 +138,14 @@ describe.each(ERAS)('tools/list (%s era)', (era) => {
     }
   })
 
+  test('search offers only engines that exist', async () => {
+    const h = harness()
+    const { client } = track(await connect(h.gateway, era))
+    const search = (await client.listTools()).tools.find((t) => t.name === 'search')
+    const properties = (search?.inputSchema.properties ?? {}) as { engines?: { items?: { enum?: string[] } } }
+    expect(properties.engines?.items?.enum).toEqual(['searxng', 'brave', 'tavily'])
+  })
+
   test('listing tools never creates the App (the factory is side-effect free)', async () => {
     const h = harness()
     const { client } = track(await connect(h.gateway, era))

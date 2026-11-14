@@ -132,7 +132,7 @@ Claude Code search mode. With no argument it shows the current mode.
 
 "keys set" reads the key from a hidden prompt, or from stdin when piped:
   pbpaste | searchhole keys set tavily
-A key is never accepted as an argument. Engines: searxng, brave, tavily, exa, mojeek, kagi, marginalia.`,
+A key is never accepted as an argument. Engines that take a key: tavily, brave. SearXNG needs none.`,
   doctor: `Usage: searchhole doctor [--probe] [--strict] [--json]
 
 Checks your engines, keys and paths and says what to fix. --probe makes a live test call to
