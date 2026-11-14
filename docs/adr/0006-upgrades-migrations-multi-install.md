@@ -139,3 +139,11 @@ Two copies serving one Claude Code session usually means two installed plugins (
 - **`doctor`** warns when duplicate turns happened in the last 7 days, and says where to look (`claude plugin list`, `claude mcp list`).
 - **Limitation:** turn hooks never create the database. The very first turn of a fresh install, before any search, can't be claimed, so both copies act as primary for that one turn.
 
+## Amendment (2026-11-14): `uninstall --purge` deletes by what a file is, not by where it is (point 13)
+
+`--purge` removed `lists`, `backups`, `secrets`, `searxng` and `run` whole. With `SEARCHHOLE_HOME` pointing at a shared folder, a user's own `backups/` went with them.
+
+- A file directly in a root goes only when its name is one search-hole writes.
+- Inside `lists/`, `backups/` and `secrets/`, only what search-hole puts there goes: list folders that hold nothing but list files, database backups by their name pattern, and key files of known engines. `searxng/` goes only when its `settings.yml` starts with search-hole's own header (the container writes other files into it).
+- Everything else stays and is listed under "Left in place". Folders and roots are removed afterwards only if empty.
+- The home-folder refusal compares paths without case on macOS and Windows and follows symlinks.

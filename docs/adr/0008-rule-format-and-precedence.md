@@ -163,3 +163,10 @@ Every result records **one** winning reason per pass (`decision`, `reason_code`,
 
 - **P1:** property tests above; the spoof fixtures; re2js throughput on a 20k-regex `RE2Set` (target: under 0.2 ms per result).
 - **P6:** golden import of every seed list (ADR appendix lists in [platform-facts-engines-lists-versions.md](../research/platform-facts-engines-lists-versions.md) §4), with the counted skips recorded in the fixture.
+
+## Amendment (2026-11-14): lists never widen a rule, and `explain` takes a bare site
+
+- **A list rule limited to a profile or an end date is skipped.** Lists in search-hole's own format used to drop `profile` and `until` and keep the rule, so `{ match: w3schools.com, action: block, profile: coding }` hid the site in every profile, and a rule that expired in 2020 applied forever. A list applies to every profile and never expires, so importing such a rule can only widen it. It is now a counted skip.
+- **A list line that matches every URL is skipped, however it is written.** The importers refused `*`, `||*` and `<all_urls>`, but `*://*/*`, `/.*/`, `://` and `|http` got through. Every pattern and regex is now tested against a few unrelated URLs after it compiles; one that matches them all is skipped. A user's own allow still beats any list, so this is hygiene, not a boundary.
+- **`explain` checks a bare site as `https://`.** `searchhole explain csdn.net` answered "kept" for a blocked site, because the text was matched as given. Input that is neither a site nor an http(s) URL is refused. The verdict also names the lift a profile gives a preferred source (`×1.45` for official documentation by default).
+- **A project rule in an untrusted file is marked.** `block --project` on a file that is not trusted prints "Saved, not applied yet" with the trust command, and `rules` lists the rule as "not trusted yet". The rule still does not apply until `searchhole trust`.

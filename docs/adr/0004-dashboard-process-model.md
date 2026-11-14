@@ -95,3 +95,14 @@ What the research found:
 - Tail benchmark: 8 writers at 10 searches/s for 10 minutes, with 2 browser clients connected. Check the latency distribution and that nothing is duplicated or lost across a reconnect with `Last-Event-ID`.
 - The port-conflict and stale-`ui.json` paths; the login code is single-use and expires after 60 s; a session token from another port's origin is rejected; DNS-rebinding tests (a wrong `Host` gets 403); and a test that no MCP tool output contains a code or token.
 - A tail cursor that survives deletes: `searches.id` is `INTEGER PRIMARY KEY AUTOINCREMENT`, and a `meta.data_epoch` change or `MAX(rowid) < cursor` triggers `reset` (ADR-0003).
+
+## Amendment (2026-11-14): who gets the sign-in link, and when `ui.json` is stale
+
+A pre-launch review found that a model with a shell could run `searchhole ui`, read the one-time sign-in link from its output, and call the dashboard's write routes. That path needs no obfuscation, so "defence in depth" did not cover it.
+
+- **`ui` is a guarded verb** (ADR-0014): the Bash guard denies it unless the dashboard skill runs it.
+- **The sign-in link is printed to a terminal only.** When stdout is not a terminal (a skill's captured output, a script, a model's shell) and the browser could not be opened, the command says to run `searchhole ui` in a terminal. Captured output never carries a code.
+- **Known limit.** `ui.json` holds the login secret that lets the CLI ask a running dashboard for a code. Any process running as the user can read it, the model's shell included. Nothing same-user can prevent that; the guard covers the commands, not the file read. SECURITY.md and the README say so.
+- **A slow dashboard keeps its `ui.json`.** `findRunningUi` used to delete the file whenever `/health` missed 1.5 s, which made a busy dashboard unfindable: later commands reported its port as taken by another program. A live process that is slow now gets a second, longer try, and the file is deleted only when nothing listens on the port, something else answers, or the process is gone.
+- **The dashboard adds global rules only.** It is one process for the whole machine, so it has no current project. Its form no longer offers "Project", and `POST /api/rules` refuses any other scope. A project rule is added with `searchhole block <site> --project` inside that project.
+- **Request bodies are JSON objects.** Anything else is a 400. The settings allowlist is checked with `Object.hasOwn`, so a path such as `constructor` no longer passes.

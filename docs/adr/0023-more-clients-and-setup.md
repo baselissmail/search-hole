@@ -33,3 +33,10 @@ P7 brings search-hole to clients beyond Claude Code and Claude Desktop. The form
 
 - One bundle serves every client. Each client gets its own host profile, so the right tools appear for it (ADR-0012).
 - **Unverified on real apps:** Codex, Cursor, Zed, Goose, VS Code and Windsurf haven't loaded `setup`'s output yet. The P7 acceptance run ("a fresh install on each client shows a search in the dashboard") is still to do.
+
+## Amendment (2026-11-14): setup shows the change; two merge fixes
+
+- **The change is shown before the question.** `setup <app>` printed only "Write <file>?". It now prints the lines it adds and removes first (the part between the common start and end of the old and new text), and `--dry-run` prints the same. The README's "previews the change" is now true.
+- **`setup generic` keeps stdout clean.** The snippet goes to stdout alone, so it can be redirected into a file; what to do with it, and that an engine is needed, goes to stderr.
+- **Codex `--env` merges.** It replaced an existing `env_vars` array; it now adds to it, as the JSON clients and Goose do. An array with a comment inside is refused, untouched.
+- **A one-line JSON config keeps its numbers.** Such a file was re-printed through JavaScript numbers, so `12345678901234567890` or `1.0` in someone else's key came back changed. When any number would not print back exactly, the file keeps its bytes and the entry is spliced in.

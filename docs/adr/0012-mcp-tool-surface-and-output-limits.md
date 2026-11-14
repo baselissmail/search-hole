@@ -177,3 +177,23 @@ Principle 3 says the model can never change rules. The boundaries are:
 - Four model-visible tools on every host. The internal tools (`hook`, `apply_rule`) are app-only, and are registered only on host profiles known to hide them or to render a panel that uses them.
 - A CI job dumps `tools/list` per host profile and diffs it against a checked-in snapshot. Any description change is a reviewed diff, together with its token count.
 - `mcp-inspector --cli … --method tools/list --strict` runs in CI in both eras. `--strict` fails only on error-severity findings, so CI also parses the findings and **fails on any portability warning** (`type-union`, `untyped-schema`, `remote-ref`) ([mcp-inspector.md](../research/mcp-inspector.md)).
+
+## Amendment (2026-11-14): rule 1 of the instructions depends on the host and on whether an engine is set up
+
+The instructions told every model to "prefer search and fetch over built-in web search". In the default install there is no engine, so `search` always failed: every session began with a failed call and a visible error (found in dozens of real session transcripts). Outside Claude Code the same text promised that search-hole filters the host's built-in search, which it cannot, and the error pointed at `/search-hole:searxng`, a Claude Code command.
+
+**Decision.** Rule 1, and the `search` description in one case, now have three forms:
+
+| Where | Rule 1 |
+|---|---|
+| Claude Code, an engine set up | As before: prefer `search` and `fetch`; fall back to the built-in search if `search` says no engine |
+| Claude Code, no engine | Use the built-in web search, which search-hole filters. Call `search` only when a web search is redirected to it. `search` says the same in its description |
+| Every other host | Use `search` and `fetch`. If no engine is set up, tell the user how to add one. search-hole can't filter any other web search |
+
+- **The choice is made once, when the gateway starts,** so `initialize`, `server/discover` and `tools/list` stay byte-stable for the life of the process.
+- **It is a guess, and a cheap one** (`gateway/engine-hint.ts`): a key in the environment, a key file, a SearXNG config, or engines mode in settings. It reads the environment and a few file names. It does not open the App or the database, ask the keychain, or touch the network, so a cold `tools/list` is as fast as before and leaves no trace (ADR-0013 point 3).
+- **Being wrong is harmless.** Only the Claude Code profile uses the guess. An engine it missed (a key kept only in the OS keychain) is picked up by the WebSearch hook, which redirects the first web search to `search`, as in any session with a healthy engine. An engine that is set up but down answers "no healthy engine" and names the built-in search, as before.
+- **The no-engine error is per host.** Outside Claude Code it tells the model to ask the user for an engine and says search-hole can't filter any other search.
+- **Only engines with an adapter are offered.** The `engines` parameter, `keys`, help and the uninstall listing named `exa`, `mojeek`, `kagi` and `marginalia`, which have no adapter. The ids stay reserved (`EngineId`); `AVAILABLE_ENGINES` is what every surface offers.
+
+**Alternatives.** Loading the App during `initialize` to know the engine state exactly: rejected, it makes every probe open the database. Hiding `search` when no engine is set up: rejected, the hook must be able to redirect to it the moment an engine appears. A SessionStart note from the hook: rejected, subagents never see it.

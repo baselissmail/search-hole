@@ -104,3 +104,9 @@ A goggle with a generic `$discard` keeps only what it matches. Its instructions 
 
 - Tests: store queries and fencing; the fetcher against a local server (ETag/304, redirects, size cap, binary, private addresses); artifact round trip and damage; registry defaults; shrink guard and `--force`; pin mismatch; corrupt artifact rebuild; the audit property through `search` and the built-in filter, including the model-facing text; contribution counts; the starter set offline; CLI parse, gate and runs with YAML comments kept; dashboard routes; doctor; the built bundle finding `dist/lists/`.
 - Next: a 418k-rule subscription end to end (refresh time, artifact size, load time against the ADR-0008 target of 50 ms).
+
+## Amendment (2026-11-14): reserved names, audit by default, compiler version 2
+
+- **`local` and `generation` are reserved list names.** A subscription named `local` shared its folder with every imported list (`lists/local/`), so removing it deleted them all; `generation` is the change stamp. Both are refused on add and import, a URL that would produce one gives no default name, a hand-written subscription with one is ignored with a doctor message, and `ListFiles.dir` refuses them as a last line of defence.
+- **A new subscription starts in audit**, in the CLI as in the dashboard. It is someone else's list, so the user sees what it would hide before it hides anything. `--mode enforce` skips the trial. Imported local files, the user's own, still start enforced.
+- **`LIST_COMPILER_VERSION` is 2.** The importers' output changed (ADR-0008 amendment of the same date), so cached artifacts are rebuilt from the stored list text.
