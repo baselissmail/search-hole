@@ -11,6 +11,7 @@ import type {
   ListUpdateResult,
   LogDetail,
   LogEntry,
+  ReviewList,
   RuleListing,
   SearchMode,
   SuggestRuleInput,
@@ -408,26 +409,31 @@ export function renderLog(entries: readonly LogEntry[], { style, timeZone }: Ren
     formatTime(e.at, timeZone),
     `"${clip(e.query, 60)}"`,
     `${e.profile}/${e.depth}${e.mode === 'builtin' ? ' (built-in)' : ''}`,
-    `${e.kept} kept${e.hidden > 0 ? style.red(` · ${e.hidden} hidden`) : ''}`,
+    `${e.kept} kept${e.hidden > 0 ? style.red(` · ${e.hidden} hidden`) : ''}${(e.opened ?? 0) > 0 ? ` · ${e.opened} opened` : ''}`,
     e.engines.length > 0 ? e.engines.join('+') : '-',
     `${e.latencyMs} ms`,
   ])
   return [...renderTable(rows), '', style.dim('Details: searchhole log show <id>')].join('\n')
 }
 
-/** `log show <id>`: one search with every result's decision. */
+/**
+ * `log show <id>`: one search with every result's decision, and for a kept result whether the
+ * assistant opened the page (`opened`) or only had it in its results (`seen`).
+ */
 export function renderLogDetail(d: LogDetail, { style, timeZone }: RenderOpts): string {
+  const opened = d.opened ?? d.results.filter((r) => r.opened).length
   const lines = [
     style.bold(`Search #${d.searchId}: ${d.query}`),
     `${formatTime(d.at, timeZone)} · ${d.profile}/${d.depth}${d.mode === 'builtin' ? ' · built-in WebSearch' : ''} · ${d.engines.join('+') || 'no engines'} · ${d.latencyMs} ms${d.client === undefined ? '' : ` · ${d.client}`}`,
-    `receipt ${d.receiptId} · ${d.kept} kept · ${d.hidden} hidden`,
+    `receipt ${d.receiptId} · ${d.kept} kept · ${d.hidden} hidden · opened ${opened} of ${d.kept}`,
     '',
   ]
   const rows = d.results.map((r) => {
     const mark =
       r.decision === 'hidden' ? style.red('hidden') : r.decision === 'pinned' ? style.green('pinned') : 'kept'
+    const read = r.decision === 'hidden' ? '' : r.opened ? style.green('opened') : style.dim('seen')
     const why = r.rule !== undefined ? ruleLabel(r.rule) : r.reason !== undefined ? hiddenWord(r.reason) : ''
-    return [String(r.rank).padStart(3), r.engine, mark, r.url ?? r.domain, r.sourceType ?? '', why]
+    return [String(r.rank).padStart(3), r.engine, mark, read, r.url ?? r.domain, r.sourceType ?? '', why]
   })
   const table = renderTable(rows)
   d.results.forEach((r, i) => {
@@ -435,6 +441,101 @@ export function renderLogDetail(d: LogDetail, { style, timeZone }: RenderOpts): 
     if (r.title !== undefined && r.title !== '') lines.push(style.dim(`      ${clip(r.title, 100)}`))
   })
   return lines.join('\n')
+}
+
+// ── review ───────────────────────────────────────────────────────────────
+
+/** Web text for a terminal: a control character (an escape sequence in a title) becomes a space. */
+function printable(text: string): string {
+  let out = ''
+  for (const ch of text) {
+    const code = ch.codePointAt(0) ?? 0
+    out += code < 0x20 || (code >= 0x7f && code <= 0x9f) ? ' ' : ch
+  }
+  return out
+}
+
+const REVIEW_HINT =
+  'Act on one: searchhole block <site> · searchhole lower <site> · searchhole review keep <site>'
+/** Kept sites named in the footer before it says "and N more". */
+const KEPT_SHOWN = 8
+
+/** The `review` listing: sites seen often and never opened, then the commands to act on one. */
+export function renderReview(list: ReviewList, { style, timeZone }: RenderOpts): string {
+  const lines: string[] = []
+  if (list.sites.length === 0) {
+    lines.push(
+      `Nothing to review yet. A site shows up here after it appears in ${list.minSearches} searches and the assistant never opens it.`,
+    )
+  } else {
+    lines.push(
+      style.bold(
+        `${plural(list.total, 'site')} seen in ${list.minSearches} or more searches of the last ${plural(list.days, 'day')} and never opened`,
+      ),
+      '',
+    )
+    const table = renderTable([
+      [
+        style.dim('SITE'),
+        style.dim('SEARCHES'),
+        style.dim('RESULTS'),
+        style.dim('LAST SEEN'),
+        style.dim('TYPE'),
+      ],
+      ...list.sites.map((s) => [
+        style.bold(printable(s.domain)),
+        String(s.searches),
+        String(s.results),
+        formatTime(s.lastSeen, timeZone),
+        s.sourceType,
+      ]),
+    ])
+    lines.push(table[0] ?? '')
+    list.sites.forEach((s, i) => {
+      lines.push(table[i + 1] ?? '')
+      for (const e of s.examples) {
+        const url = clip(printable(e.url), 100)
+        lines.push(
+          style.dim(`    ${e.title === undefined ? url : `${clip(printable(e.title), 70)}  ${url}`}`),
+        )
+      }
+      if (s.examples.length === 0) lines.push(style.dim('    (no titles or URLs are stored for this site)'))
+    })
+    if (list.total > list.sites.length) {
+      lines.push(style.dim(`… and ${list.total - list.sites.length} more`))
+    }
+    lines.push('', style.dim(REVIEW_HINT))
+  }
+  if (list.dismissed.length > 0) {
+    const names = list.dismissed.slice(0, KEPT_SHOWN).map((d) => printable(d.domain))
+    const more = list.dismissed.length - names.length
+    lines.push(
+      style.dim(
+        `Kept, so not listed: ${names.join(', ')}${more > 0 ? ` and ${more} more` : ''}. List one again: searchhole review unkeep <site>`,
+      ),
+    )
+  }
+  return lines.join('\n')
+}
+
+/** Confirmation after `review keep` / `review unkeep`. */
+export function renderReviewChanged(
+  result: { domain: string; changed: boolean },
+  kept: boolean,
+  { style }: RenderOpts,
+): string {
+  const site = style.bold(printable(result.domain))
+  if (kept) {
+    return [
+      result.changed
+        ? `${style.green('✓')} Kept ${site}: it will not be listed for review again.`
+        : `${site} was kept already.`,
+      style.dim(`  Undo with: searchhole review unkeep ${printable(result.domain)}`),
+    ].join('\n')
+  }
+  return result.changed
+    ? `${style.green('✓')} ${site} can show up in \`searchhole review\` again.`
+    : `${site} was not kept, so nothing changed.`
 }
 
 // ── suggestions, keys, mode ──────────────────────────────────────────────

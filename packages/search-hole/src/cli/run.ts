@@ -13,6 +13,7 @@ import type {
   HostProfile,
   ListsApi,
   RequestCtx,
+  ReviewApi,
   SearchArgs,
 } from '../app/types.ts'
 import { SearchHoleError } from '../shared/errors.ts'
@@ -35,6 +36,8 @@ import {
   renderLog,
   renderLogDetail,
   renderMode,
+  renderReview,
+  renderReviewChanged,
   renderRuleAdded,
   renderRules,
   renderRulesRemoved,
@@ -493,6 +496,40 @@ async function runLists(cmd: ListsCommand, io: CliIo, deps: CliDeps): Promise<nu
   }
 }
 
+/** The app's review API, or a clear error from a build without it. */
+function reviewOf(app: App): ReviewApi {
+  if (app.review === undefined) throw new SearchHoleError('internal', 'This build has no review list.')
+  return app.review
+}
+
+/**
+ * `searchhole review …` (ADR-0025). Listing only reads the local log. `keep` and `unkeep` change
+ * what the user is shown, so they go through the actor gate like the rule verbs.
+ */
+async function runReview(
+  cmd: Extract<Command, { name: 'review' | 'review-keep' | 'review-unkeep' }>,
+  io: CliIo,
+  deps: CliDeps,
+): Promise<number> {
+  const opts = renderOpts(io, deps)
+  if (cmd.name === 'review') {
+    const list = await withApp(io, deps, (app) =>
+      reviewOf(app).list(cmd.days === undefined ? undefined : { days: cmd.days }),
+    )
+    if (cmd.json) json(io, list)
+    else line(io, renderReview(list, opts))
+    return 0
+  }
+  resolveActor(io, cmd.yes, 'your review list')
+  const keep = cmd.name === 'review-keep'
+  const result = await withApp(io, deps, (app) =>
+    keep ? reviewOf(app).dismiss(cmd.site) : reviewOf(app).restore(cmd.site),
+  )
+  if (cmd.json) json(io, { domain: result.domain, kept: keep, changed: result.changed })
+  else line(io, renderReviewChanged(result, keep, opts))
+  return 0
+}
+
 /** Rebuilds an error with `secret` removed from its text, in case a lower layer echoed it. */
 function withoutSecret(error: unknown, secret: string): unknown {
   const clean = (text: string): string => scrub(text, secret)
@@ -775,6 +812,10 @@ async function execute(
       else line(io, renderLogDetail(detail, opts))
       return 0
     }
+    case 'review':
+    case 'review-keep':
+    case 'review-unkeep':
+      return runReview(cmd, io, deps)
     case 'suggestions': {
       const items = await withApp(io, deps, (app) => app.suggestions.list())
       if (cmd.json) json(io, items)

@@ -1,0 +1,27 @@
+3 sites seen in 3 or more searches of the last 30 days and never opened
+
+SITE                SEARCHES  RESULTS  LAST SEEN         TYPE
+geeksforgeeks.org   9         14       2026-10-30 09:15  blog
+    React Compiler explained  https://www.geeksforgeeks.org/react-compiler/
+    https://www.geeksforgeeks.org/node-sqlite/
+brave-only.example  5         5        2026-10-29 18:00  unknown
+    (no titles or URLs are stored for this site)
+… and 1 more
+
+Act on one: searchhole block <site> · searchhole lower <site> · searchhole review keep <site>
+Kept, so not listed: stackoverflow.com. List one again: searchhole review unkeep <site>
+---
+Nothing to review yet. A site shows up here after it appears in 3 searches and the assistant never opens it.
+---
+Nothing to review yet. A site shows up here after it appears in 3 searches and the assistant never opens it.
+Kept, so not listed: stackoverflow.com. List one again: searchhole review unkeep <site>
+---
+✓ Kept example.com: it will not be listed for review again.
+  Undo with: searchhole review unkeep example.com
+---
+example.com was kept already.
+  Undo with: searchhole review unkeep example.com
+---
+✓ example.com can show up in `searchhole review` again.
+---
+example.com was not kept, so nothing changed.

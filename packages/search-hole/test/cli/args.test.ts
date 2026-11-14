@@ -255,6 +255,36 @@ describe('other commands', () => {
     expect(failure('log', 'extra').why).toBe('Too many arguments.')
   })
 
+  it('review, review keep and review unkeep', () => {
+    expect(parse('review')).toEqual({ name: 'review', json: false })
+    expect(parse('review', '--days', '7', '--json')).toEqual({ name: 'review', days: 7, json: true })
+    expect(parse('review', '--help')).toEqual({ name: 'help', topic: 'review' })
+    expect(parse('review', 'keep', 'example.com')).toEqual({
+      name: 'review-keep',
+      site: 'example.com',
+      yes: false,
+      json: false,
+    })
+    expect(parse('review', 'unkeep', 'example.com', '-y', '--json')).toEqual({
+      name: 'review-unkeep',
+      site: 'example.com',
+      yes: true,
+      json: true,
+    })
+    for (const days of ['0', '366', 'abc', '1.5', '-3']) {
+      expect(failure('review', `--days=${days}`).why, days).toBe(
+        '--days must be a whole number from 1 to 365.',
+      )
+    }
+    expect(failure('review', 'keep').why).toContain('Missing site')
+    expect(failure('review', 'keep', 'a.com', 'b.com').why).toBe('Too many arguments.')
+    expect(failure('review', 'keep', 'a.com', '--days', '7').why).toBe('--days only applies to the listing.')
+    const unknown = failure('review', 'dismiss', 'a.com')
+    expect(unknown.why).toContain('review keep <site>')
+    expect(unknown.fix).toBe('Run `searchhole help review`.')
+    expect(suggestCommand('reviw')).toBe('review')
+  })
+
   it('approve, reject, trust, mode', () => {
     expect(parse('approve', '3', '--yes')).toEqual({ name: 'approve', id: 3, yes: true, json: false })
     expect(parse('reject', '4')).toEqual({ name: 'reject', id: 4, yes: false, json: false })
@@ -300,6 +330,10 @@ describe('usage errors never quote what was typed', () => {
     [['search', 'q', `--=${secret}`]],
     [['search', 'q', `--limit=${secret}`]],
     [['log', secret]],
+    [['review', secret]],
+    [['review', secret, 'a.com']],
+    [['review', `--days=${secret}`]],
+    [['review', 'keep', 'a.com', secret]],
     [['mode', secret]],
     [['searxng', secret]],
     [['mcp', '--host', secret]],

@@ -8,6 +8,8 @@ import {
   renderLog,
   renderLogDetail,
   renderMode,
+  renderReview,
+  renderReviewChanged,
   renderRuleAdded,
   renderRules,
   renderSearch,
@@ -26,6 +28,7 @@ import {
   sampleLog,
   sampleLogDetail,
   sampleOutcome,
+  sampleReview,
   sampleRules,
   stripAnsi,
 } from './helpers.ts'
@@ -140,6 +143,76 @@ describe('rules, log and the rest', () => {
     await expect(`${renderLog(sampleLog(), plain)}\n`).toMatchFileSnapshot(snap('log'))
     await expect(`${renderLogDetail(sampleLogDetail(), plain)}\n`).toMatchFileSnapshot(snap('log-show'))
     expect(renderLog([], plain)).toBe('Nothing logged yet.')
+  })
+
+  it('log show marks kept results opened or seen, in colour only when colour is on', () => {
+    const colour = renderLogDetail(sampleLogDetail(), { style: createStyle(true), timeZone: 'UTC' })
+    expect(stripAnsi(colour)).toBe(renderLogDetail(sampleLogDetail(), plain))
+    expect(colour).toContain('\u001b[32mopened\u001b[39m')
+    // An entry from an older app (no count): the header counts the flags itself.
+    const { opened: _count, ...older } = sampleLogDetail()
+    expect(renderLogDetail(older, plain)).toContain('opened 1 of 8')
+  })
+
+  it('review: the list, its empty state and the keep confirmations', async () => {
+    const empty = { days: 30, minSearches: 3, total: 0, sites: [], dismissed: [] }
+    const out = [
+      renderReview(sampleReview(), plain),
+      renderReview(empty, plain),
+      renderReview({ ...empty, dismissed: sampleReview().dismissed }, plain),
+      renderReviewChanged({ domain: 'example.com', changed: true }, true, plain),
+      renderReviewChanged({ domain: 'example.com', changed: false }, true, plain),
+      renderReviewChanged({ domain: 'example.com', changed: true }, false, plain),
+      renderReviewChanged({ domain: 'example.com', changed: false }, false, plain),
+    ].join('\n---\n')
+    await expect(`${out}\n`).toMatchFileSnapshot(snap('review'))
+  })
+
+  it('review: one site and one day are singular; many kept sites are cut short', () => {
+    const [site] = sampleReview().sites
+    if (site === undefined) throw new Error('fixture')
+    const one = renderReview({ days: 1, minSearches: 3, total: 1, sites: [site], dismissed: [] }, plain)
+    expect(one.split('\n')[0]).toBe('1 site seen in 3 or more searches of the last 1 day and never opened')
+    expect(one).not.toContain('… and')
+    const dismissed = Array.from({ length: 11 }, (_, i) => ({
+      domain: `kept${i}.example`,
+      at: '2026-10-28T10:00:00.000Z',
+    }))
+    const many = renderReview({ days: 30, minSearches: 3, total: 0, sites: [], dismissed }, plain)
+    expect(many).toContain('kept7.example and 3 more.')
+    expect(many).not.toContain('kept8.example')
+  })
+
+  it('review: text from the web cannot move the cursor or colour the terminal', () => {
+    const esc = String.fromCharCode(27)
+    const out = renderReview(
+      {
+        days: 30,
+        minSearches: 3,
+        total: 1,
+        sites: [
+          {
+            domain: 'evil.example',
+            searches: 3,
+            results: 3,
+            lastSeen: '2026-10-30T09:15:00.000Z',
+            sourceType: 'unknown',
+            examples: [
+              {
+                url: `https://evil.example/${esc}[2J`,
+                title: `Free${esc}[31m prizes\u0007\nsecond line\u009b1m`,
+              },
+            ],
+          },
+        ],
+        dismissed: [],
+      },
+      plain,
+    )
+    expect(out).not.toContain(esc)
+    expect(out).not.toContain('\u0007')
+    expect(out).not.toContain('\u009b')
+    expect(out).toContain('Free [31m prizes second line 1m  https://evil.example/ [2J')
   })
 
   it('doctor', async () => {

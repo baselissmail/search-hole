@@ -52,6 +52,7 @@ describe('help and version', () => {
       'rules',
       'explain',
       'log',
+      'review',
       'suggestions',
       'approve',
       'trust',
@@ -372,6 +373,66 @@ describe('read-only commands', () => {
     expect(missing.err).toContain('There is no search #99 in the log.')
   })
 
+  it('log shows how many results were opened; log show marks each result, also in --json', async () => {
+    const list = await run(['log'])
+    expect(list.out).toContain('8 kept · 3 hidden · 1 opened')
+    expect(list.out).not.toContain('0 opened')
+    expect((JSON.parse((await run(['log', '--json'])).out) as Array<{ opened: number }>)[0]?.opened).toBe(1)
+    const show = await run(['log', 'show', '12'])
+    expect(show.out).toContain('opened 1 of 8')
+    expect(show.out).toMatch(/pinned\s+opened\s+https:\/\/react\.dev/)
+    expect(show.out).toMatch(/kept\s+seen\s+https:\/\/www\.geeksforgeeks\.org/)
+    expect(show.out).toMatch(/hidden\s+https:\/\/pinterest\.com/)
+    const json = JSON.parse((await run(['log', 'show', '12', '--json'])).out) as {
+      results: Array<{ domain: string; opened: boolean }>
+    }
+    expect(json.results.map((r) => [r.domain, r.opened])).toEqual([
+      ['react.dev', true],
+      ['geeksforgeeks.org', false],
+      ['pinterest.com', false],
+      ['old.example.org', false],
+    ])
+  })
+
+  it('review lists the sites with one hint line, takes --days, and prints the list as JSON', async () => {
+    const r = await run(['review'])
+    expect(r.code).toBe(0)
+    expect(call(r.app.calls, 'review.list').args).toEqual([undefined])
+    expect(r.out).toContain('3 sites seen in 3 or more searches of the last 30 days and never opened')
+    expect(r.out).toContain('geeksforgeeks.org')
+    expect(r.out).toContain('React Compiler explained  https://www.geeksforgeeks.org/react-compiler/')
+    expect(r.out).toContain('(no titles or URLs are stored for this site)')
+    const hints = r.out.split('\n').filter((l) => l.includes('searchhole block <site>'))
+    expect(hints).toEqual([
+      'Act on one: searchhole block <site> · searchhole lower <site> · searchhole review keep <site>',
+    ])
+    expect(r.out).toContain('searchhole review unkeep <site>')
+    // Reading the list changes nothing, so it needs no terminal and no --yes.
+    expect(r.io.confirms).toEqual([])
+
+    const week = await run(['review', '--days', '7', '--json'])
+    expect(call(week.app.calls, 'review.list').args).toEqual([{ days: 7 }])
+    expect(JSON.parse(week.out)).toMatchObject({
+      days: 30,
+      minSearches: 3,
+      total: 3,
+      sites: [
+        { domain: 'geeksforgeeks.org', searches: 9, results: 14, sourceType: 'blog' },
+        { domain: 'brave-only.example', examples: [] },
+      ],
+      dismissed: [{ domain: 'stackoverflow.com' }],
+    })
+
+    const empty = await run(
+      ['review'],
+      {},
+      { review: { days: 30, minSearches: 3, total: 0, sites: [], dismissed: [] } },
+    )
+    expect(empty.out).toBe(
+      'Nothing to review yet. A site shows up here after it appears in 3 searches and the assistant never opens it.\n',
+    )
+  })
+
   it('suggestions lists the queue', async () => {
     const r = await run(
       ['suggestions'],
@@ -450,6 +511,69 @@ describe('approve, reject, trust, mode', () => {
     expect(set.out).toContain('Mode set. engines (working as engines)')
     const skill = await run(['mode', 'builtin', '--json'], { env: { SEARCHHOLE_SKILL: '1' } })
     expect(JSON.parse(skill.out)).toEqual({ configured: 'auto', effective: 'builtin' })
+  })
+})
+
+describe('review keep and unkeep (ADR-0025)', () => {
+  it('keep dismisses a site and says how to undo it; unkeep lists it again', async () => {
+    const keep = await run(['review', 'keep', 'Example.com'], { tty: true })
+    expect(keep.code).toBe(0)
+    expect(call(keep.app.calls, 'review.dismiss').args).toEqual(['Example.com'])
+    expect(keep.out).toBe(
+      '✓ Kept example.com: it will not be listed for review again.\n  Undo with: searchhole review unkeep example.com\n',
+    )
+    const unkeep = await run(['review', 'unkeep', 'example.com'], { tty: true })
+    expect(call(unkeep.app.calls, 'review.restore').args).toEqual(['example.com'])
+    expect(unkeep.out).toBe('✓ example.com can show up in `searchhole review` again.\n')
+  })
+
+  it('says so when nothing changed, and still exits 0', async () => {
+    const keep = await run(['review', 'keep', 'example.com'], { tty: true }, { reviewChanged: false })
+    expect(keep.code).toBe(0)
+    expect(keep.out).toContain('example.com was kept already.')
+    const unkeep = await run(['review', 'unkeep', 'example.com'], { tty: true }, { reviewChanged: false })
+    expect(unkeep.code).toBe(0)
+    expect(unkeep.out).toBe('example.com was not kept, so nothing changed.\n')
+  })
+
+  it('--json prints the site, whether it is kept now, and whether anything changed', async () => {
+    const keep = await run(['review', 'keep', 'example.com', '--json'], { tty: true })
+    expect(JSON.parse(keep.out)).toEqual({ domain: 'example.com', kept: true, changed: true })
+    const unkeep = await run(['review', 'unkeep', 'example.com', '--json'], { tty: true })
+    expect(JSON.parse(unkeep.out)).toEqual({ domain: 'example.com', kept: false, changed: true })
+  })
+
+  it('goes through the actor gate: no terminal and no --yes changes nothing', async () => {
+    for (const verb of ['keep', 'unkeep']) {
+      const refused = await run(['review', verb, 'example.com'])
+      expect(refused.code, verb).toBe(2)
+      expect(refused.err, verb).toContain('This command changes your review list')
+      expect(refused.app.opened, verb).toHaveLength(0)
+      expect(refused.out, verb).toBe('')
+      const yes = await run(['review', verb, 'example.com', '--yes'])
+      expect(yes.code, verb).toBe(0)
+      const skill = await run(['review', verb, 'example.com'], { env: { SEARCHHOLE_SKILL: '1' } })
+      expect(skill.code, verb).toBe(0)
+      expect(skill.app.calls.map((c) => c.method)).toEqual([
+        verb === 'keep' ? 'review.dismiss' : 'review.restore',
+      ])
+    }
+  })
+
+  it('an app error (not a site, database unavailable) is exit 2 with the fix', async () => {
+    const r = await run(
+      ['review', 'keep', 'nonsense'],
+      { tty: true },
+      {
+        failWith: new SearchHoleError('invalid_argument', 'That is not a site.', {
+          fix: 'Name a domain such as example.com.',
+        }),
+      },
+    )
+    expect(r.code).toBe(2)
+    expect(r.err).toContain('That is not a site.')
+    expect(r.err).toContain('Name a domain such as example.com.')
+    expect(r.out).toBe('')
   })
 })
 

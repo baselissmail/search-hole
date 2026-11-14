@@ -7,6 +7,7 @@ import type {
   EngineStatus,
   LogDetail,
   LogEntry,
+  ReviewList,
   RuleListing,
   SearchArgs,
   SearchMode,
@@ -294,6 +295,7 @@ export function sampleLog(): LogEntry[] {
       kept: 8,
       hidden: 3,
       latencyMs: 812,
+      opened: 1,
     },
     {
       searchId: 11,
@@ -307,6 +309,7 @@ export function sampleLog(): LogEntry[] {
       kept: 6,
       hidden: 0,
       latencyMs: 40,
+      opened: 0,
     },
   ]
 }
@@ -329,6 +332,16 @@ export function sampleLogDetail(): LogDetail {
       },
       {
         rank: 2,
+        engine: 'searxng',
+        url: 'https://www.geeksforgeeks.org/react-compiler/',
+        domain: 'geeksforgeeks.org',
+        title: 'React Compiler explained',
+        decision: 'kept',
+        opened: false,
+        sourceType: 'blog',
+      },
+      {
+        rank: 2,
         engine: 'brave',
         url: 'https://pinterest.com/pin/123',
         domain: 'pinterest.com',
@@ -347,6 +360,36 @@ export function sampleLogDetail(): LogDetail {
         reason: 'stale',
       },
     ],
+  }
+}
+
+export function sampleReview(): ReviewList {
+  return {
+    days: 30,
+    minSearches: 3,
+    total: 3,
+    sites: [
+      {
+        domain: 'geeksforgeeks.org',
+        searches: 9,
+        results: 14,
+        lastSeen: '2026-10-30T09:15:00.000Z',
+        sourceType: 'blog',
+        examples: [
+          { url: 'https://www.geeksforgeeks.org/react-compiler/', title: 'React Compiler explained' },
+          { url: 'https://www.geeksforgeeks.org/node-sqlite/' },
+        ],
+      },
+      {
+        domain: 'brave-only.example',
+        searches: 5,
+        results: 5,
+        lastSeen: '2026-10-29T18:00:00.000Z',
+        sourceType: 'unknown',
+        examples: [],
+      },
+    ],
+    dismissed: [{ domain: 'stackoverflow.com', at: '2026-10-28T10:00:00.000Z' }],
   }
 }
 
@@ -418,6 +461,9 @@ export interface FakeAppOptions {
   suggestions?: Array<{ id: number; input: SuggestRuleInput; createdAt: string; status: string }>
   keyStatus?: Array<{ engine: EngineId; present: boolean; source: string }>
   removeResult?: RuleListing[]
+  review?: ReviewList
+  /** What `review.dismiss` / `review.restore` report as `changed` (default true). */
+  reviewChanged?: boolean
   failWith?: Error
 }
 
@@ -499,6 +545,13 @@ export function makeFakeApp(o: FakeAppOptions = {}): FakeApp {
     log: {
       recent: async (opts) => rec('log.recent', [opts], o.logs ?? sampleLog()),
       detail: async (id) => rec('log.detail', [id], 'detail' in o ? o.detail : sampleLogDetail()),
+    },
+    review: {
+      list: async (opts) => rec('review.list', [opts], o.review ?? sampleReview()),
+      dismiss: async (site) =>
+        rec('review.dismiss', [site], { domain: site.toLowerCase(), changed: o.reviewChanged ?? true }),
+      restore: async (site) =>
+        rec('review.restore', [site], { domain: site.toLowerCase(), changed: o.reviewChanged ?? true }),
     },
     settings: {
       get: async () => rec('settings.get', [], {}),

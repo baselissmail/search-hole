@@ -19,6 +19,7 @@ Search and rules
   lists                 Your block lists and starter lists; "lists catalog" for more
   explain <url>         Say how your rules treat a URL
   log                   Recent searches; "log show <id>" for one search in full
+  review                Sites seen in many searches that your assistant never opened
   suggestions           Rules your assistant proposed, waiting for you
   approve <id>          Accept a suggested rule
   reject <id>           Dismiss a suggested rule
@@ -113,7 +114,23 @@ Options: --yes confirms a change when there is no terminal; --json prints JSON.`
        searchhole log show <searchId> [--json]
 
 Recent searches, newest first. --hidden lists only searches that hid something.
-"log show" prints every result of one search with its decision and rule.`,
+"log show" prints every result of one search with its decision and rule.
+A kept result is marked "opened" when your assistant opened that page in the same session,
+and "seen" when it did not.`,
+  review: `Usage: searchhole review [--days <n>] [--json]
+       searchhole review keep <site> [--yes] [--json]
+       searchhole review unkeep <site> [--yes] [--json]
+
+Sites that had results in at least 3 searches of the last 30 days (--days 1-365) and that
+your assistant never opened, most-seen first, each with up to 3 of its pages. It is read
+from your local search log; nothing is sent anywhere and no rule changes by itself.
+A site leaves the list when one of its pages is opened, when one of your global rules
+decides it, or when you keep it.
+  block <site>   hide it (searchhole block <site>)
+  lower <site>   rank it lower (searchhole lower <site>)
+  keep <site>    "this site is fine": stop listing it
+  unkeep <site>  list it again
+Engines that may not store titles or URLs (Brave) show the site without example pages.`,
   suggestions: `Usage: searchhole suggestions [--json]\n\nLists rules your assistant proposed. Nothing applies until you approve it.`,
   approve: `Usage: searchhole approve <id> [--yes] [--json]\n\nApplies a suggested rule.`,
   reject: `Usage: searchhole reject <id> [--yes] [--json]\n\nDismisses a suggested rule.`,

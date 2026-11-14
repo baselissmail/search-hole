@@ -81,6 +81,9 @@ export type Command =
   | { name: 'explain'; url: string; profile?: string; json: boolean }
   | { name: 'log'; limit?: number; hidden: boolean; json: boolean }
   | { name: 'log-show'; searchId: number; json: boolean }
+  | { name: 'review'; days?: number; json: boolean }
+  | { name: 'review-keep'; site: string; yes: boolean; json: boolean }
+  | { name: 'review-unkeep'; site: string; yes: boolean; json: boolean }
   | { name: 'suggestions'; json: boolean }
   | { name: 'approve'; id: number; yes: boolean; json: boolean }
   | { name: 'reject'; id: number; yes: boolean; json: boolean }
@@ -118,6 +121,7 @@ export const COMMAND_NAMES = [
   'lists',
   'explain',
   'log',
+  'review',
   'suggestions',
   'approve',
   'reject',
@@ -617,6 +621,39 @@ function parseLog(args: readonly string[]): Command {
   }
 }
 
+/** `review` lists; `review keep <site>` and `review unkeep <site>` change what it lists. */
+function parseReview(args: readonly string[]): Command {
+  const { values, positionals } = guard('review', () =>
+    parseArgs({
+      args: [...args],
+      allowPositionals: true,
+      options: {
+        ...HELP_OPTION,
+        days: { type: 'string' },
+        yes: { type: 'boolean', short: 'y' },
+        json: { type: 'boolean' },
+      },
+    }),
+  )
+  if (values.help === true) return { name: 'help', topic: 'review' }
+  const [sub, ...rest] = positionals
+  const json = values.json === true
+  if (sub === undefined) {
+    return {
+      name: 'review',
+      json,
+      ...(values.days === undefined ? {} : { days: wholeNumber('review', '--days', values.days, 1, 365) }),
+    }
+  }
+  if (sub !== 'keep' && sub !== 'unkeep') {
+    throw usageError('review', 'Use `review`, `review keep <site>` or `review unkeep <site>`.')
+  }
+  if (values.days !== undefined) throw usageError('review', '--days only applies to the listing.')
+  const site = nonEmpty('review', 'site (a domain from `searchhole review`)', rest[0])
+  noExtra('review', rest, 1)
+  return { name: sub === 'keep' ? 'review-keep' : 'review-unkeep', site, yes: values.yes === true, json }
+}
+
 function parseIdVerb(name: 'approve' | 'reject', args: readonly string[]): Command {
   const { values, positionals } = guard(name, () =>
     parseArgs({
@@ -884,6 +921,8 @@ export function parseCommand(argv: readonly string[], now: number = Date.now()):
       return parseExplain(rest)
     case 'log':
       return parseLog(rest)
+    case 'review':
+      return parseReview(rest)
     case 'suggestions': {
       const { values } = guard('suggestions', () =>
         parseArgs({ args: [...rest], options: { ...HELP_OPTION, json: { type: 'boolean' } } }),
