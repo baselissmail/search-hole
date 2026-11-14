@@ -45,7 +45,14 @@ describe('uninstall', () => {
         )
         .sort(),
     ).toEqual(
-      ['lists/vendor', 'rules.yaml', 'run/ui.json', 'searchhole.db', 'searchhole.db-wal', 'settings.yaml'].sort(),
+      [
+        'lists/vendor',
+        'rules.yaml',
+        'run/ui.json',
+        'searchhole.db',
+        'searchhole.db-wal',
+        'settings.yaml',
+      ].sort(),
     )
     expect(plan.left).toEqual([])
     expect(plan.elsewhere.join('\n')).toContain('claude plugin uninstall')
@@ -101,9 +108,22 @@ describe('uninstall', () => {
     const roots = { config: root, data: root, run: join(root, 'run'), source: 'env' as const }
     const plan = planUninstall({ roots, home: join(base, 'home') })
     const rel = (paths: string[]): string[] =>
-      paths.map((p) => p.slice(root.length + 1).split(sep).join('/')).sort()
+      paths
+        .map((p) =>
+          p
+            .slice(root.length + 1)
+            .split(sep)
+            .join('/'),
+        )
+        .sort()
     expect(rel(plan.left)).toEqual(
-      ['backups/photos-2019.tar', 'lists/groceries.txt', 'lists/local/keep', 'lists/recipes', 'secrets/notes.txt'].sort(),
+      [
+        'backups/photos-2019.tar',
+        'lists/groceries.txt',
+        'lists/local/keep',
+        'lists/recipes',
+        'secrets/notes.txt',
+      ].sort(),
     )
     await runUninstall(plan, { removeKey: async () => {} })
     const foreign = [
@@ -113,7 +133,8 @@ describe('uninstall', () => {
       'lists/recipes/soup.md',
       'lists/local/keep/readme.md',
     ]
-    for (const f of Object.keys(files)) expect([f, existsSync(join(root, f))]).toEqual([f, foreign.includes(f)])
+    for (const f of Object.keys(files))
+      expect([f, existsSync(join(root, f))]).toEqual([f, foreign.includes(f)])
     expect(existsSync(join(root, 'lists', 'quenhus-dev-filter'))).toBe(false)
     expect(existsSync(join(root, 'lists', 'local', 'mine'))).toBe(false)
     expect(existsSync(join(root, 'searxng'))).toBe(false)

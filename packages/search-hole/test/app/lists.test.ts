@@ -399,7 +399,9 @@ describe('modes, removal and imports', () => {
     await lists.import(file, { name: 'mine', kind: 'block', format: 'domains' })
 
     // A URL whose file name is a reserved word gives no name, and asking for one is refused.
-    expect((await rejection(lists.add({ source: 'https://lists.test/local.txt' }))).why).toContain('name this list')
+    expect((await rejection(lists.add({ source: 'https://lists.test/local.txt' }))).why).toContain(
+      'name this list',
+    )
     expect((await rejection(lists.add({ source: 'https://lists.test/generation.txt' }))).why).toContain(
       'name this list',
     )
@@ -419,7 +421,8 @@ describe('modes, removal and imports', () => {
   it('ignores a hand-written subscription with a reserved name and says so in doctor', async () => {
     const h = await setup({
       host: 'cli',
-      rules: 'version: 1\nrules: []\nsubscriptions:\n  - { name: local, url: "https://lists.test/local.txt" }\n',
+      rules:
+        'version: 1\nrules: []\nsubscriptions:\n  - { name: local, url: "https://lists.test/local.txt" }\n',
     })
     const lists = h.app.lists
     if (lists === undefined) throw new Error('no list API')

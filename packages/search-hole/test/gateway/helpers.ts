@@ -50,6 +50,8 @@ export interface HarnessOptions {
   fake?: FakeAppOptions
   version?: string
   failCreate?: number
+  /** The gateway's start-up guess that an engine is set up (default true). */
+  engineSetUp?: boolean
 }
 
 /** A Gateway with a FakeApp factory and a manual clock. */
@@ -81,6 +83,7 @@ export function harness(opts: HarnessOptions = {}): Harness {
       pid: 4242,
       home: opts.home ?? '/home/tester',
       platform: 'linux',
+      engineSetUp: () => opts.engineSetUp ?? true,
     },
   )
   return { gateway, app: () => app, appCreations: () => creations, logs: lines, clock }

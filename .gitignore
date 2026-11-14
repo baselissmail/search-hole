@@ -10,3 +10,6 @@ playwright-report/
 
 # Packed extensions (.mcpb)
 distribution/out/
+
+# Claude Code local worktrees and settings
+.claude/

@@ -93,7 +93,8 @@ export class ListFiles {
    */
   dir(id: string, local: boolean): string {
     const safe = id.toLowerCase()
-    if (!LIST_ID.test(safe) || (!local && RESERVED_LIST_IDS.has(safe))) throw new Error(`invalid list id: ${id}`)
+    if (!LIST_ID.test(safe) || (!local && RESERVED_LIST_IDS.has(safe)))
+      throw new Error(`invalid list id: ${id}`)
     return local ? join(this.root, 'local', safe) : join(this.root, safe)
   }
 

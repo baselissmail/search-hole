@@ -868,7 +868,12 @@ export class RulesService {
    * site (`example.com`) is checked as `https://example.com`; anything that is not a site or
    * an http(s) URL is refused, never answered with "kept".
    */
-  explain(rc: RuleContext, input: string, profile: string, now: number): { decision: string; lines: string[] } {
+  explain(
+    rc: RuleContext,
+    input: string,
+    profile: string,
+    now: number,
+  ): { decision: string; lines: string[] } {
     const url = explainTarget(input)
     const decision: RuleDecision = rc.ruleSet.decide(url, { profile, now })
     const byId = new Map(rc.userRules.map((r) => [r.id, r]))

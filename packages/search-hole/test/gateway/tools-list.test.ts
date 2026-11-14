@@ -114,6 +114,30 @@ describe.each(ERAS)('tools/list (%s era)', (era) => {
     expect(SERVER_INSTRUCTIONS.length).toBeLessThanOrEqual(MAX_INSTRUCTIONS_CHARS)
   })
 
+  test('with no engine set up, Claude Code is told to use the built-in search, not to try search first', async () => {
+    const h = harness({ host: 'claude-code', engineSetUp: false })
+    const { client } = track(await connect(h.gateway, era))
+    const text = client.getInstructions() ?? ''
+    expect(text).toContain('No search engine is set up, so use the built-in web search')
+    expect(text).not.toContain('Prefer search and fetch')
+    const search = (await client.listTools()).tools.find((t) => t.name === 'search')
+    expect(search?.description).toContain('No engine is set up')
+    expect(search?.description).not.toContain('Use it instead of built-in web search')
+    expect(h.appCreations()).toBe(0)
+  })
+
+  test('outside Claude Code the instructions never promise a filtered built-in search', async () => {
+    for (const engineSetUp of [true, false]) {
+      const h = harness({ host: 'generic', engineSetUp })
+      const { client } = track(await connect(h.gateway, era))
+      const text = client.getInstructions() ?? ''
+      expect(text).toContain("search-hole can't filter any other web search you have")
+      expect(text).not.toContain('filters it with the same rules')
+      const search = (await client.listTools()).tools.find((t) => t.name === 'search')
+      expect(search?.description).toContain('Use it instead of built-in web search')
+    }
+  })
+
   test('listing tools never creates the App (the factory is side-effect free)', async () => {
     const h = harness()
     const { client } = track(await connect(h.gateway, era))

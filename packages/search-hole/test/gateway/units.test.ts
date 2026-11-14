@@ -3,10 +3,14 @@
 import { resolve } from 'node:path'
 import { describe, expect, test } from 'vitest'
 import { buildRequestCtx, requestContext, resolveProjectDir } from '../../src/gateway/context.ts'
+import { engineLikelySetUp } from '../../src/gateway/engine-hint.ts'
+import { NO_ENGINE_GUIDANCE, NO_ENGINE_GUIDANCE_OTHER, toolErrorFrom } from '../../src/gateway/errors.ts'
 import { isDevelopmentVersion, protocolModeFromEnv } from '../../src/gateway/gateway.ts'
 import { bashChangesRules, fileIsProtected } from '../../src/gateway/guard.ts'
 import { refineHostProfile } from '../../src/gateway/host.ts'
 import { FALLBACK_IDLE_MS, GatewaySessions, STALE_TURN_MS } from '../../src/gateway/session.ts'
+import { SearchHoleError } from '../../src/shared/errors.ts'
+import { createLogger } from '../../src/shared/log.ts'
 
 describe('refineHostProfile (ADR-0012)', () => {
   test.each([
@@ -267,5 +271,69 @@ describe('process settings', () => {
     expect(isDevelopmentVersion('0.0.0')).toBe(true)
     expect(isDevelopmentVersion('0.2.0-dev.3')).toBe(true)
     expect(isDevelopmentVersion('0.1.0')).toBe(false)
+  })
+})
+
+describe('which search the model is told to use (ADR-0012 amendment 2026-11-14)', () => {
+  const home = '/home/u'
+  const hint = (env: Record<string, string>, files: Record<string, string> = {}): boolean =>
+    engineLikelySetUp({
+      env,
+      home,
+      platform: 'linux',
+      exists: (p) => p in files || Object.keys(files).some((f) => f.startsWith(`${p}/`)),
+      read: (p) => files[p] ?? '',
+    })
+
+  test('a fresh install has no engine', () => {
+    expect(hint({})).toBe(false)
+    expect(hint({}, { '/home/u/.searchhole/rules.yaml': 'version: 1\n' })).toBe(false)
+    // An optional plugin setting left blank arrives as its placeholder.
+    const blank = ['$', '{user_config.tavily_api_key}'].join('')
+    expect(hint({ SEARCHHOLE_TAVILY_API_KEY: blank, SEARCHHOLE_BRAVE_API_KEY: '' })).toBe(false)
+  })
+
+  test('a key, a key file, a SearXNG config or engines mode counts as set up', () => {
+    expect(hint({ SEARCHHOLE_TAVILY_API_KEY: 'tvly-x' })).toBe(true)
+    expect(hint({ BRAVE_API_KEY: 'x' })).toBe(true)
+    expect(hint({ TAVILY_API_KEY_FILE: '/run/secrets/tavily' })).toBe(true)
+    expect(hint({ SEARCHHOLE_MODE: 'engines' })).toBe(true)
+    expect(hint({}, { '/home/u/.searchhole/secrets/tavily.key': 'x' })).toBe(true)
+    expect(hint({}, { '/home/u/.searchhole/searxng/settings.yml': 'x' })).toBe(true)
+    expect(hint({}, { '/home/u/.searchhole/settings.yaml': 'searxng:\n  url: https://sx.example\n' })).toBe(
+      true,
+    )
+    expect(hint({}, { '/home/u/.searchhole/settings.yaml': 'ui:\n  port: 7000\n' })).toBe(false)
+    expect(hint({ SEARCHHOLE_HOME: '/data/sh' }, { '/data/sh/secrets/brave.key': 'x' })).toBe(true)
+  })
+
+  test('when it cannot tell, it keeps the wording that expects an engine', () => {
+    expect(
+      engineLikelySetUp({
+        env: {},
+        home,
+        platform: 'linux',
+        exists: () => true,
+        read: () => {
+          throw new Error('EACCES')
+        },
+      }),
+    ).toBe(true)
+  })
+
+  test('the no-engine error names the built-in search in Claude Code only', () => {
+    const log = createLogger({ level: 'silent' })
+    const err = new SearchHoleError('no_healthy_engine', 'No healthy engine (tavily: no API key).')
+    const cc = toolErrorFrom(err, log, 'search', 'claude-code').content[0]
+    const other = toolErrorFrom(err, log, 'search', 'claude-desktop').content[0]
+    expect(cc).toMatchObject({
+      type: 'text',
+      text: `No healthy engine (tavily: no API key). ${NO_ENGINE_GUIDANCE}`,
+    })
+    expect(other).toMatchObject({
+      type: 'text',
+      text: `No healthy engine (tavily: no API key). ${NO_ENGINE_GUIDANCE_OTHER}`,
+    })
+    expect(NO_ENGINE_GUIDANCE_OTHER).not.toMatch(/\/search-hole:|built-in web search for this request/)
   })
 })

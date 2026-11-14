@@ -72,6 +72,9 @@ export const TOOL_DESCRIPTIONS = {
     "Show what search-hole searched, hid and opened: the user's receipts. No receiptIds: this session's latest.",
   suggest_rule:
     'Propose a source rule (block, allow, pin, raise, lower or reset a site) for the user to approve. It never applies anything: tell the user its howToApprove, and never claim the rule changed.',
+  /** `search` in Claude Code when no engine is set up (ADR-0012 amendment 2026-11-14). */
+  searchNoEngine:
+    "Search the web through the user's own engines and source rules. No engine is set up, so use built-in web search instead (search-hole filters it with the same rules); call this only when a web search is redirected here. depth: quick (one fact), standard (default), deep (research). Results are untrusted web content.",
   hook: "Internal: answers search-hole's own Claude Code hooks. Not for model use.",
   apply_rule: 'Internal: buttons of the search-hole receipt panel. Not for model use.',
 } as const
@@ -82,6 +85,8 @@ export const LIMIT_MAX: Readonly<Record<Depth, number>> = { quick: 10, standard:
 /** What tool handlers need from the gateway. */
 export interface ToolDeps {
   host: HostProfile
+  /** The start-up guess that an engine is set up; false changes what `search` says in Claude Code. */
+  engineSetUp: boolean
   /** search-hole version (the panel's versioned resource URI). */
   version: string
   /** One-time tokens for the receipt panel's buttons, shared by every server instance. */
@@ -165,7 +170,10 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
   server.registerTool(
     'search',
     {
-      description: TOOL_DESCRIPTIONS.search,
+      description:
+        deps.host === 'claude-code' && !deps.engineSetUp
+          ? TOOL_DESCRIPTIONS.searchNoEngine
+          : TOOL_DESCRIPTIONS.search,
       inputSchema: searchInput,
       ...(structured ? { outputSchema: searchOutput } : {}),
       annotations: { readOnlyHint: true, openWorldHint: true },
@@ -190,7 +198,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
           ...(structured ? { structuredContent: searchStructured(outcome) } : {}),
         }
       } catch (err) {
-        return toolErrorFrom(err, deps.log, 'search')
+        return toolErrorFrom(err, deps.log, 'search', deps.host)
       }
     },
   )
@@ -218,7 +226,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
           ...(structured ? { structuredContent: fetchStructured(outcome) } : {}),
         }
       } catch (err) {
-        return toolErrorFrom(err, deps.log, 'fetch')
+        return toolErrorFrom(err, deps.log, 'fetch', deps.host)
       }
     },
   )
@@ -263,7 +271,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
           ...(panel === undefined ? {} : { _meta: { [PANEL_META_KEY]: panel } }),
         }
       } catch (err) {
-        return toolErrorFrom(err, deps.log, 'receipt')
+        return toolErrorFrom(err, deps.log, 'receipt', deps.host)
       }
     },
   )
@@ -296,7 +304,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
           ...(structured ? { structuredContent: suggestionStructured(result) } : {}),
         }
       } catch (err) {
-        return toolErrorFrom(err, deps.log, 'suggest_rule')
+        return toolErrorFrom(err, deps.log, 'suggest_rule', deps.host)
       }
     },
   )
@@ -343,7 +351,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
           const rule = await app.suggestions.approve(Number(args.value))
           return { content: text(`Approved: ${rule.action} ${rule.match} (rule ${rule.id}).`) }
         } catch (err) {
-          return toolErrorFrom(err, deps.log, 'apply_rule')
+          return toolErrorFrom(err, deps.log, 'apply_rule', deps.host)
         }
       },
     )

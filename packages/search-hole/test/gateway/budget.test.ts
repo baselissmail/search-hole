@@ -3,7 +3,11 @@
 import { afterEach, describe, expect, test } from 'vitest'
 import type { FetchOutcome, Receipt } from '../../src/app/types.ts'
 import { estimateTokens, takeChunk } from '../../src/fetch/tokens.ts'
-import { MAX_INSTRUCTIONS_CHARS, SERVER_INSTRUCTIONS } from '../../src/gateway/instructions.ts'
+import {
+  MAX_INSTRUCTIONS_CHARS,
+  SERVER_INSTRUCTIONS,
+  serverInstructions,
+} from '../../src/gateway/instructions.ts'
 import {
   dateLabel,
   FETCH_TEXT_BUDGET,
@@ -68,6 +72,42 @@ describe('tool surface budget', () => {
     const at = order.map((s) => SERVER_INSTRUCTIONS.indexOf(s))
     expect(at.every((i) => i >= 0)).toBe(true)
     expect([...at].sort((a, b) => a - b)).toEqual(at)
+  })
+
+  test.each([
+    ['claude-code', false],
+    ['claude-desktop', true],
+    ['generic', false],
+  ] as const)('every variant keeps the limits and the order (%s, engine %s)', (host, engineSetUp) => {
+    const text = serverInstructions({ host, engineSetUp })
+    expect(text.length).toBeLessThanOrEqual(MAX_INSTRUCTIONS_CHARS)
+    expect(text).not.toMatch(/https?:\/\/|127\.0\.0\.1|localhost|rcpt_/)
+    expect(text.split('\n').map((l) => l.slice(0, 2))).toEqual([
+      'se',
+      '1.',
+      '2.',
+      '3.',
+      '4.',
+      '5.',
+      '6.',
+      '7.',
+    ])
+  })
+
+  test('the no-engine surface in Claude Code stays inside the budget', async () => {
+    const h = harness({ host: 'claude-code', engineSetUp: false })
+    const c = await connect(h.gateway, 'modern')
+    open.push(c)
+    const { tools } = await c.client.listTools()
+    const visible = tools
+      .filter(
+        (t) => (t._meta?.ui as { visibility?: string[] } | undefined)?.visibility?.includes('app') !== true,
+      )
+      .map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }))
+    const tokens =
+      estimateTokens(serverInstructions({ host: 'claude-code', engineSetUp: false })) +
+      estimateTokens(JSON.stringify(visible))
+    expect(tokens).toBeLessThanOrEqual(SURFACE_BUDGET)
   })
 })
 

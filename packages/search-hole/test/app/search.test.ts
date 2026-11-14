@@ -212,7 +212,8 @@ engines:
     expect(e.code).toBe('no_healthy_engine')
     expect(e.why).toMatch(/searxng: not reachable/)
     expect(e.why).toMatch(/tavily: no API key/)
-    expect(e.fix).toBe('run `searchhole doctor`')
+    expect(e.fix).toContain('searchhole searxng up')
+    expect(e.fix).toContain('searchhole keys set tavily')
   })
 
   it('throws no_healthy_engine before calling anything when no engine is configured', async () => {

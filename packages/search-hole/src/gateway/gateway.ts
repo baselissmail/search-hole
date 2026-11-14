@@ -24,9 +24,10 @@ import type { App, CreateApp, HostProfile } from '../app/types.ts'
 import { createLogger, type Logger } from '../shared/log.ts'
 import { resolveRoots } from '../shared/paths.ts'
 import type { ProcessContext } from './context.ts'
+import { engineLikelySetUp } from './engine-hint.ts'
 import { dotDir, type ProtectedRoots } from './guard.ts'
 import { refineHostProfile } from './host.ts'
-import { MAX_INSTRUCTIONS_CHARS, SERVER_INSTRUCTIONS } from './instructions.ts'
+import { MAX_INSTRUCTIONS_CHARS, serverInstructions } from './instructions.ts'
 import { ActionTokens, registerPanelResource } from './panel.ts'
 import { GatewaySessions } from './session.ts'
 import { registerTools } from './tools.ts'
@@ -55,6 +56,8 @@ export interface GatewayDeps {
   pid?: number
   home?: string
   platform?: NodeJS.Platform
+  /** Replaces the start-up guess that an engine is set up (engine-hint.ts). */
+  engineSetUp?: () => boolean
 }
 
 /** Which eras this process serves (ADR-0013 point 6). */
@@ -82,6 +85,8 @@ export class Gateway {
   readonly tokens = new ActionTokens()
   readonly proc: ProcessContext
   readonly protocolMode: ProtocolMode
+  /** Guessed once at start, so the instructions and the tool list stay byte-stable. */
+  readonly engineSetUp: boolean
   /** The server factory for `serveStdio` / `createMcpHandler`. */
   readonly factory: McpServerFactory
 
@@ -102,8 +107,12 @@ export class Gateway {
     this.createAppFn = deps.createApp
     this.now = deps.now
     this.platform = deps.platform ?? process.platform
-    this.proc = { env: opts.env, cwd: opts.cwd, home: deps.home ?? homedir() }
+    const home = deps.home ?? homedir()
+    this.proc = { env: opts.env, cwd: opts.cwd, home }
     this.protocolMode = protocolModeFromEnv(opts.env)
+    this.engineSetUp = (
+      deps.engineSetUp ?? (() => engineLikelySetUp({ env: opts.env, home, platform: this.platform }))
+    )()
     this.sessions = new GatewaySessions({
       host: refined.host,
       pid: deps.pid ?? process.pid,
@@ -129,7 +138,10 @@ export class Gateway {
       { name: SERVER_NAME, version: this.version },
       {
         capabilities: { tools: {} },
-        instructions: SERVER_INSTRUCTIONS.slice(0, MAX_INSTRUCTIONS_CHARS),
+        instructions: serverInstructions({ host: this.host, engineSetUp: this.engineSetUp }).slice(
+          0,
+          MAX_INSTRUCTIONS_CHARS,
+        ),
         cacheHints: {
           'tools/list': { ttlMs, cacheScope: 'private' },
           'server/discover': { ttlMs, cacheScope: 'private' },
@@ -138,6 +150,7 @@ export class Gateway {
     )
     registerTools(server, {
       host: this.host,
+      engineSetUp: this.engineSetUp,
       version: this.version,
       tokens: this.tokens,
       era,

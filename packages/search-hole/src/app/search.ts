@@ -113,12 +113,12 @@ export function describeRun(run: EngineRun): string {
   return `${run.engine}: ok`
 }
 
-/** The ADR-0012 error: "No healthy engine (brave: key rejected; searxng: not reachable) → run searchhole doctor". */
+/** The ADR-0012 error: "No healthy engine (brave: key rejected; searxng: not reachable) → add an engine…". */
 export function noHealthyEngine(states: readonly string[]): SearchHoleError {
   const why =
     states.length > 0 ? `No healthy engine (${states.join('; ')}).` : 'No search engine is configured.'
   return new SearchHoleError('no_healthy_engine', why, {
-    fix: 'run `searchhole doctor`',
+    fix: 'add an engine with `searchhole searxng up` (private, needs Docker) or `searchhole keys set tavily` (free key); `searchhole doctor` shows what is set up',
     details: { engines: [...states] },
   })
 }

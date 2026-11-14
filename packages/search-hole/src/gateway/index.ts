@@ -9,7 +9,7 @@ import { Gateway, type GatewayHandle, type GatewayOptions, serveGatewayStdio } f
 
 export { Gateway, type GatewayHandle, type GatewayOptions, SERVER_NAME } from './gateway.ts'
 export { refineHostProfile } from './host.ts'
-export { SERVER_INSTRUCTIONS } from './instructions.ts'
+export { SERVER_INSTRUCTIONS, serverInstructions } from './instructions.ts'
 
 /** Loads the App module on first use (see the file header). */
 const lazyCreateApp: CreateApp = async (opts) => {
