@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Seeds a temporary search-hole home for the end-to-end run through the real App (no fixtures):
-// built-in searches with hostile titles, a rule, a pending suggestion, and lists (offline: an
-// imported file, a subscription refused before any connection, searches lists acted on).
+// built-in searches with hostile titles, a rule, a pending suggestion, lists (offline: an
+// imported file, a subscription refused before any connection, searches lists acted on), and
+// sites seen in three searches with one opened page (the review list and the Opened marks).
 // Usage: SEARCHHOLE_HOME=<dir> node --experimental-strip-types e2e/seed.ts [initial|add <query>]
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -33,6 +34,21 @@ if (mode === 'initial') {
     name: 'private-address',
     mode: 'audit',
   })
+  // The review list (ADR-0025): two sites kept in three searches and never opened, and a third
+  // whose page the assistant opened (not listed, and its result reads "Opened" in the log).
+  // These are the oldest searches, so the rows the other tests use stay on top.
+  for (const query of ['css grid layout', 'css flexbox gap', 'css subgrid support']) {
+    await app.filterBuiltinResults(
+      query,
+      [
+        { title: 'CSS guide', url: 'https://docs.reviewed.example/css/guide' },
+        { title: `Top 10 tips: ${query}`, url: `https://farm.example/${query.replaceAll(' ', '-')}` },
+        { title: 'CSS tutorial', url: 'https://tutorials.example/css' },
+      ],
+      session,
+    )
+  }
+  await app.recordBuiltinFetch('https://docs.reviewed.example/css/guide', session)
   await app.filterBuiltinResults(
     'react compiler',
     [

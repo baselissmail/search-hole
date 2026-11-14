@@ -124,6 +124,16 @@ for (const theme of ['light', 'dark'] as const) {
     await page.keyboard.press('Escape')
     await expect(catalog).toHaveCount(0)
 
+    // Review (ADR-0025): the sites to act on, each with its pages and three actions.
+    await page
+      .getByRole('navigation', { name: 'Rules and lists' })
+      .getByRole('link', { name: /^Review/ })
+      .click()
+    await expect(page.getByRole('list', { name: 'Sites to review' })).toBeVisible()
+    await page.waitForTimeout(250)
+    await expectNoSeriousAxeIssues(page, `review ${theme}`)
+    await page.screenshot({ path: join(SCREENS, `review-${theme}.png`) })
+
     expect(seen.csp).toEqual([])
     expect(seen.errors).toEqual([])
   })
@@ -303,6 +313,134 @@ test('command menu: Browse list catalog opens it from anywhere', async ({ page }
   const catalog = page.getByRole('dialog', { name: 'List catalog' })
   await expect(catalog.getByRole('heading', { name: 'Super SEO Spam Suppressor' })).toBeVisible()
   await expect(catalog.getByText(/Adding one downloads it from its address/)).toBeVisible()
+})
+
+test('live log: every result says Opened, Seen or Hidden, and the panel counts what was opened', async ({
+  page,
+}) => {
+  await signIn(page)
+  await page.getByRole('button', { name: 'css grid layout' }).click()
+  const results = page.getByRole('table', { name: 'Results for “css grid layout”' })
+  await expect(results).toBeVisible()
+  await expect(page.getByTitle('Results the assistant opened, of those it was shown')).toHaveText(
+    'opened 1 of 3',
+  )
+  const row = (domain: string) => results.locator('tbody tr', { hasText: domain })
+  // The seed opened the guide with WebFetch in the same session; the other two were only listed.
+  await expect(row('reviewed.example').getByText('Opened', { exact: true })).toBeVisible()
+  await expect(row('farm.example').getByText('Seen', { exact: true })).toBeVisible()
+  await expect(row('tutorials.example').getByText('Seen', { exact: true })).toBeVisible()
+  await expect(results.getByText('Opened', { exact: true })).toHaveCount(1)
+
+  // The expanded panel with its marks, in both themes (the page-by-page axe run has no row open).
+  for (const theme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: theme })
+    await page.waitForTimeout(150)
+    await expectNoSeriousAxeIssues(page, `results panel ${theme}`)
+    await page.screenshot({ path: join(SCREENS, `log-results-${theme}.png`) })
+  }
+
+  // A hidden result has neither mark: it was never shown to the assistant.
+  await page.getByRole('button', { name: 'react compiler' }).click()
+  const hidden = page
+    .getByRole('table', { name: 'Results for “react compiler”' })
+    .locator('tbody tr', { hasText: 'pinterest.com' })
+  await expect(hidden.getByText('Hidden', { exact: true })).toBeVisible()
+  await expect(hidden.getByText(/^(Opened|Seen)$/)).toHaveCount(0)
+})
+
+interface ReviewNow {
+  total: number
+  sites: Array<{ domain: string; searches: number }>
+  dismissed: Array<{ domain: string }>
+}
+
+async function reviewNow(page: Page): Promise<ReviewNow> {
+  return (await (await page.request.get('/api/review', { headers: await auth(page) })).json()) as ReviewNow
+}
+
+async function rulesNow(page: Page): Promise<Array<{ match: string; action: string; scope: string }>> {
+  return (await (await page.request.get('/api/rules', { headers: await auth(page) })).json()) as Array<{
+    match: string
+    action: string
+    scope: string
+  }>
+}
+
+test('review: sites seen often and never opened; Keep and Block with Undo, from the keyboard', async ({
+  page,
+}) => {
+  const seen = await watch(page)
+  await signIn(page, '/rules')
+  const tab = page.getByRole('navigation', { name: 'Rules and lists' }).getByRole('link', { name: /^Review/ })
+  // The badge counts the sites waiting, and the link's name says what the number is.
+  await expect(tab).toHaveAccessibleName(/^Review\s+2 sites to review$/)
+  await tab.click()
+  await expect(page).toHaveURL(/\/rules\/review$/)
+
+  const list = page.getByRole('list', { name: 'Sites to review' })
+  const site = (domain: string) => list.locator(`[data-review-site="${domain}"]`)
+  // farm.example and tutorials.example were in three searches each; the site whose page was
+  // opened (reviewed.example) is not listed.
+  await expect(list.locator('[data-review-site]')).toHaveCount(2)
+  await expect(site('farm.example')).toContainText('3 searches · 3 results')
+  await expect(site('farm.example').getByRole('link')).toHaveCount(3)
+  await expect(site('tutorials.example').getByText('CSS tutorial')).toBeVisible()
+  await expect(site('tutorials.example').getByRole('link', { name: /tutorials\.example\/css/ })).toBeVisible()
+  expect((await reviewNow(page)).sites.map((s) => s.domain).sort()).toEqual([
+    'farm.example',
+    'tutorials.example',
+  ])
+
+  // Keep ("this site is fine"), then Undo within the toast.
+  await page.getByRole('button', { name: 'Keep tutorials.example' }).click()
+  await expect(site('tutorials.example')).toHaveCount(0)
+  await expect
+    .poll(async () => (await reviewNow(page)).dismissed.map((d) => d.domain))
+    .toEqual(['tutorials.example'])
+  await expect(tab).toHaveAccessibleName(/^Review\s+1 site to review$/)
+  await page
+    .locator('[data-sonner-toast]', { hasText: 'Kept tutorials.example' })
+    .getByRole('button', { name: 'Undo' })
+    .click()
+  await expect(site('tutorials.example')).toBeVisible()
+  await expect.poll(async () => (await reviewNow(page)).dismissed).toEqual([])
+
+  // Block from the keyboard: a global block rule, focus moves to the next site, Undo removes the rule.
+  await page.getByRole('button', { name: 'Block farm.example' }).focus()
+  await page.keyboard.press('Enter')
+  await expect(site('farm.example')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Block tutorials.example' })).toBeFocused()
+  expect((await rulesNow(page)).find((r) => r.match === 'farm.example')).toMatchObject({
+    action: 'block',
+    scope: 'global',
+  })
+  await page
+    .locator('[data-sonner-toast]', { hasText: 'Blocked farm.example' })
+    .getByRole('button', { name: 'Undo' })
+    .click()
+  await expect(site('farm.example')).toBeVisible()
+  expect((await rulesNow(page)).some((r) => r.match === 'farm.example')).toBe(false)
+
+  // A kept site can be listed again later, from the foot of the card.
+  await page.getByRole('button', { name: 'Keep farm.example' }).click()
+  await expect(site('farm.example')).toHaveCount(0)
+  await page.getByText('kept site is not listed').click()
+  await page.getByRole('button', { name: 'Review farm.example again' }).click()
+  await expect(site('farm.example')).toBeVisible()
+  await expect.poll(async () => (await reviewNow(page)).dismissed).toEqual([])
+
+  expect(seen.csp).toEqual([])
+  expect(seen.errors).toEqual([])
+})
+
+test('command menu: Review sites opens the review list', async ({ page }) => {
+  await signIn(page)
+  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+k' : 'Control+k')
+  await page.keyboard.type('review sites')
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/\/rules\/review$/)
+  await expect(page.getByRole('heading', { name: 'Review', exact: true })).toBeVisible()
 })
 
 async function auth(page: Page): Promise<Record<string, string>> {
