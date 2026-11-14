@@ -164,7 +164,7 @@ It runs only when you start it, listens on 127.0.0.1 only, and signs you in with
 Claude Code works with no engine (see the limits below). An engine gives better developer results, snippets, dates and freshness rules.
 
 - **SearXNG** (free, private, no account). Needs Docker. `searchhole searxng up` (or `/search-hole:searxng up --yes`) downloads about 380 MB once and listens on 127.0.0.1 only. SearXNG itself gets its results by querying other search engines.
-- **Tavily** (a free plan with no card; check [their site](https://tavily.com) for the current allowance). Sign up at <https://app.tavily.com> and paste the key into the plugin settings. search-hole stops at 300 searches a day and 900 a month by default (`engines.tavily.caps` in `settings.yaml`).
+- **Tavily** (free plan: 1,000 credits a month, no card; a search costs one credit and a deep one two. Checked in November 2026 against [their pricing](https://www.tavily.com/pricing)). Sign up at <https://app.tavily.com> and paste the key into the plugin settings. search-hole stops at 300 searches a day and 900 a month by default (`engines.tavily.caps` in `settings.yaml`).
 - **Brave** (needs a card; check [their terms](https://brave.com/search/api/) for the current free credit and the attribution they ask for). The same default caps apply. Brave's terms don't allow storing its results, so the log keeps only the site and the decision for them.
 
 Recommended: SearXNG plus a free Tavily key, so one engine covers for the other.

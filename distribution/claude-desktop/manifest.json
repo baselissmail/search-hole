@@ -60,14 +60,14 @@
     "tavily_api_key": {
       "type": "string",
       "title": "Tavily API key (optional)",
-      "description": "The easiest free engine: 1,000 searches a month, no credit card. Sign up at https://app.tavily.com and paste the key. Stored in your system keychain.",
+      "description": "The easiest free engine: 1,000 credits a month, no credit card (a search costs one credit, a deep search two). Sign up at https://app.tavily.com and paste the key. Stored in your system keychain.",
       "sensitive": true,
       "required": false
     },
     "brave_api_key": {
       "type": "string",
       "title": "Brave Search API key (optional)",
-      "description": "Optional extra engine with $5 of free credit a month (about 1,000 searches); it asks for a card. Sign up at https://brave.com/search/api/. Stored in your system keychain.",
+      "description": "Optional extra engine. Brave's API asks for a card; see https://brave.com/search/api/ for its current free credit and terms. Stored in your system keychain.",
       "sensitive": true,
       "required": false
     }
