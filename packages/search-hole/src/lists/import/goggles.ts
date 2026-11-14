@@ -46,7 +46,8 @@ export function sitePatternRegex(site: string, pattern: string): { match: string
   if (p.startsWith('|')) return { error: 'a start-anchored pattern combined with site= is not supported' }
   const r = urlPatternToRegex(p)
   if (!r.ok) return { error: r.error }
-  const src = r.source.replace(/\//g, '\\/')
+  // Escape each bare slash for the /regex/ form; a backslash escape, an escaped slash included, stays as it is.
+  const src = r.source.replace(/\\.|\//g, (m) => (m === '/' ? '\\/' : m))
   const head = `^[a-z][a-z0-9+.\\-]*:\\/\\/(?:[^\\/?#:]*\\.)?${escapeRegex(site)}(?::[0-9]+)?`
   // At the very start of the path only when the pattern cannot also continue the host name.
   const atStart = HOST_CHAR.test(p[0] ?? '') ? '' : `${src}|`

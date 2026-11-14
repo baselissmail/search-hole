@@ -96,7 +96,7 @@ function unwrap(text: string): string {
   return text
     .trim()
     .replace(/^<!--/, '')
-    .replace(/-->$/, '')
+    .replace(/--!?>$/, '')
     .replace(/^\s*(?:\/\/\s*)?<!\[CDATA\[/, '')
     .replace(/(?:\/\/\s*)?\]\]>\s*$/, '')
     .trim()

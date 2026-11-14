@@ -16,7 +16,7 @@
  * - User choices are written to the global rules.yaml with the locked, comment-preserving
  *   writer: `subscriptions:` for URL lists, `lists.<id>.mode` for every other list.
  */
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { closeSync, existsSync, fstatSync, openSync, readFileSync } from 'node:fs'
 import { basename, resolve } from 'node:path'
 import { type Document, isMap, isSeq, type YAMLMap, type YAMLSeq } from 'yaml'
 import type { CancelEntry, ListInput } from '../core/rules/engine.ts'
@@ -658,17 +658,23 @@ export class ListsService {
       throw bad(`A list named "${id}" already exists.`, 'Pick another --name.')
     }
     const file = resolve(this.ctx.cwd, path)
-    let size: number
+    // One open file for the checks and the read, and the cap is checked on what was read.
+    let bytes: Buffer
     try {
-      const s = statSync(file)
-      if (!s.isFile()) throw bad(`${path} is not a file.`)
-      size = s.size
+      const fd = openSync(file, 'r')
+      try {
+        const s = fstatSync(fd)
+        if (!s.isFile()) throw bad(`${path} is not a file.`)
+        if (s.size > MAX_IMPORT_BYTES) throw bad(`${path} is larger than 64 MiB, the per-list cap.`)
+        bytes = readFileSync(fd)
+      } finally {
+        closeSync(fd)
+      }
     } catch (e) {
       if (e instanceof SearchHoleError) throw e
       throw bad(`Cannot read ${path}.`, 'Check the path and its permissions.')
     }
-    if (size > MAX_IMPORT_BYTES) throw bad(`${path} is larger than 64 MiB, the per-list cap.`)
-    const bytes = readFileSync(file)
+    if (bytes.length > MAX_IMPORT_BYTES) throw bad(`${path} is larger than 64 MiB, the per-list cap.`)
     if (bytes.subarray(0, 8192).includes(0)) throw bad(`${path} is a binary file, not a text list.`)
     const text = new TextDecoder('utf-8', { fatal: false, ignoreBOM: true }).decode(bytes)
     const imported = importList(text, { format, listId: id, kind: input.kind })

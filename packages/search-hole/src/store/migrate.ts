@@ -15,16 +15,7 @@
  * SQLite DDL is transactional, so a crash leaves either the old or the new schema, never a
  * half-applied one. A crashed migrator's claim simply expires (120 s) and another takes over.
  */
-import {
-  chmodSync,
-  closeSync,
-  existsSync,
-  mkdirSync,
-  openSync,
-  readdirSync,
-  statSync,
-  unlinkSync,
-} from 'node:fs'
+import { chmodSync, closeSync, mkdirSync, openSync, readdirSync, statSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { setTimeout as sleepFor } from 'node:timers/promises'
 import { SearchHoleError } from '../shared/errors.ts'
@@ -133,10 +124,18 @@ export function backupDatabase(
   const dir = join(dataDir, 'backups')
   mkdirSync(dir, { recursive: true, mode: 0o700 })
   const stem = join(dir, `searchhole-v${from}-${timestamp(now)}-${pid}`)
-  let file = `${stem}.db`
-  for (let n = 1; existsSync(file); n++) file = `${stem}-${n}.db`
   // VACUUM INTO accepts an existing empty file, so the backup is never briefly world-readable.
-  closeSync(openSync(file, 'wx', 0o600))
+  // The exclusive create also picks the name: a taken one gets `-1`, `-2`…
+  let file = `${stem}.db`
+  for (let n = 1; ; n++) {
+    try {
+      closeSync(openSync(file, 'wx', 0o600))
+      break
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e
+      file = `${stem}-${n}.db`
+    }
+  }
   db.exec(`VACUUM INTO '${file.replaceAll("'", "''")}'`)
   try {
     chmodSync(file, 0o600)

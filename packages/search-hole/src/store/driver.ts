@@ -8,7 +8,7 @@
  * class and kept the old name as an alias). On Node 22 importing `node:sqlite` prints an
  * ExperimentalWarning; only that one warning is suppressed.
  */
-import { chmodSync, closeSync, existsSync, mkdirSync, openSync, statSync } from 'node:fs'
+import { chmodSync, closeSync, mkdirSync, openSync, statSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { SearchHoleError } from '../shared/errors.ts'
@@ -137,7 +137,13 @@ function ensureDir(dir: string): void {
 
 /** Creates the DB file `0600` before SQLite does (SQLite gives -wal/-shm the same mode). True when new. */
 function prepareFile(path: string): boolean {
-  if (!existsSync(path)) closeSync(openSync(path, 'a', 0o600))
+  try {
+    // Exclusive create: no window between "is it there?" and creating it.
+    closeSync(openSync(path, 'ax', 0o600))
+    return true
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e
+  }
   return statSync(path).size === 0
 }
 

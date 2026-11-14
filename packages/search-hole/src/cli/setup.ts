@@ -25,14 +25,16 @@
  */
 import {
   chmodSync,
+  closeSync,
   copyFileSync,
   existsSync,
   constants as fsConstants,
+  fstatSync,
   lstatSync,
   mkdirSync,
+  openSync,
   readFileSync,
   realpathSync,
-  statSync,
 } from 'node:fs'
 import { posix, win32 } from 'node:path'
 import { type Document, isMap, isScalar, isSeq, parseDocument } from 'yaml'
@@ -1418,13 +1420,19 @@ function readExisting(file: string): ExistingFile {
       })
     }
   }
-  const st = statSync(real)
-  if (!st.isFile()) {
-    throw new SearchHoleError('config_invalid', `${file} is not a file.`, {
-      fix: 'Move it aside, then run setup again.',
-    })
+  // One open file for the check and the read, so both see the same file.
+  const fd = openSync(real, 'r')
+  try {
+    const st = fstatSync(fd)
+    if (!st.isFile()) {
+      throw new SearchHoleError('config_invalid', `${file} is not a file.`, {
+        fix: 'Move it aside, then run setup again.',
+      })
+    }
+    return { text: readFileSync(fd, 'utf8'), real, mode: st.mode & 0o777 }
+  } finally {
+    closeSync(fd)
   }
-  return { text: readFileSync(real, 'utf8'), real, mode: st.mode & 0o777 }
 }
 
 /** `<file>.bak-20261031T185703Z`, with `-2`, `-3`… if that name is taken. */
