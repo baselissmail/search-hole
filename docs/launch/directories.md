@@ -5,7 +5,7 @@ A checklist per directory. Requirements change often: re-read each directory's c
 ## Shared prerequisites
 
 - [ ] A public release whose install works from the README on macOS, Windows and Linux (docs/release.md step 7).
-- [ ] README: a one-line description, the hero GIF, a 60-second quickstart per client, the privacy model, the limits, and the licence.
+- [ ] README: a one-line description, a hero GIF (still to record; the README has no image today), a quickstart per client, the privacy model, the limits, and the licence.
 - [ ] PRIVACY.md (MASTER_PLAN §12.5). It doesn't exist yet. Directories that review data handling ask for it.
 - [x] A square icon: `distribution/claude-plugin/.claude-plugin/icon.png`, the same 512×512 icon as the Desktop extension.
 - [ ] Screenshots: the dashboard in light and dark, and the receipt card in Claude Desktop.
@@ -17,7 +17,7 @@ A checklist per directory. Requirements change often: re-read each directory's c
 
 - [ ] `.claude-plugin/marketplace.json` at the repository root with the `archive` entry from the release (docs/release.md, one-time setup and step 7).
 - [ ] `claude plugin validate . --strict` passes on the repository root.
-- [ ] Install test: `claude plugin marketplace add baselissmail/search-hole`, then `/plugin install search-hole@search-hole`.
+- [ ] Install test: `claude plugin marketplace add baselissmail/search-hole`, then `/plugin install search-hole@search-hole`. [check: only true after the first release]
 
 ## Claude Code: Anthropic's plugin directory
 
@@ -38,21 +38,23 @@ A checklist per directory. Requirements change often: re-read each directory's c
 
 ## Cursor
 
-Blocked on P7. The Cursor manifest (`.cursor-plugin/plugin.json` plus `mcp.json` and hooks) doesn't exist yet.
+Built; fresh-install test pending. The Cursor plugin is in `distribution/cursor-plugin/` (`.cursor-plugin/plugin.json` plus `mcp.json` and a research skill). It has no hooks, by design: Cursor's plugin hooks can't call the running gateway.
 
-- [ ] P7 done: manifest, docs page, and a fresh-install test in Cursor that shows a search in the dashboard.
+- [x] The manifest and the docs page (docs/clients/cursor.md).
+- [ ] A fresh-install test in Cursor that shows a search in the dashboard.
 - [ ] Cursor's plugin or MCP directory submission. [check: which directory is current and what it requires]
 
 ## Codex
 
-Blocked on P7. Codex gets the **hookless** variant: a root `plugin.json` plus `mcp.json` in the Agent Plugins format, so it can be listed (MASTER_PLAN §9.3).
+Built; fresh-install test pending. Codex gets the **hookless** variant: a root `plugin.json` plus `mcp.json` in the Agent Plugins format (`distribution/codex/`), so it can be listed (MASTER_PLAN §9.3).
 
-- [ ] P7 done: the hookless manifests, and a fresh-install test in Codex.
+- [x] The hookless manifests and the docs page (docs/clients/codex.md).
+- [ ] A fresh-install test in Codex.
 - [ ] Codex plugin directory submission. [check: the URL and requirements]
 
 ## MCP server lists
 
-- [ ] The official MCP Registry (`modelcontextprotocol/registry`): publish `server.json` for the npm package `search-hole`. [check: the current publisher CLI, and namespace verification for `io.github.baselissmail/search-hole`]
+- [ ] The official MCP Registry (`modelcontextprotocol/registry`): publish `server.json` for the npm package `search-hole`. [check: only after the first release, when the npm package exists] [check: the current publisher CLI, and namespace verification for `io.github.baselissmail/search-hole`]
 - [ ] awesome-mcp-servers lists. Open one pull request each, follow the list's format and category (search), and keep the line factual:
 
   > [search-hole](https://github.com/baselissmail/search-hole) – Local search gateway: your engines (SearXNG, Tavily, Brave), site rules, a local log of every search, and source receipts with dates.

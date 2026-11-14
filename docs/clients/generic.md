@@ -2,7 +2,9 @@
 
 Any app that can start a local (stdio) MCP server can run search-hole.
 
-## Quickstart (about 60 seconds)
+Status: the snippet search-hole prints is checked by tests; this guide has not yet been tried in a real app.
+
+## Quickstart
 
 You need Node.js 22.19+ (`node --version`), the `searchhole` command and an engine. See [Before you start](README.md#before-you-start-every-app-except-claude-code).
 
@@ -12,7 +14,7 @@ You need Node.js 22.19+ (`node --version`), the `searchhole` command and an engi
    searchhole setup generic
    ```
 
-   It prints this, with the path of your copy, and writes nothing:
+   It writes no file. It prints this, with the path of your copy, alone on stdout (so you can redirect it into a file), and the next steps on stderr:
 
    ```json
    {
@@ -26,7 +28,7 @@ You need Node.js 22.19+ (`node --version`), the `searchhole` command and an engi
    ```
 
 2. Paste it into your app's MCP server settings. Most apps use this `mcpServers` shape; some want the command and the arguments in separate fields. Restart the app.
-3. Ask for something that needs the web, naming search-hole. Then run `searchhole log` or `searchhole ui --open` to see the search.
+3. Ask for something that needs the web, naming search-hole. Then run `searchhole log` or `searchhole ui --open` to see the search. If no engine is set up, `search` answers with an error and tells the assistant to ask you to add one.
 
 If the app wants a single command line: `node "/path/to/search-hole/dist/searchhole.mjs" mcp --host generic`.
 
@@ -48,7 +50,7 @@ Use the keychain, which works without any app support:
 searchhole keys set tavily
 ```
 
-If your app can pass environment variables to a server, search-hole also reads `TAVILY_API_KEY`, `BRAVE_SEARCH_API_KEY` and the like from its environment. Keep the key itself out of the app's config file.
+If your app can pass environment variables to a server, search-hole also reads `TAVILY_API_KEY` and `BRAVE_SEARCH_API_KEY` from its environment. Keep the key itself out of the app's config file.
 
 ## Uninstall
 

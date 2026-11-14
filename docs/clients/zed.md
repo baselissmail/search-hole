@@ -2,7 +2,9 @@
 
 Zed's Agent panel gets search-hole's tools as a context server.
 
-## Quickstart (about 60 seconds)
+Status: the config search-hole writes is checked by tests; this guide has not yet been tried in the real app.
+
+## Quickstart
 
 You need Node.js 22.19+ (`node --version`), the `searchhole` command and an engine. See [Before you start](README.md#before-you-start-every-app-except-claude-code).
 
@@ -12,7 +14,7 @@ You need Node.js 22.19+ (`node --version`), the `searchhole` command and an engi
    searchhole setup zed
    ```
 
-   It adds `search-hole` under `context_servers` in your Zed settings: `~/.config/zed/settings.json` on macOS and Linux (`$XDG_CONFIG_HOME/zed/` if you set it on Linux), `%APPDATA%\Zed\settings.json` on Windows. Your other settings and comments stay, and the old file is saved as `settings.json.bak-<time>`.
+   It shows the lines it will add and asks before it writes. Then it adds `search-hole` under `context_servers` in your Zed settings: `~/.config/zed/settings.json` on macOS and Linux (`$XDG_CONFIG_HOME/zed/` if you set it on Linux), `%APPDATA%\Zed\settings.json` on Windows. Your other settings and comments stay, and the old file is saved as `settings.json.bak-<time>`.
 2. Zed reloads its settings by itself. Open the Agent panel's settings: search-hole should have a green dot.
 3. Ask the agent: *"Use search-hole to find the Node.js 24 release notes, and cite your sources with dates."*
 4. Run `searchhole log` or `searchhole ui --open` to see the search.

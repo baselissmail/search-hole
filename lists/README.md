@@ -5,7 +5,7 @@ Lists written and maintained by search-hole, licensed CC0-1.0 (see `LICENSE` her
 | List | Kind | Default mode | Entries | Source | What it does |
 | --- | --- | --- | --- | --- | --- |
 | `official-docs` | official | enforce (annotation) | 96 | `packages/search-hole/src/lists/bundled/official-docs.ts` | Marks official documentation sites as `official` in results and receipts; the default profile ranks them higher. Never hides anything. |
-| `official-health` | official | enforce (annotation) | 111 | `packages/search-hole/src/lists/bundled/official-health.ts` | Marks health ministries, public-health agencies, medicines regulators and a few clinical reference sites (Mayo Clinic, Cleveland Clinic, Johns Hopkins, MSD Manuals, Cochrane) as `official`. Never hides anything. |
+| `official-health` | official | enforce (annotation) | 111 | `packages/search-hole/src/lists/bundled/official-health.ts` | Marks health ministries, public-health agencies, medicines regulators and a few clinical reference sites (Mayo Clinic, Cleveland Clinic, Johns Hopkins, MSD Manuals, Cochrane) as `official`; the default profile ranks them higher too. Never hides anything. |
 | `github-clones` | clone | enforce | 172 | `packages/search-hole/src/lists/bundled/github-clones.ts` | Hides sites that republish Stack Exchange or GitHub content wholesale. |
 | `ai-content-farms` | content-farm | audit | 21 | `packages/search-hole/src/lists/bundled/ai-content-farms.ts` | Records "would hide" for sites that mass-publish machine-generated articles; the user can enforce it after trying it. |
 
@@ -22,7 +22,7 @@ Don't edit the `.txt` files by hand. Change the module, then run `node scripts/e
 
 ## Vendored third-party lists
 
-`vendor/` holds unchanged copies of the third-party starter lists whose licences permit it (ADR-0017 point 7). **They are not CC0**: each keeps its own licence, named in its header and in `THIRD_PARTY_NOTICES.md`. The catalog of lists you can subscribe to is `packages/search-hole/src/lists/catalog.ts`.
+`vendor/` holds unchanged copies of the third-party starter lists whose licences permit it (ADR-0017 point 7). `searchhole lists` and the dashboard show them as "starter". **They are not CC0**: each keeps its own licence, named in its header and in `THIRD_PARTY_NOTICES.md`. The catalog of lists you can subscribe to is `packages/search-hole/src/lists/catalog.ts`.
 
 ## Contributing
 

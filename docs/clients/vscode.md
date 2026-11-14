@@ -2,7 +2,9 @@
 
 Copilot Chat's agent gets search-hole's tools, and the receipt card renders in the chat with its "Block a site…" button.
 
-## Quickstart (about 60 seconds)
+Status: the config search-hole writes is checked by tests; this guide has not yet been tried in the real app.
+
+## Quickstart
 
 You need VS Code with GitHub Copilot, Node.js 22.19+ (`node --version`), the `searchhole` command and an engine. See [Before you start](README.md#before-you-start-every-app-except-claude-code).
 
@@ -12,7 +14,7 @@ You need VS Code with GitHub Copilot, Node.js 22.19+ (`node --version`), the `se
    searchhole setup vscode
    ```
 
-   It adds `search-hole` under `servers` in your user `mcp.json`: `~/Library/Application Support/Code/User/mcp.json` on macOS, `~/.config/Code/User/mcp.json` on Linux, `%APPDATA%\Code\User\mcp.json` on Windows. Comments and other servers stay, and the old file is saved as `mcp.json.bak-<time>`.
+   It shows the lines it will add and asks before it writes. Then it adds `search-hole` under `servers` in your user `mcp.json`: `~/Library/Application Support/Code/User/mcp.json` on macOS, `~/.config/Code/User/mcp.json` on Linux, `%APPDATA%\Code\User\mcp.json` on Windows. Comments and other servers stay, and the old file is saved as `mcp.json.bak-<time>`.
 2. Reload VS Code (Command Palette → **Developer: Reload Window**). The first time VS Code starts search-hole, it asks you to trust it.
 3. Open Copilot Chat, pick **Agent** mode, and check that search-hole is ticked in the tools list. Ask: *"Use search-hole to find the Node.js 24 release notes, then show the search-hole receipt."*
 4. Run `searchhole log` or `searchhole ui --open` to see the search.

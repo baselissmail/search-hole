@@ -2,6 +2,8 @@
 
 search-hole is one local program. Every app below starts it the same way, as an MCP server: `node <path>/searchhole.mjs mcp --host <profile>`. Only the way you add it, and what the app can do with it, differ.
 
+Status: Claude Code on macOS is used daily. For every other app below, the config search-hole writes is checked by tests; the guide has not yet been tried in the real app.
+
 | App | Guide | How you add it | Host profile | Hooks | Receipt panel | Panel buttons | Built-in search filtered |
 |---|---|---|---|---|---|---|---|
 | Claude Code | [claude-code.md](claude-code.md) | plugin | `claude-code` | yes | no (text receipt) | n/a | yes |
@@ -20,36 +22,39 @@ What the columns mean:
 - **Hooks** run search-hole when the app does something, such as before a built-in web search or at the end of a turn. Only Claude Code has hooks that can call the gateway, so only Claude Code gets the one-line receipt after each turn and the guard against the model editing your rules.
 - **Receipt panel** is the receipt card shown as an MCP App inside the chat. Apps that don't render MCP Apps get the same receipt as text.
 - **Panel buttons** ("Block a site…") use the app-only `apply_rule` tool. They are only on hosts that hide app-only tools from the model and let a panel call the server. Codex and Zed never get `apply_rule`.
-- **Built-in search filtered** means search-hole applies your rules to the app's own web search. Only Claude Code allows that (ADR-0018). In every other app search-hole is an extra search tool: it needs an engine, and the app may still use its own search unless you ask for search-hole or turn the built-in one off.
+- **Built-in search filtered** means search-hole applies your rules to the app's own web search. Only Claude Code allows that (ADR-0018). In every other app search-hole is an extra search tool: it needs an engine, and the app may still use its own search unless you ask for search-hole or turn the built-in one off. With no engine set up, `search` answers with an error that tells the assistant to ask you to add one.
 
 ## Before you start (every app except Claude Code)
 
 1. **Node.js 22.19 or newer** must be on your PATH: `node --version`. Apps started from the Dock or the Start menu may not see a Node.js installed by nvm, fnm, mise or similar; see each guide's troubleshooting.
-2. **The `searchhole` command.** Once search-hole is on npm, install it with:
+2. **The `searchhole` command.** search-hole is not on npm yet, so use a checkout. Clone the repository and build it once (this needs [mise](https://mise.jdx.dev)):
 
    ```sh
-   npm install -g search-hole
+   mise install
+   mise exec -- pnpm install --frozen-lockfile
+   mise exec -- node scripts/build-plugin.mjs
    ```
 
-   Until then, use a checkout. Build it once with `node scripts/build-plugin.mjs` (this needs [mise](https://mise.jdx.dev)), then run `node "<repo>/packages/search-hole/dist/searchhole.mjs"` wherever these guides say `searchhole`. `setup` writes the path of the copy you run into the app's config, so run it from a copy that stays put: a global install or your checkout, not `npx` (npx's cache can be deleted).
-3. **An engine.** Outside Claude Code, search-hole needs one. The quickest is a free Tavily key (1,000 searches a month, no card, from https://app.tavily.com), kept in your OS keychain:
+   Then run `node "<repo>/packages/search-hole/dist/searchhole.mjs"` wherever these guides say `searchhole`. `setup` writes the path of the copy you run into the app's config, so run it from a copy that stays put, such as your checkout. After the first release, `npm install -g search-hole` will give you the `searchhole` command; don't run `setup` through `npx` (npx's cache can be deleted).
+3. **An engine.** Outside Claude Code, search-hole needs one. The quickest is a Tavily key (free plan: 1,000 credits a month, no card; a search costs one credit, a deep search two; checked November 2026; sign up at <https://app.tavily.com>), kept in your OS keychain:
 
    ```sh
    searchhole keys set tavily
    ```
 
-   Or run a private SearXNG in Docker with `searchhole searxng up`. `searchhole doctor` checks either.
+   Or run a private SearXNG in Docker with `searchhole searxng up`. `searchhole doctor` checks either. Brave works too (`searchhole keys set brave`); its API asks for a card, see <https://brave.com/search/api/> for the current terms. search-hole's own default cap stops Tavily and Brave at 300 searches a day and 900 a month (`engines.<name>.caps` in `settings.yaml`).
 
 ## What `searchhole setup` does
 
 `searchhole setup <app>` adds one entry named `search-hole` to the app's own config file:
 
+- It **shows the change and asks first.** It prints the lines it will add (`+ …`) and remove (`- …`), with two lines of context, then asks `Write <file>? (a backup is kept)`. With no terminal to ask in, it writes nothing unless you pass `--yes`.
 - It **keeps everything else**: other servers, other settings and, in files that allow them, comments.
 - It **saves the old file first**, next to it, as `<file>.bak-<time>`.
 - It **refuses a file it can't read** instead of guessing, and prints what to add by hand.
 - It **never writes a key.** `--env NAME` lets the app pass an environment variable through, by name only. Keys stored with `searchhole keys set` need nothing at all.
 
-`--dry-run` shows the change and writes nothing. `--project` writes the project's file instead of your user file (VS Code, Cursor, Zed and Codex). Running it again changes nothing.
+`--dry-run` shows the same lines and writes nothing. `--project` writes the project's file instead of your user file (VS Code, Cursor, Zed and Codex). Running it again changes nothing. `setup generic` never writes a file: it prints the JSON snippet alone on stdout, and the next steps on stderr.
 
 ## Check that it works
 

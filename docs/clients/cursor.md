@@ -2,7 +2,9 @@
 
 Cursor's agent gets search-hole's tools, and the receipt card renders in the chat with its "Block a site…" button. There are two ways in: one command that edits `~/.cursor/mcp.json`, or the Cursor plugin.
 
-## Quickstart (about 60 seconds)
+Status: the config search-hole writes is checked by tests; this guide has not yet been tried in the real app.
+
+## Quickstart
 
 You need Node.js 22.19+ (`node --version`), the `searchhole` command and an engine. See [Before you start](README.md#before-you-start-every-app-except-claude-code).
 
@@ -12,7 +14,7 @@ You need Node.js 22.19+ (`node --version`), the `searchhole` command and an engi
    searchhole setup cursor
    ```
 
-   It adds `search-hole` to `~/.cursor/mcp.json` (`%USERPROFILE%\.cursor\mcp.json` on Windows), keeps your other servers and saves the old file as `mcp.json.bak-<time>`.
+   It shows the lines it will add and asks before it writes. Then it adds `search-hole` to `~/.cursor/mcp.json` (`%USERPROFILE%\.cursor\mcp.json` on Windows), keeps your other servers and saves the old file as `mcp.json.bak-<time>`.
 2. Open **Customize** in Cursor's sidebar (older versions: **Cursor Settings → MCP**) and check that **search-hole** is on, with a green dot.
 3. In a new chat in Agent mode, ask: *"Use search-hole to find the Node.js 24 release notes, then show the search-hole receipt."*
 4. Run `searchhole log` or `searchhole ui --open` to see the search.
@@ -31,7 +33,7 @@ By hand, add this inside `mcpServers`, with your path:
 
 ## The Cursor plugin
 
-The plugin (`distribution/cursor-plugin/`) is the same server plus a research skill. To try a local build:
+The plugin (`distribution/cursor-plugin/`) is the same server plus a research skill. It has no hooks, by design (see the table below). To try a local build (after the build in [Before you start](README.md#before-you-start-every-app-except-claude-code)):
 
 ```sh
 node scripts/build-plugin.mjs --target cursor

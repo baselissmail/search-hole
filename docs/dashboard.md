@@ -6,7 +6,7 @@ The dashboard is a small website that runs on your own computer. It answers thre
 2. **What did search-hole hide, and why?**
 3. **How do I change that?** You add rules, manage lists and change settings without typing commands.
 
-Everything stays on your machine. The dashboard reads the same data and rules as the CLI and the plugin, so a change made here applies to every app from its next search.
+The dashboard runs on your machine and loads nothing from the internet. It reads the same data and rules as the CLI and the plugin, so a change made here applies to every app from its next search.
 
 ## Opening it
 
@@ -19,9 +19,11 @@ Either one starts the dashboard at `http://127.0.0.1:7341` and opens your browse
 
 - There's no password. The command gives the browser a link that works **once** and only for **60 seconds**. Any website you visit could try to talk to a server on your computer, so the dashboard only trusts someone who just ran the command.
 - The session lasts until you close the tab or the dashboard stops. Nothing goes into cookies.
+- The link is printed only in a terminal, never in output that Claude can read. With `--open`, the browser gets it directly and it is not printed at all. If `/search-hole:dashboard` can't open a browser, it tells you to run `searchhole ui` yourself in a terminal.
+- A hook denies Claude's attempts to run `searchhole ui`, so Claude can't start the dashboard for itself.
 - If you see the "Sign in" screen, run the command again.
 
-**When it stops:** after 30 minutes with no activity, so it doesn't run forever in the background. `/search-hole:dashboard --stay` keeps it running.
+**When it stops:** after 30 minutes with no open tab, so it doesn't run forever in the background. `/search-hole:dashboard --stay` keeps it running.
 
 ## The layout
 
@@ -39,11 +41,11 @@ A quick health check, so you can see at a glance whether search-hole is doing an
 | Number | What it shows | Why it's there |
 |---|---|---|
 | **Searches · 7 days** | How many searches ran this week. | Shows that search-hole is seeing Claude's searches at all. |
-| **Hidden** | How many results were hidden this week. | The main sign of whether it's useful to you. If this stays near 0, it isn't changing much. |
-| **Built-in vs engines** | A bar: searches through Claude's own WebSearch compared with search-hole's engines. | Shows which path your searches take. In Claude Code it's normally all built-in. |
+| **Hidden** | How many results were hidden this week, and their share of all results. | Shows how much your rules and lists change. At 0, nothing is being filtered; the log still shows what was searched. |
+| **Built-in vs engines** | A bar: searches through Claude's own WebSearch compared with search-hole's engines. | Shows which path your searches take. In Claude Code with no engine set up, it's all built-in. |
 | **Mode** | The search mode. "Auto → Built-in" means you chose Auto, and it used built-in because no engine was available. | So you can see what actually happened, not only what you set. |
 | **Engines used** | The engines that served searches, top 3. | Only matters when you use engines (SearXNG, Brave, Tavily). |
-| **Sources kept** | What kinds of pages were kept: Official, Docs, Forum, Blog, News, Repo, Reference, Content farm, Unknown. | Shows the quality mix of what Claude reads. More Official and Docs is better. |
+| **Sources kept** | What kinds of pages were kept, top 3: Official, Docs, Forum, Blog, News, Repo, Reference, Content farm, Unknown. | Shows the mix of sources in the results Claude was given. It doesn't show which of them Claude opened. |
 | **Top hidden** | The 3 sites hidden most often. | Tells you which rules or lists are doing the work, and catches a site hidden by mistake. |
 
 On a phone, only the first numbers show.
@@ -85,7 +87,7 @@ Click a row, or press Enter, to see every result of that search.
 
 | For each result | Why |
 |---|---|
-| **Rank, site, title and URL** | What the result was. Only `http` and `https` addresses become links. Web text is shown as plain text, never run as code. |
+| **Rank, site, title and URL** | What the result was. Only `http` and `https` addresses become links. Web text is shown as plain text, never run as code. One exception: for results from Brave, only the site and the decision are stored, because Brave's terms don't allow keeping titles and URLs. Those rows say "Title not kept". |
 | **Decision:** Kept, Hidden or Pinned | What search-hole did with it. |
 | **Reason:** Your rule, A list, Too old, No date found, or Not on the allowlist | Why it was hidden. |
 | **The rule that fired** | Hover to see the exact rule and its level (session, project, global or list). This is how you find a wrong rule. |
@@ -100,9 +102,9 @@ Click a row, or press Enter, to see every result of that search.
 - **Pin:** put this site's results first.
 - **Raise / Lower:** move it up or down.
 
-Every action shows an **Undo** for 8 seconds. That's why there are no "Are you sure?" dialogs: mistakes are cheap to reverse.
+A rule added this way is global: it applies to every project. Every action shows an **Undo** for 8 seconds. That's why there are no "Are you sure?" dialogs: mistakes are cheap to reverse.
 
-**Not shown yet:** whether Claude actually *opened* each kept result. You can see what was hidden, but not which kept pages Claude read and which it ignored. (Your dogfooding finding; not built yet.)
+**Not shown yet:** whether Claude actually *opened* each kept result. You can see what was hidden, but not which kept pages Claude read and which it ignored. (Not built yet.)
 
 ## 2. Rules & lists → Rules
 
@@ -110,24 +112,25 @@ Every action shows an **Undo** for 8 seconds. That's why there are no "Are you s
 
 **Why it exists:** rules are how you tell search-hole what you trust and what you don't. Your rules always beat lists. When two of your rules clash, the more local one wins: session, then project, then global.
 
-### Add rule
+### Add a rule
 
 | Field | Meaning |
 |---|---|
 | **Match** | Which pages: a domain (`example.com`), a host and path, a URL pattern with `*`, or a `/regex/`. |
-| **Action** | Block, Allow, Pin, Raise or Lower. |
+| **Action** | Block, Allow, Pin, Raise, Lower or Normal (cancels a raise or lower that a list applies). |
 | **Weight** | For Raise and Lower only: 1 is a nudge, 10 a shove. |
-| **Scope** | **Global** (every project) or **Project** (only the current one). |
 | **Until** (optional) | The rule stops after this day. Good for temporary rules. |
 | **Note** (optional) | A reminder to yourself of why you added it. |
 
+There is no scope to choose. A rule added in the dashboard is always global: it applies to every project. One dashboard serves every project, so it has no "current project" to write to. For a rule in one project only, run `searchhole block <site> --project` in that project.
+
 ### Your rules
 
-A table of every rule: Match, Action, Weight, Scope, Source (the file the rule is stored in, such as `rules.yaml`, or a project's `.searchhole.yaml`) and Note (including an end date, if it has one). You can sort it and filter it, and remove any rule with Undo.
+A table of every rule: Match, Action, Weight, Scope, Source (the file the rule is stored in, such as `rules.yaml`, or a project's `.searchhole.yaml`) and Note (including an end date, if it has one). A project rule whose `.searchhole.yaml` you haven't trusted is marked "· not trusted": it is saved, but doesn't apply until you run `searchhole trust` in that project. You can sort the table and filter it, and remove any rule with Undo.
 
 ### Test a URL
 
-Paste a URL to see what your rules would do with it and every rule that matched. Nothing is downloaded; only the rules are checked.
+Enter a site or a URL to see what your rules would do with it and every rule that matched. Nothing is downloaded; only the rules are checked.
 
 **Why:** to answer "why was this hidden?" or "will my new rule catch this?" without waiting for a real search.
 
@@ -141,7 +144,7 @@ Claude can *propose* a rule (the `suggest_rule` tool), for example "lower geeksf
 
 **What it is:** block lists that other people maintain, like an ad blocker's filter lists, plus search-hole's own lists.
 
-**Why it exists:** writing rules for hundreds of junk sites by hand isn't realistic. Lists give you that protection out of the box, and this page shows whether they're helping.
+**Why it exists:** writing rules for hundreds of junk sites by hand isn't realistic. A list does it in one step, and this page shows whether each list is doing anything.
 
 ### The summary at the top
 
@@ -160,13 +163,13 @@ Claude can *propose* a rule (the `suggest_rule` tool), for example "lower geeksf
 | **This week** | How many results it hid, or would have hidden in Audit. |
 | **Actions** | Update now, try again after an error, or remove. Only lists you added can be removed; built-in and starter lists can only be switched off. |
 
-**Why Audit exists:** a new list might hide good sites. Audit lets you watch what it *would* do for a while, then switch to Enforce once you trust it. New subscriptions start in Audit for that reason.
+**Why Audit exists:** a new list might hide good sites. Audit lets you watch what it *would* do for a while, then switch to Enforce once you trust it. New subscriptions start in Audit for that reason. It is the same in the CLI: `searchhole lists add` starts a list in audit mode unless you pass `--mode enforce`.
 
 **Errors:** a failed update shows the error *and* how to fix it. The old copy keeps working in the meantime.
 
 ### Buttons
 
-- **Browse catalog:** lists you can add, each with what it does, its licence and size, and whether you already have it. "Add" subscribes in the recommended mode.
+- **Browse catalog:** lists you can add, each with what it does, its licence and size, and whether you already have it. "Add" subscribes in the recommended mode, which is Audit for every list outside the starter set.
 - **Update all:** download fresh copies now.
 - **Subscribe by address:** add any list by its web address (`https://…`), with an optional name, its kind, its format (uBlacklist, AdGuard, hosts, plain domains, Goggles), a mode (Audit by default) and how often to update it. Lines search-hole can't read are counted and skipped.
 
@@ -174,7 +177,7 @@ Claude can *propose* a rule (the `suggest_rule` tool), for example "lower geeksf
 
 ## 4. Engines
 
-**What it is:** the search engines search-hole can use (SearXNG, Brave, Tavily, …) and the health checks.
+**What it is:** the search engines search-hole can use (SearXNG, Brave and Tavily) and the health checks.
 
 **Why it exists:** when searches go through engines, you need to know which ones work and why one doesn't. **In Claude Code you can mostly ignore this page,** because built-in mode needs no engine. It matters for Claude Desktop, Cursor, VS Code and the other apps.
 
@@ -184,12 +187,13 @@ One card per engine:
 
 | Fact | Meaning |
 |---|---|
-| **Health** | Healthy, Unhealthy or Unknown. |
+| **State** | Active, Inactive, or Not set up (for example, an engine with no key yet). |
+| **Health** | Healthy, Unhealthy or Unknown. Shown once an engine is set up. |
 | **Why inactive** | No API key, no endpoint set, turned off, spend cap reached, suspended, and so on. |
 | **Key** | *Where* the key comes from (keychain, environment, …). The key itself is never shown. |
 | **Last error** | For example "Rate limited" or "Key rejected". |
 | **Suspended until** | When an engine fails in certain ways, for example its quota is used up, search-hole pauses it for a while instead of slowing every search. |
-| **Endpoint / Attribution** | Where it sends queries, and the credit the engine requires. |
+| **Endpoint** | "Not answering", when nothing responds at the engine's address (for example, a private SearXNG that isn't started). |
 
 **Check now** tests every engine immediately.
 
@@ -211,7 +215,7 @@ The same checks as `searchhole doctor`: Node version, hooks, engines, keys and f
 | **History** | How long to keep searches (default 90 days), and the **receipt line** that Claude Code shows after a turn that searched. | Your log stays on your machine and doesn't grow forever. |
 | **Appearance** | Light, dark or system theme. Stored in this browser only. | Comfort. |
 | **Lists** | Update lists in the background, on or off. | Off means lists change only when you press Update. |
-| **Files** | Where your config and data live (normally `~/.searchhole`). | So you know where to look, back up, or delete. |
+| **Files** | Where your config and data live: `~/.searchhole/` on macOS; `~/.config/searchhole/` and `~/.local/share/searchhole/` on Linux; `%APPDATA%\searchhole\` and `%LOCALAPPDATA%\searchhole\` on Windows. | So you know where to look, back up, or delete. |
 
 ## Keyboard and command menu
 
@@ -219,7 +223,7 @@ The whole dashboard works without a mouse.
 
 | Keys | Does |
 |---|---|
-| `⌘K` | Command menu: go to a page, Add rule, Check engines, Update all lists, Browse list catalog, Show searches that hid results, change the theme. |
+| `⌘K` (`Ctrl K` on Windows and Linux) | Command menu: go to a page, Add rule, Check engines, Update all lists, Browse list catalog, Show searches that hid results, change the theme. |
 | `?` | Show all shortcuts. |
 | `G` then `L` / `R` / `E` / `S` | Go to Live log / Rules / Engines / Settings. |
 | `J` / `K` (or ↓ / ↑) | Next or previous search or result in the Live log. |
@@ -233,7 +237,7 @@ The whole dashboard works without a mouse.
 The dashboard can change your rules, and any website open in your browser could try to reach a server on your computer. So:
 
 - It only listens on `127.0.0.1`. It rejects requests addressed to any other host name, and changes sent from any other website.
-- You sign in with a one-time, 60-second link. There's no password and no cookie.
+- You sign in with a one-time, 60-second link. There's no password and no cookie. The link is printed only to a terminal, never into Claude's context.
 - Text from the web (titles, URLs, list names) is always shown as plain text, never as HTML or code.
 - A strict security policy blocks any script that isn't the dashboard's own.
 

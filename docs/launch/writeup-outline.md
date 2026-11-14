@@ -1,22 +1,28 @@
 # Write-up outline (Medium and LinkedIn)
 
-One long piece for Medium, with a shorter LinkedIn post that links to it. Basel's voice, first person, about 1,500–2,000 words on Medium. The angle is "what I learned giving an AI assistant's web search a filter and a paper trail", not "launching a product".
+One long piece for Medium, with a shorter LinkedIn post that links to it. Basel's voice, first person, about 1,500–2,000 words on Medium. The angle is "what I learned giving an AI assistant's web search a paper trail and a filter", not "launching a product". Lead with the paper trail: in two weeks of real use the filter hid nothing (docs/launch/README.md has the numbers).
 
 ## Working titles
 
-- What my AI assistant was actually reading, and how I made it stop
-- Giving Claude's web search a blocklist and a receipt
+- What my AI assistant searched for two weeks, and what it actually opened
+- Giving Claude's web search a receipt and a blocklist
 - A Pi-hole idea for AI search: notes from building search-hole. "Pi-hole" here only describes the idea; keep it out of the branding.
 
 ## Outline
 
-1. **The moment** (about 150 words). A concrete case from the dogfood log (docs/dogfood.md), such as a stale doc or an SEO clone that Claude cited. A screenshot of the receipt that showed it. [check: pick a real entry, with private details removed]
+1. **What two weeks showed** (about 150 words). The numbers from your own log, 2026-10-31 to 2026-11-13 (Claude Code on macOS, default setup):
+   - 96 searches returned 1,243 results from 538 sites;
+   - the assistant opened pages from 37 of those sites;
+   - several sites came back in 5 to 10 separate searches and were never opened once;
+   - no rule and no list hid anything.
+
+   Say plainly that the block lists did nothing in this sample, and that the value so far is seeing, then deciding. Don't name a site from the log, and don't say what the searches were about. A screenshot of a receipt. [check: pick one with no private details]
 2. **The problem in general** (about 250 words):
    - Assistants search constantly.
-   - You can't choose the sources or the engine, and you can't see what happened.
+   - You can't see what was searched, what came back or what was opened, and you can't choose the sources or the engine.
    - Keep it to what you've observed. No figures about other products unless you can cite them.
 3. **What search-hole does** (about 300 words, with one diagram):
-   - rules (block, allow, pin, raise, lower), engines you choose, a local log, and a receipt per turn;
+   - a local log, a receipt per turn, rules (block, allow, pin, raise, lower), and engines you choose;
    - the dashboard and the Desktop card;
    - the ARCHITECTURE.md process diagram, simplified.
 4. **Three design decisions worth sharing** (about 600 words). Each one: the problem, the options, the choice, the trade-off. Link the ADR.
@@ -24,30 +30,32 @@ One long piece for Medium, with a shorter LinkedIn post that links to it. Basel'
    - Hooks that fail open, plus a guard so the model can only *suggest* rules (ADR-0014, ADR-0012).
    - One dependency-free bundle on Node's built-in SQLite instead of native modules or standalone binaries (ADR-0002, ADR-0003). Include the Node-version lesson from CI.
 5. **Privacy model** (about 200 words):
-   - local only, no telemetry;
+   - no telemetry and no account; the log, the rules and the settings are files on your disk;
    - where each file lives, retention, and keys in the keychain;
    - query hygiene (secrets block the search, private IPs are cut out);
-   - what the engines still see.
-6. **Honest limits** (about 150 words): built-in mode lacks snippets and dates; "opened", not "cited"; claude.ai on the web isn't supported yet; the guard is defence in depth.
+   - what still leaves the machine: your queries, to the search you use; your blocked sites, as an exclude list; and the weekly refresh of the block lists from GitHub.
+6. **Honest limits** (about 150 words): built-in mode lacks snippets and dates; a publish date is found only when the page states one (8 of the 40 pages opened through search-hole's fetch in those two weeks); "opened", not "cited"; claude.ai on the web isn't supported; the guard is defence in depth; only Claude Code on macOS has daily use behind it, and the other apps have not been tried in the real app. [check: update with what you have tried by then]
 7. **How it was built** (about 200 words):
    - built with Claude Code;
    - an ADR for every non-obvious choice;
    - adversarial reviews, and the two-week rule for dependency versions;
-   - CI on three OSes, npm provenance, an SBOM.
+   - CI on three OSes; npm provenance and an SBOM. [check: only true after the first release]
 
    What worked, and what you'd do differently.
-8. **Try it** (about 100 words): the 60-second quickstart for Claude Code and the CLI, a link to the repo, and the kind of feedback you want (rules you'd use, lists you trust).
+8. **Try it** (about 100 words): the quickstart for Claude Code and the CLI, a link to the repo, and the kind of feedback you want (rules you'd use, lists you trust). [check: the install commands, after the first release]
 
 ## Assets
 
-- The hero GIF from the README: a search, then the receipt line, then `/search-hole:block`.
+- A hero GIF, still to record (the README has no image today): a search, then the receipt line, then `/search-hole:block`.
 - Dashboard screenshots in light and dark (`apps/dashboard/test-results/screens/`, regenerated by the e2e run).
-- The receipt card in Claude Desktop (a screenshot from a real Desktop session, not the test host).
+- The receipt card in Claude Desktop (a screenshot from a real Desktop session, not the test host). [check: the card has not been tried in the real app yet]
 - The process diagram.
 
 ## LinkedIn post (about 150 words)
 
-> For the last few weeks I've been building search-hole, an open-source, local search gateway for AI assistants. It lets you choose which sites Claude (and other MCP clients) may use, logs every search on your machine, and gives each answer a receipt: what was searched, what was hidden, and what was opened, with real dates.
+> For the last few weeks I've been building search-hole, an open-source, local search gateway for AI assistants. It logs every search your assistant runs on your machine, gives each answer a receipt (what was searched, what was hidden, and what was opened, with publish dates when the page states one), and lets you choose which sites Claude (and other MCP clients) may use.
+>
+> In two weeks of my own use, Claude ran 96 searches that returned 1,243 results from 538 sites, and opened pages from 37 of them. The block lists hid nothing. Seeing that was the useful part.
 >
 > Three things I learned along the way: [one line each from section 4].
 >
@@ -55,6 +63,7 @@ One long piece for Medium, with a shorter LinkedIn post that links to it. Basel'
 
 ## Before publishing
 
-- [ ] Numbers and screenshots come from the released version.
+- [ ] Numbers and screenshots come from the released version. The log numbers carry their dates (2026-10-31 to 2026-11-13).
+- [ ] No site from the log is named, and nothing says what the searches were about.
 - [ ] No employer names, internal tools or anything from work (MASTER_PLAN §14).
 - [ ] Every ADR link points to the public repository.

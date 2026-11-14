@@ -2,7 +2,9 @@
 
 Goose (CLI and Desktop) gets search-hole as a command-line extension. The receipt card renders in Goose Desktop.
 
-## Quickstart (about 60 seconds)
+Status: the config search-hole writes is checked by tests; this guide has not yet been tried in the real app.
+
+## Quickstart
 
 You need Node.js 22.19+ (`node --version`), the `searchhole` command and an engine. See [Before you start](README.md#before-you-start-every-app-except-claude-code).
 
@@ -12,7 +14,7 @@ You need Node.js 22.19+ (`node --version`), the `searchhole` command and an engi
    searchhole setup goose
    ```
 
-   It adds an extension named `search-hole` to goose's `config.yaml`: `~/.config/goose/config.yaml` on macOS and Linux (`$XDG_CONFIG_HOME/goose/` if you set it), `%APPDATA%\Block\goose\config\config.yaml` on Windows, or under `$GOOSE_PATH_ROOT/config/` if you use that. Other extensions, settings and comments stay, and the old file is saved as `config.yaml.bak-<time>`.
+   It shows the lines it will add and asks before it writes. Then it adds an extension named `search-hole` to goose's `config.yaml`: `~/.config/goose/config.yaml` on macOS and Linux (`$XDG_CONFIG_HOME/goose/` if you set it), `%APPDATA%\Block\goose\config\config.yaml` on Windows, or under `$GOOSE_PATH_ROOT/config/` if you use that. Other extensions, settings and comments stay, and the old file is saved as `config.yaml.bak-<time>`.
 2. Start a new session (`goose session`), or restart Goose Desktop. search-hole is listed under Extensions.
 3. Ask: *"Use search-hole to find the Node.js 24 release notes, then show the search-hole receipt."*
 4. Run `searchhole log` or `searchhole ui --open` to see the search.

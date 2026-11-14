@@ -19,15 +19,22 @@ The toolchain is pinned in [`.mise.toml`](.mise.toml): Node 26.13.0 and pnpm 12.
 2. Build everything and assemble the Claude Code plugin:
 
    ```sh
-   node scripts/build-plugin.mjs     # dashboard, receipt panel, package, then distribution/marketplace/search-hole/
+   mise exec -- node scripts/build-plugin.mjs     # dashboard, receipt panel, package, then distribution/marketplace/search-hole/
    ```
 
 3. Try it:
 
    ```sh
+   node packages/search-hole/dist/searchhole.mjs doctor      # what is set up, and how to fix what isn't
+   pnpm -C packages/search-hole dev doctor                   # the same, straight from source (Node type stripping)
+   claude --plugin-dir distribution/marketplace/search-hole  # the plugin in Claude Code; needs no engine
+   ```
+
+   The CLI's `search` command uses search-hole's own engines, so it needs one first. With none it exits 2 with "No healthy engine". Add an engine, then search:
+
+   ```sh
+   node packages/search-hole/dist/searchhole.mjs searxng up   # a private engine; needs Docker. Or: keys set tavily
    node packages/search-hole/dist/searchhole.mjs search "react compiler" --explain
-   pnpm -C packages/search-hole dev doctor          # straight from source (Node type stripping)
-   claude --plugin-dir distribution/marketplace/search-hole
    ```
 
    Use a scratch data folder while you experiment, so your real log and rules stay untouched: `SEARCHHOLE_HOME="$PWD/.tmp-home" node packages/search-hole/dist/searchhole.mjs …`.

@@ -2,7 +2,9 @@
 
 Codex (the CLI, the IDE extension and the desktop app share one config) gets search-hole's four tools. There are two ways in: one command that edits `~/.codex/config.toml`, or the hookless Codex plugin.
 
-## Quickstart (about 60 seconds)
+Status: the config search-hole writes is checked by tests; this guide has not yet been tried in the real app.
+
+## Quickstart
 
 You need Node.js 22.19+ (`node --version`), the `searchhole` command and an engine. See [Before you start](README.md#before-you-start-every-app-except-claude-code).
 
@@ -12,7 +14,7 @@ You need Node.js 22.19+ (`node --version`), the `searchhole` command and an engi
    searchhole setup codex
    ```
 
-   It appends this table to `~/.codex/config.toml` (`%USERPROFILE%\.codex\config.toml` on Windows, or `$CODEX_HOME/config.toml`), with your path:
+   It shows the lines it will add and asks before it writes. Then it appends this table to `~/.codex/config.toml` (`%USERPROFILE%\.codex\config.toml` on Windows, or `$CODEX_HOME/config.toml`), with your path:
 
    ```toml
    [mcp_servers.search-hole]
@@ -31,7 +33,7 @@ For one project only: `searchhole setup codex --project` writes `.codex/config.t
 
 ## The Codex plugin
 
-The plugin (`distribution/codex/`) is the same server in the Agent Plugins layout: a root `plugin.json` and `mcp.json`, plus a research skill. It has **no hooks**, because OpenAI's plugin directory does not list plugins with lifecycle hooks. To try a local build:
+The plugin (`distribution/codex/`) is the same server in the Agent Plugins layout: a root `plugin.json` and `mcp.json`, plus a research skill. It has **no hooks**, because OpenAI's plugin directory does not list plugins with lifecycle hooks. To try a local build (after the build in [Before you start](README.md#before-you-start-every-app-except-claude-code)):
 
 ```sh
 node scripts/build-plugin.mjs --target codex
@@ -55,7 +57,7 @@ Then run `codex`, type `/plugins`, install **search-hole** from **search-hole-lo
 Codex passes only a few basic variables to MCP servers. A key in your shell (`TAVILY_API_KEY`) doesn't reach search-hole unless the table lists it. Pick one:
 
 - **Keychain (recommended):** `searchhole keys set tavily`. Nothing goes in Codex's config.
-- **Forward a variable by name:** `searchhole setup codex --env TAVILY_API_KEY` adds `env_vars = ["TAVILY_API_KEY"]`. The key itself never goes in the file.
+- **Forward a variable by name:** `searchhole setup codex --env TAVILY_API_KEY` adds `env_vars = ["TAVILY_API_KEY"]`. If the table already has an `env_vars` list, the name is added to it and the others stay. The key itself never goes in the file.
 
 ## Troubleshooting
 
