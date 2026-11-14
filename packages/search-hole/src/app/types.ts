@@ -211,6 +211,11 @@ export interface RuleListing {
   until?: string
   note?: string
   source: string
+  /**
+   * A project rule whose `.searchhole.yaml` is not trusted yet: it is saved, but it does not
+   * apply until the user runs `searchhole trust` in the project.
+   */
+  needsTrust?: true
 }
 
 export interface AddRuleInput {

@@ -15,7 +15,7 @@ import { extname, join, normalize, resolve, sep } from 'node:path'
 import { type Context, Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { streamSSE } from 'hono/streaming'
-import type { AddListInput, App, DashboardApi, ListMode, ListsApi } from '../app/types.ts'
+import type { AddListInput, AddRuleInput, App, DashboardApi, ListMode, ListsApi } from '../app/types.ts'
 import { isSearchHoleError } from '../shared/errors.ts'
 import type { Logger } from '../shared/log.ts'
 import type { ApiError, StreamEvent } from './contract.ts'
@@ -204,12 +204,17 @@ export function createUiServer(o: UiServerOptions): UiServer {
     bodyLimit({ maxSize: BODY_LIMIT_BYTES, onError: (c) => fail(c, 413, 'bad_request', 'Body too large.') }),
   )
 
+  /** The request body: always a JSON object, so handlers can read fields without checking for null. */
   const json = async <T>(c: Context): Promise<T> => {
+    let body: unknown
     try {
-      return (await c.req.json()) as T
+      body = await c.req.json()
     } catch {
       throw new BadRequest('The body must be JSON.')
     }
+    if (typeof body !== 'object' || body === null || Array.isArray(body))
+      throw new BadRequest('The body must be a JSON object.')
+    return body as T
   }
 
   h.get('/api/overview', async (c) => c.json(await dash.overview(intParam(c.req.query('days')) ?? 7)))
@@ -283,7 +288,15 @@ export function createUiServer(o: UiServerOptions): UiServer {
   })
 
   h.get('/api/rules', async (c) => c.json(await app.rules.list()))
-  h.post('/api/rules', async (c) => c.json(await app.rules.add(await json(c))))
+  h.post('/api/rules', async (c) => {
+    const body = await json<AddRuleInput>(c)
+    // One dashboard serves every project, so it has no "current project" to write a rule into.
+    if (body.scope !== undefined && body.scope !== 'global')
+      throw new BadRequest(
+        'The dashboard adds rules for every project. For one project, run `searchhole block <site> --project` in that project.',
+      )
+    return c.json(await app.rules.add(body))
+  })
   h.post('/api/rules/remove', async (c) => {
     const body = await json<{ rule?: unknown; scope?: unknown }>(c)
     if (typeof body.rule !== 'string' || body.rule.trim() === '')

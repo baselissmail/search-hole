@@ -208,7 +208,9 @@ describe('project rules and trust (ADR-0008)', () => {
     ])
 
     // search-hole writing an already trusted file keeps it trusted.
-    await h.app.rules.add({ match: 'pinfarm.com', action: 'block', scope: 'project' })
+    const added = await h.app.rules.add({ match: 'pinfarm.com', action: 'block', scope: 'project' })
+    expect(added.needsTrust).toBeUndefined()
+    expect((await h.app.rules.list({ scope: 'project' })).some((r) => r.needsTrust)).toBe(false)
     expect((await h.app.filterBuiltinResults('x', PIN, {})).hidden).toHaveLength(2)
 
     // A hand edit changes the hash: untrusted again.
@@ -220,6 +222,19 @@ describe('project rules and trust (ADR-0008)', () => {
     expect((await h.app.doctor()).checks.find((c) => c.id === 'project')?.detail).toMatch(
       /changed since you trusted it/,
     )
+  })
+
+  it('a rule added to an untrusted project file is saved, listed and marked as not applied', async () => {
+    const h = await setup({})
+    const added = await h.app.rules.add({ match: 'react.dev', action: 'block', scope: 'project' })
+    expect(added).toMatchObject({ scope: 'project', needsTrust: true })
+    const listed = await h.app.rules.list({ scope: 'project' })
+    expect(listed).toMatchObject([{ match: 'react.dev', needsTrust: true }])
+    expect((await h.app.rules.explain('https://react.dev/learn')).decision).toBe('kept')
+    await h.app.rules.trust(h.project)
+    expect(await h.app.rules.list({ scope: 'project' })).toMatchObject([{ match: 'react.dev' }])
+    expect((await h.app.rules.list({ scope: 'project' }))[0]?.needsTrust).toBeUndefined()
+    expect((await h.app.rules.explain('https://react.dev/learn')).decision).toBe('hidden')
   })
 
   it('refuses important in project rules', async () => {

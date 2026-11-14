@@ -359,15 +359,25 @@ export function renderRules(rules: readonly RuleListing[], { style }: RenderOpts
   const rows: string[][] = [
     [style.dim('ID'), style.dim('SCOPE'), style.dim('ACTION'), style.dim('MATCH'), style.dim('NOTES')],
   ]
-  for (const r of rules) rows.push([r.id, r.scope, actionText(r), r.match, ruleExtras(r)])
-  return [...renderTable(rows), '', style.dim(plural(rules.length, 'rule'))].join('\n')
+  for (const r of rules) {
+    const notes = [ruleExtras(r), r.needsTrust ? 'not trusted yet' : ''].filter((x) => x !== '').join(' · ')
+    rows.push([r.id, r.scope, actionText(r), r.match, notes])
+  }
+  const out = [...renderTable(rows), '', style.dim(plural(rules.length, 'rule'))]
+  if (rules.some((r) => r.needsTrust)) out.push(NEEDS_TRUST)
+  return out.join('\n')
 }
+
+/** Shown wherever a project rule is saved but not applied (ADR-0008: project files need trust). */
+const NEEDS_TRUST =
+  "This project's rules don't apply until you trust its .searchhole.yaml: run `searchhole trust` in the project."
 
 /** Confirmation after a rule verb. */
 export function renderRuleAdded(rule: RuleListing, { style }: RenderOpts): string {
   const extras = ruleExtras(rule)
   return [
     `${style.green('✓')} ${actionText(rule)} ${style.bold(rule.match)} (${rule.scope}) as ${rule.id}${extras === '' ? '' : ` · ${extras}`}`,
+    ...(rule.needsTrust ? [style.yellow(`  Saved, not applied yet. ${NEEDS_TRUST}`)] : []),
     style.dim(`  Undo with: searchhole unrule ${rule.id}`),
   ].join('\n')
 }

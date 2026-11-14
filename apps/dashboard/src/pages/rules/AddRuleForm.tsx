@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-/** Add a rule: match, action, weight (raise/lower), scope, optional end date and note. */
+/**
+ * Add a rule: match, action, weight (raise/lower), optional end date and note. Rules added
+ * here are global: one dashboard serves every project, so it has no current project.
+ */
 import { useQueryClient } from '@tanstack/react-query'
 import { useLocation } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
@@ -38,7 +41,6 @@ export function AddRuleForm() {
   const [match, setMatch] = useState('')
   const [action, setAction] = useState<RuleAction>('block')
   const [weight, setWeight] = useState('3')
-  const [scope, setScope] = useState<'global' | 'project'>('global')
   const [until, setUntil] = useState('')
   const [note, setNote] = useState('')
   const [problem, setProblem] = useState<Problem | null>(null)
@@ -68,7 +70,7 @@ export function AddRuleForm() {
       setProblem({ field: 'weight', message: 'The weight is a whole number from 1 to 10.' })
       return
     }
-    const input: AddRuleInput = { match: text, action, scope }
+    const input: AddRuleInput = { match: text, action, scope: 'global' }
     if (weighted) input.weight = w
     if (until) input.until = until
     if (note.trim()) input.note = note.trim()
@@ -98,14 +100,14 @@ export function AddRuleForm() {
     <Card
       id="add-rule"
       title="Add a rule"
-      description="Rules you add apply from the next search. Your rules always beat lists."
+      description="Rules you add here apply to every project, from the next search. Your rules always beat lists."
     >
       <form
         onSubmit={(event) => void submit(event)}
         noValidate
         className="grid gap-x-4 gap-y-3 p-4 md:grid-cols-12"
       >
-        <div className="md:col-span-5">
+        <div className="md:col-span-7">
           <Label htmlFor={`${id}-match`}>Match</Label>
           <input
             ref={matchRef}
@@ -169,25 +171,6 @@ export function AddRuleForm() {
             </Hint>
           )}
         </div>
-        <fieldset className="md:col-span-2">
-          <legend className="mb-1 block text-xs font-medium text-fg">Scope</legend>
-          <div className="flex h-8 items-center gap-3">
-            {(['global', 'project'] as const).map((s) => (
-              <label key={s} className="inline-flex items-center gap-1.5 text-[13px] text-fg">
-                <input
-                  type="radio"
-                  name={`${id}-scope`}
-                  value={s}
-                  checked={scope === s}
-                  onChange={() => setScope(s)}
-                  className="size-3.5 accent-fg"
-                />
-                {s === 'global' ? 'Global' : 'Project'}
-              </label>
-            ))}
-          </div>
-          <Hint>{scope === 'global' ? 'Every project.' : 'Only the current project.'}</Hint>
-        </fieldset>
         <div className="md:col-span-3">
           <Label htmlFor={`${id}-until`}>Until (optional)</Label>
           <input

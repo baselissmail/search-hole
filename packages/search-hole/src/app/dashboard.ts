@@ -117,7 +117,8 @@ export function createDashboardApi(d: DashboardDeps): DashboardApi {
     settingsView: view,
 
     async patchSettings(patch) {
-      const check = PATCHABLE[patch.path]
+      // hasOwn: a path such as "constructor" must not find an inherited function.
+      const check = Object.hasOwn(PATCHABLE, patch.path) ? PATCHABLE[patch.path] : undefined
       if (check === undefined || !check(patch.value)) {
         throw new SearchHoleError('invalid_argument', `Can't set ${String(patch.path)} from the dashboard.`, {
           fix: 'Edit settings.yaml for anything else.',

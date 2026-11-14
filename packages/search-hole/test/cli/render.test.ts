@@ -126,6 +126,14 @@ describe('rules, log and the rest', () => {
     const [first] = sampleRules()
     if (first === undefined) throw new Error('fixture')
     await expect(`${renderRuleAdded(first, plain)}\n`).toMatchFileSnapshot(snap('rule-added'))
+    // A project rule in a file that isn't trusted yet says so, where it is added and where it is listed.
+    const pending = { ...first, scope: 'project' as const, needsTrust: true as const }
+    expect(renderRuleAdded(pending, plain)).toContain('Saved, not applied yet.')
+    expect(renderRuleAdded(pending, plain)).toContain('searchhole trust')
+    expect(renderRuleAdded(first, plain)).not.toContain('not applied')
+    const listed = renderRules([pending], plain)
+    expect(listed).toContain('not trusted yet')
+    expect(listed).toContain('searchhole trust')
   })
 
   it('log and log show', async () => {

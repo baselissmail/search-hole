@@ -76,6 +76,14 @@ const columns = helper.columns([
       <span className="text-fg-muted">
         {SCOPE_WORDS[info.getValue()] ?? info.getValue()}
         {info.row.original.important ? <span className="ms-1.5 text-xs text-fg">· important</span> : null}
+        {info.row.original.needsTrust ? (
+          <span
+            className="ms-1.5 text-xs text-fg"
+            title="Saved, but it doesn't apply until you run `searchhole trust` in that project."
+          >
+            · not trusted
+          </span>
+        ) : null}
       </span>
     ),
   }),

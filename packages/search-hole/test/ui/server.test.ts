@@ -174,6 +174,43 @@ describe('API', () => {
     expect(bad.status).toBe(400)
     const notJson = await api('/api/rules', token, { method: 'POST', body: '{nope' })
     expect(notJson.status).toBe(400)
+    for (const body of ['null', '[]', '"x"', '3']) {
+      expect([body, (await api('/api/rules', token, { method: 'POST', body })).status]).toEqual([body, 400])
+      expect([body, (await api('/api/settings', token, { method: 'POST', body })).status]).toEqual([
+        body,
+        400,
+      ])
+    }
+  })
+
+  it('rules are added for every project: the dashboard has no current project', async () => {
+    const { signIn, api } = await harness()
+    const token = await signIn()
+    for (const scope of ['project', 'session']) {
+      const res = await api('/api/rules', token, {
+        method: 'POST',
+        body: JSON.stringify({ match: 'a.example', action: 'block', scope }),
+      })
+      expect(res.status).toBe(400)
+      expect(JSON.stringify(await res.json())).toContain('every project')
+    }
+    const ok = await api('/api/rules', token, {
+      method: 'POST',
+      body: JSON.stringify({ match: 'a.example', action: 'block', scope: 'global' }),
+    })
+    expect(ok.status).toBe(200)
+  })
+
+  it('settings: a path that only exists on Object.prototype is refused', async () => {
+    const { signIn, api } = await harness()
+    const token = await signIn()
+    for (const path of ['constructor', 'toString', '__proto__', 'valueOf', 'hasOwnProperty']) {
+      const res = await api('/api/settings', token, {
+        method: 'POST',
+        body: JSON.stringify({ path, value: 'x' }),
+      })
+      expect([path, res.status]).toEqual([path, 400])
+    }
   })
 
   it('settings: allowlisted paths only, validated before writing', async () => {

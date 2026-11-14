@@ -553,10 +553,25 @@ export class RulesService {
       const dir = this.projectDir()
       const p = dir === undefined ? undefined : this.project(dir, store)
       if (p?.trust === 'trusted') out.push(...(p.loaded?.rules ?? []).map(listingOf))
+      // Rules in a file that isn't trusted are listed, marked: they are saved but don't apply.
+      else if (p?.exists)
+        out.push(...this.untrustedRules(p.path).map((r) => ({ ...r, needsTrust: true as const })))
     }
     if (scope === undefined || scope === 'global')
       out.push(...(this.global(store).loaded?.rules ?? []).map(listingOf))
     return out
+  }
+
+  /** The rules written in a project file that isn't trusted, for listing only: nothing is cached or applied. */
+  private untrustedRules(path: string): RuleListing[] {
+    try {
+      const text = readTextIfExists(path)
+      return text === undefined
+        ? []
+        : loadRulesYaml(text, { scope: 'project', file: path }).rules.map(listingOf)
+    } catch {
+      return []
+    }
   }
 
   /** Validates an AddRuleInput; throws `invalid_argument` naming the problem. */
@@ -649,7 +664,8 @@ export class RulesService {
     this.files.delete(file)
     const rule = existing ?? edit.loaded.rules.find((r) => r.id === wantedId)
     if (!rule) throw new SearchHoleError('internal', 'The rule was written but could not be read back.')
-    return listingOf(rule)
+    // A rule written to a project file that isn't trusted is saved, not applied: say so.
+    return scope === 'project' && !trustedBefore ? { ...listingOf(rule), needsTrust: true } : listingOf(rule)
   }
 
   private async addSession(
