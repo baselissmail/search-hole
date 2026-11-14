@@ -19,4 +19,4 @@ minimumReleaseAgeExclude:
 # dev dependency) pulls in. Neither is in anything search-hole ships.
 overrides:
   node-forge: 1.4.3
-  tmp: 0.2.6 # GHSA-ph9p-34f9-6g65, GHSA-52f5-9888-hmc6
+  tmp: 0.2.7 # GHSA-ph9p-34f9-6g65, GHSA-52f5-9888-hmc6, GHSA-7c78-jf6q-g5cm

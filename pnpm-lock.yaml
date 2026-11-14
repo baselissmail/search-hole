@@ -164,7 +164,7 @@ settings:
 
 overrides:
   node-forge: 1.4.3
-  tmp: 0.2.6
+  tmp: 0.2.7
 
 packageExtensionsChecksum: sha256-xNXJoe/LWZHQMuW9DvRq7vAoP3hgHsiu6+3ydtNSXL8=
 
@@ -2143,8 +2143,8 @@ packages:
     resolution: {integrity: sha512-48dH6aSpQnpbzDUc4vIQZ1VjB8tkK+e8c1yx05/SZK+rkssgjEOlxDd/yU8/a4vGYQ9vRgJr9dwMq9TJ0b3X2Q==}
     hasBin: true
 
-  tmp@0.2.6:
-    resolution: {integrity: sha512-5sJPdPjfI5Kx+qbrDesxkglRBxW//g7hCsqspEjwkewGvBMGIKMOTKzLt1hFVJzyadba3lDUN20O9qhvbQUSTA==}
+  tmp@0.2.7:
+    resolution: {integrity: sha512-e0votIpp4Uo2AJYSzVHV6xCcawuiez3DzqDAbrTc3YxBkplN6e+dM13ZeIcZnDg/QpSuU2zfZ3rzwY8ukEnaXw==}
     engines: {node: '>=14.14'}
 
   tsdown@0.23.4:
@@ -3407,7 +3407,7 @@ snapshots:
     dependencies:
       chardet: 0.7.0
       iconv-lite: 0.4.24
-      tmp: 0.2.6
+      tmp: 0.2.7
 
   fast-check@4.10.2:
     dependencies:
@@ -3852,7 +3852,7 @@ snapshots:
     dependencies:
       tldts-core: 7.4.20
 
-  tmp@0.2.6: {}
+  tmp@0.2.7: {}
 
   tsdown@0.23.4(typescript@7.0.2):
     dependencies:

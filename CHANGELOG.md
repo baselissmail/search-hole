@@ -30,7 +30,7 @@ Fixes and corrections from a pre-launch review (`docs/launch/prelaunch-review.md
 ### Security
 
 - hono 4.13.16 and @hono/node-server 2.1.6. One of the advisories (GHSA-h7mg-cq63-vhpq) is about wildcard middleware being skipped, which is how the dashboard applies its Host check and sign-in. A new test probes every dashboard route with encoded line terminators; the old version was not bypassable either.
-- Patched `tmp` and `node-forge` for `@anthropic-ai/mcpb`, the dev tool that packs the Desktop extension. One advisory against that tool's own zod 3 stays open: its only fix is zod 4, which the tool doesn't support. search-hole ships zod 4.6.7.
+- Patched `tmp` (0.2.7) and `node-forge` for `@anthropic-ai/mcpb`, the dev tool that packs the Desktop extension. One advisory against that tool's own zod 3 stays open: its only fix is zod 4, which the tool doesn't support. search-hole ships zod 4.6.7.
 - pnpm's two-week minimum release age is on (ADR-0024 amendment); security fixes wait three days and are listed by advisory in `pnpm-workspace.yaml`.
 
 ### Fixed
