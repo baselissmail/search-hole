@@ -40,6 +40,43 @@ function declaredLicence(component) {
   return first?.license?.id ?? first?.license?.name ?? first?.expression
 }
 
+/** `name@version` → installed folder, for every package in pnpm's store. Built once, on the first miss. */
+let storeIndex
+
+/**
+ * Reads the name and version of every package under `.pnpm/<entry>/node_modules/`. The folder
+ * names can't be trusted for this: pnpm shortens long ones to a hash (always on Windows).
+ */
+export function indexStore(entries) {
+  const index = new Map()
+  const note = (dir) => {
+    try {
+      const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
+      if (typeof pkg.name === 'string' && typeof pkg.version === 'string') {
+        index.set(`${pkg.name}@${pkg.version}`, dir)
+      }
+    } catch {
+      // Not a package folder.
+    }
+  }
+  const list = (dir) => {
+    try {
+      return readdirSync(dir)
+    } catch {
+      return []
+    }
+  }
+  for (const entry of entries) {
+    const modules = join(STORE, entry, 'node_modules')
+    for (const name of list(modules)) {
+      if (name.startsWith('.')) continue
+      if (!name.startsWith('@')) note(join(modules, name))
+      else for (const scoped of list(join(modules, name))) note(join(modules, name, scoped))
+    }
+  }
+  return index
+}
+
 /** The installed folder of `name@version` in pnpm's store, or undefined. */
 function installedDir(name, version, entries) {
   const prefix = `${name.replace('/', '+')}@`
@@ -52,7 +89,8 @@ function installedDir(name, version, entries) {
       // Another package whose name starts the same way.
     }
   }
-  return undefined
+  storeIndex ??= indexStore(entries)
+  return storeIndex.get(`${name}@${version}`)
 }
 
 /**
