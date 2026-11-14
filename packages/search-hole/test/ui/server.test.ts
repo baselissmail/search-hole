@@ -435,3 +435,169 @@ describe('lists API (ADR-0022)', () => {
     expect(after.some((l) => l.id === 'super-seo-spam-suppressor')).toBe(false)
   })
 })
+
+describe('review API and opened results (ADR-0025)', () => {
+  type Review = {
+    days: number
+    minSearches: number
+    total: number
+    sites: Array<{ domain: string; searches: number; examples: Array<{ url: string; title?: string }> }>
+    dismissed: Array<{ domain: string }>
+  }
+  const seed = async (h: Awaited<ReturnType<typeof harness>>['h']) => {
+    for (const q of ['one', 'two', 'three']) {
+      await h.app.filterBuiltinResults(
+        q,
+        [
+          { title: 'Farm page', url: 'https://farm.example/page' },
+          { title: 'Read page', url: 'https://read.example/page' },
+        ],
+        hookSession(),
+      )
+    }
+    await h.app.recordBuiltinFetch('https://read.example/page', hookSession())
+  }
+
+  it('needs the session token, and the dismiss POST also the right Host and Origin', async () => {
+    const { h, call, signIn } = await harness()
+    await seed(h)
+    const body = JSON.stringify({ domain: 'farm.example' })
+    expect((await call('/api/review')).status).toBe(401)
+    expect((await call('/api/review', { headers: { authorization: `Bearer ${SECRET}` } })).status).toBe(401)
+    for (const path of ['/api/review/dismiss', '/api/review/restore']) {
+      expect((await call(path, { method: 'POST', body })).status, path).toBe(401)
+    }
+    const token = await signIn()
+    const auth = { authorization: `Bearer ${token}`, 'content-type': 'application/json' }
+    expect((await call('/api/review', { headers: auth, host: 'evil.example:7341' })).status).toBe(403)
+    for (const path of ['/api/review/dismiss', '/api/review/restore']) {
+      const cross = await call(path, {
+        method: 'POST',
+        headers: { ...auth, origin: 'http://evil.example' },
+        body,
+      })
+      expect(cross.status, path).toBe(403)
+      const rebound = await call(path, { method: 'POST', headers: auth, body, host: 'evil.example:7341' })
+      expect(rebound.status, path).toBe(403)
+    }
+    // Nothing above changed anything.
+    const list = await call('/api/review', { headers: auth })
+    expect(list.status).toBe(200)
+    expect(list.headers.get('cache-control')).toBe('no-store')
+    expect(list.headers.get('access-control-allow-origin')).toBeNull()
+    const before = (await list.json()) as Review
+    expect(before.sites.map((s) => s.domain)).toEqual(['farm.example'])
+    expect(before.dismissed).toEqual([])
+    const same = await call('/api/review/dismiss', {
+      method: 'POST',
+      headers: { ...auth, origin: BASE },
+      body,
+    })
+    expect(same.status).toBe(200)
+  })
+
+  it('GET lists the sites; dismiss hides one and restore brings it back', async () => {
+    const { h, signIn, api } = await harness()
+    await seed(h)
+    const token = await signIn()
+    const get = async (query = ''): Promise<Review> =>
+      (await (await api(`/api/review${query}`, token)).json()) as Review
+    expect(await get()).toEqual({
+      days: 30,
+      minSearches: 3,
+      total: 1,
+      sites: [
+        {
+          domain: 'farm.example',
+          searches: 3,
+          results: 3,
+          lastSeen: new Date(h.clock.now()).toISOString(),
+          sourceType: 'unknown',
+          examples: [{ url: 'https://farm.example/page', title: 'Farm page' }],
+        },
+      ],
+      dismissed: [],
+    })
+    // Query parameters: clamped, and anything that is not a whole number falls back to the default.
+    expect(await get('?days=7&limit=1')).toMatchObject({ days: 7, total: 1 })
+    expect((await get('?days=9999')).days).toBe(365)
+    expect((await get('?days=0')).days).toBe(1)
+    for (const bad of ['?days=abc', '?days=-5', '?days=1.5', '?days=', '?limit=x']) {
+      expect(await get(bad), bad).toMatchObject({ days: 30, total: 1 })
+    }
+
+    const post = (path: string, body: unknown) =>
+      api(path, token, { method: 'POST', body: JSON.stringify(body) })
+    const dismissed = await post('/api/review/dismiss', { domain: 'farm.example' })
+    expect(dismissed.status).toBe(200)
+    expect(await dismissed.json()).toEqual({ domain: 'farm.example', changed: true })
+    expect(await (await post('/api/review/dismiss', { domain: 'farm.example' })).json()).toEqual({
+      domain: 'farm.example',
+      changed: false,
+    })
+    const after = await get()
+    expect(after.sites).toEqual([])
+    expect(after.dismissed.map((d) => d.domain)).toEqual(['farm.example'])
+    expect(await (await post('/api/review/restore', { domain: 'farm.example' })).json()).toEqual({
+      domain: 'farm.example',
+      changed: true,
+    })
+    expect((await get()).sites.map((s) => s.domain)).toEqual(['farm.example'])
+
+    // A rule added from the dashboard takes the site off the list as well.
+    await post('/api/rules', { match: 'farm.example', action: 'lower' })
+    expect((await get()).sites).toEqual([])
+  })
+
+  it('refuses bad dismiss bodies with a 400, and an oversized one with a 413', async () => {
+    const { h, signIn, api } = await harness()
+    await seed(h)
+    const token = await signIn()
+    for (const path of ['/api/review/dismiss', '/api/review/restore']) {
+      const send = (body: string) => api(path, token, { method: 'POST', body })
+      for (const body of [
+        '{nope',
+        '',
+        'null',
+        '[]',
+        '"farm.example"',
+        '{}',
+        '{"domain":42}',
+        '{"domain":["farm.example"]}',
+        '{"domain":""}',
+        '{"domain":"   "}',
+        JSON.stringify({ domain: `${'a'.repeat(250)}.example` }),
+      ]) {
+        const res = await send(body)
+        expect(res.status, `${path} ${body.slice(0, 30)}`).toBe(400)
+        expect(((await res.json()) as { error: { code: string } }).error.code).toBe('bad_request')
+      }
+      // A string that is not a site reaches the app, which names the fix.
+      const notSite = await send(JSON.stringify({ domain: 'two words' }))
+      expect(notSite.status).toBe(400)
+      expect((await notSite.json()) as { error: { code: string; fix: string } }).toMatchObject({
+        error: { code: 'invalid_argument', fix: expect.stringContaining('example.com') },
+      })
+      const huge = await send(JSON.stringify({ domain: 'farm.example', pad: 'x'.repeat(70_000) }))
+      expect(huge.status).toBe(413)
+    }
+    expect((await api('/api/review/dismiss', token)).status).toBe(404) // GET is not a route
+    const list = (await (await api('/api/review', token)).json()) as Review
+    expect(list.sites.map((s) => s.domain)).toEqual(['farm.example'])
+    expect(list.dismissed).toEqual([])
+  })
+
+  it('the search detail says which results were opened', async () => {
+    const { h, signIn, api } = await harness()
+    await seed(h)
+    const detail = (await (await api('/api/searches/1', await signIn())).json()) as {
+      opened: number
+      results: Array<{ domain: string; opened: boolean }>
+    }
+    expect(detail.opened).toBe(1)
+    expect(detail.results.map((r) => [r.domain, r.opened])).toEqual([
+      ['farm.example', false],
+      ['read.example', true],
+    ])
+  })
+})

@@ -15,7 +15,15 @@ import { extname, join, normalize, resolve, sep } from 'node:path'
 import { type Context, Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { streamSSE } from 'hono/streaming'
-import type { AddListInput, AddRuleInput, App, DashboardApi, ListMode, ListsApi } from '../app/types.ts'
+import type {
+  AddListInput,
+  AddRuleInput,
+  App,
+  DashboardApi,
+  ListMode,
+  ListsApi,
+  ReviewApi,
+} from '../app/types.ts'
 import { isSearchHoleError } from '../shared/errors.ts'
 import type { Logger } from '../shared/log.ts'
 import type { ApiError, StreamEvent } from './contract.ts'
@@ -325,6 +333,30 @@ export function createUiServer(o: UiServerOptions): UiServer {
     await app.suggestions.reject(id)
     return c.json({ ok: true })
   })
+
+  // Review list (ADR-0025): a read of the local log, and the user's "this site is fine".
+  const review = (): ReviewApi => {
+    if (app.review === undefined) throw new NotFound('This build has no review list.')
+    return app.review
+  }
+  const reviewSite = async (c: Context): Promise<string> => {
+    const { domain } = await json<{ domain?: unknown }>(c)
+    if (typeof domain !== 'string' || domain.trim() === '' || domain.length > 253)
+      throw new BadRequest('Name the site as "domain", for example "example.com".')
+    return domain
+  }
+  h.get('/api/review', async (c) => {
+    const days = intParam(c.req.query('days'))
+    const limit = intParam(c.req.query('limit'))
+    return c.json(
+      await review().list({
+        ...(days === undefined ? {} : { days }),
+        ...(limit === undefined ? {} : { limit }),
+      }),
+    )
+  })
+  h.post('/api/review/dismiss', async (c) => c.json(await review().dismiss(await reviewSite(c))))
+  h.post('/api/review/restore', async (c) => c.json(await review().restore(await reviewSite(c))))
 
   // Lists (ADR-0022).
   const lists = (): ListsApi => {

@@ -30,6 +30,8 @@ import type {
   LogDetail,
   LogEntry,
   LogPage,
+  ReviewList,
+  ReviewSite,
   RuleListing,
   SearchMode,
   SettingsPatch,
@@ -53,6 +55,8 @@ export type {
   ListUpdateResult,
   LogDetail,
   LogEntry,
+  ReviewList,
+  ReviewSite,
   RuleListing,
   SearchMode,
   SuggestRuleInput,
@@ -90,6 +94,16 @@ export const ROUTES = {
   approveSuggestion: (id: number) => `/api/suggestions/${id}/approve`,
   /** POST → `{ ok: true }`. */
   rejectSuggestion: (id: number) => `/api/suggestions/${id}/reject`,
+  /**
+   * GET `ReviewList`: sites with kept results in at least 3 searches that the assistant never
+   * opened (ADR-0025), most-seen first. Query: `days` (1..365, default 30); `limit` (1..500,
+   * default 100). Computed from the local log; a site a global rule decides is left out.
+   */
+  review: '/api/review',
+  /** POST `ReviewSiteRequest` → `ReviewSiteResponse`: "this site is fine", stop listing it. */
+  dismissReview: '/api/review/dismiss',
+  /** POST `ReviewSiteRequest` → `ReviewSiteResponse`: list a dismissed site again (the Undo). */
+  restoreReview: '/api/review/restore',
   /** GET `EngineStatus[]`. */
   engines: '/api/engines',
   /** POST → `EngineStatus[]` after a bounded health probe (≤ 3 s). */
@@ -183,6 +197,17 @@ export interface SuggestionItem {
   input: SuggestRuleInput
   createdAt: string
   status: string
+}
+
+export interface ReviewSiteRequest {
+  /** The site as the review list names it (a registrable domain, at most 253 characters). */
+  domain: string
+}
+export interface ReviewSiteResponse {
+  /** The registrable domain that was stored or removed. */
+  domain: string
+  /** False when nothing changed (dismissed already, or not dismissed). */
+  changed: boolean
 }
 
 export type { SettingsPatch, SettingsView }
