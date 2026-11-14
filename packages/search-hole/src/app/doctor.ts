@@ -271,23 +271,30 @@ export async function runDoctor(d: DoctorDeps, opts: { probe?: boolean } = {}): 
       const status = engines.find((e) => e.engine === 'searxng')
       if (status) status.reachable = false
       const line = checks.findIndex((c) => c.id === 'engine:searxng')
-      if (line >= 0 && status?.health !== 'unhealthy') {
+      const managed = ctx.settings.settings.searxng.managed
+      const optional = line >= 0 && status?.health !== 'unhealthy'
+      if (optional) {
         checks[line] = {
           id: 'engine:searxng',
           status: 'info',
           title: 'searxng: not running (optional)',
+          detail: `nothing answers at ${base}`,
           fix: SETUP_FIX.searxng ?? 'Start it with `searchhole searxng up`.',
         }
       }
-      checks.push({
-        id: 'searxng',
-        status: 'info',
-        title: `SearXNG is not reachable at ${base}`,
-        detail: res.failure.networkError,
-        fix: ctx.settings.settings.searxng.managed
-          ? 'Start it with `searchhole searxng up`.'
-          : 'Check engines.searxng.url in settings.yaml.',
-      })
+      // One line is enough for the private engine that simply isn't started. A second one is
+      // worth it when it was working and stopped, or when the address is the user's own.
+      if (!optional || !managed) {
+        checks.push({
+          id: 'searxng',
+          status: 'info',
+          title: `SearXNG is not reachable at ${base}`,
+          detail: res.failure.networkError,
+          fix: managed
+            ? 'Start it with `searchhole searxng up`.'
+            : 'Check engines.searxng.url in settings.yaml.',
+        })
+      }
     } else {
       let json = false
       try {

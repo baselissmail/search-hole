@@ -7,8 +7,8 @@ search-hole 0.1.0 doctor
     → Check permissions on ~/.searchhole
 
 Engines
-  searxng  inactive  unhealthy · last error unreachable
-  tavily   inactive  missing_key
+  searxng  inactive    unhealthy · last error unreachable
+  tavily   not set up  no key yet
 
 Paths
   config     /home/u/.searchhole

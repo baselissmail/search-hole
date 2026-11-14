@@ -40,6 +40,9 @@ describe('searchhole setup', () => {
     const dry = await run(['setup', 'cursor', '--dry-run'], { entry: w.bundle }, {}, w.deps)
     expect(dry.code).toBe(0)
     expect(dry.out).toContain('Dry run')
+    // The dry run shows the lines it would add, not only the file's name.
+    expect(dry.out).toMatch(/^\+ +"search-hole": \{$/m)
+    expect(dry.out).toMatch(/^\+ +"command": "node",$/m)
     expect(readFileSync(w.cursor, 'utf8')).not.toContain('search-hole')
     const ok = await run(['setup', 'cursor', '--yes'], { entry: w.bundle }, {}, w.deps)
     expect(ok.code).toBe(0)
@@ -63,7 +66,17 @@ describe('searchhole setup', () => {
       w.deps,
     )
     expect(no.out).toContain('Nothing written.')
+    // The change is shown before the question.
+    expect(no.err).toMatch(/^\+ +"search-hole": \{$/m)
     expect(readFileSync(w.cursor, 'utf8')).not.toContain('search-hole')
+  })
+
+  it('generic prints the snippet alone on stdout and what to do with it on stderr', async () => {
+    const w = world()
+    const r = await run(['setup', 'generic'], { entry: w.bundle }, {}, w.deps)
+    expect(r.code).toBe(0)
+    expect(JSON.parse(r.out)).toHaveProperty(['mcpServers', 'search-hole'])
+    expect(r.err).toContain('needs an engine')
   })
 
   it('needs a built bundle and a known app; the model may not run it', async () => {

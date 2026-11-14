@@ -25,6 +25,7 @@ import type { CliIo } from './io.ts'
 import {
   type RenderOpts,
   renderCatalog,
+  renderConfigChange,
   renderDoctor,
   renderKeysStatus,
   renderListRemoved,
@@ -146,8 +147,14 @@ async function runSetupCommand(
   for (const w of preview.warnings) io.stderr.write(`${style.yellow(`⚠ ${w}`)}\n`)
   const done = (r: typeof preview): number => {
     if (cmd.json) json(io, r)
-    else if (r.file === null) line(io, r.after)
-    else for (const l of r.instructions) line(io, l)
+    else if (r.file === null) {
+      // The snippet alone on stdout, so it can be redirected into a file; what to do with it on stderr.
+      line(io, r.after)
+      for (const l of r.instructions) io.stderr.write(`${l}\n`)
+    } else {
+      if (r.changed && !r.written) line(io, renderConfigChange(r.before, r.after))
+      for (const l of r.instructions) line(io, l)
+    }
     return 0
   }
   if (cmd.dryRun || !preview.changed || preview.file === null) return done(preview)
@@ -161,6 +168,8 @@ async function runSetupCommand(
         },
       )
     }
+    // Show the change before asking for it.
+    io.stderr.write(`${renderConfigChange(preview.before, preview.after)}\n`)
     if (!(await io.confirm(`Write ${preview.file}? (a backup is kept)`, true))) {
       line(io, 'Nothing written.')
       return 0

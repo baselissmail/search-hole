@@ -487,18 +487,30 @@ export function renderMode(
 
 // ── doctor ───────────────────────────────────────────────────────────────
 
+/** Why an engine is not in use, in words (the codes stay in `--json`). */
+const INACTIVE_WORDS: Readonly<Record<string, string>> = {
+  missing_key: 'no key yet',
+  no_endpoint: 'no address set',
+  disabled: 'turned off in settings',
+  spend_cap: 'monthly limit reached',
+  suspended: 'paused after errors',
+  json_disabled: 'JSON output is off in SearXNG',
+}
+
 function engineStatusRow(s: EngineStatus, style: Style): string[] {
+  // An optional engine that was never set up is "not set up", not "unhealthy".
+  const unset = !s.configured && s.inactiveReason !== 'disabled'
   const state =
     s.reachable === false
       ? style.dim('not running')
       : s.active
         ? style.green('active')
-        : style.dim('inactive')
+        : style.dim(unset ? 'not set up' : 'inactive')
   const why = [
     ...new Set(
       [
-        s.active ? '' : (s.inactiveReason ?? ''),
-        s.health === 'unknown' ? '' : s.health,
+        s.active ? '' : (INACTIVE_WORDS[s.inactiveReason ?? ''] ?? s.inactiveReason ?? ''),
+        s.health === 'unknown' || unset ? '' : s.health,
         s.lastError === undefined ? '' : `last error ${s.lastError}`,
         s.keySource === undefined ? '' : `key from ${s.keySource}`,
         s.suspendedUntil === undefined ? '' : `suspended until ${s.suspendedUntil}`,
@@ -748,4 +760,33 @@ export function renderListUpdates(results: readonly ListUpdateResult[], { style 
 /** `searchhole lists remove`. */
 export function renderListRemoved(s: ListStatus, { style }: RenderOpts): string {
   return `${style.green('✓')} removed ${s.id} (${s.source}, ${num(s.ruleCount)} rules)`
+}
+
+/** Most lines of a config change shown before asking (`setup`). */
+const CHANGE_MAX_LINES = 40
+
+/**
+ * What a config edit changes, as `-` and `+` lines with two lines of context: the lines
+ * between the common start and the common end of the two texts. `setup` edits one place, so
+ * this is the whole change. A new file is shown in full.
+ */
+export function renderConfigChange(before: string | undefined, after: string): string {
+  const a = before === undefined ? [] : before.replace(/\r?\n$/, '').split(/\r?\n/)
+  const b = after.replace(/\r?\n$/, '').split(/\r?\n/)
+  let start = 0
+  while (start < a.length && start < b.length && a[start] === b[start]) start++
+  let end = 0
+  while (end < a.length - start && end < b.length - start && a[a.length - 1 - end] === b[b.length - 1 - end])
+    end++
+  const lines = [
+    ...a.slice(Math.max(0, start - 2), start).map((l) => `  ${l}`),
+    ...a.slice(start, a.length - end).map((l) => `- ${l}`),
+    ...b.slice(start, b.length - end).map((l) => `+ ${l}`),
+    ...b.slice(b.length - end, b.length - end + 2).map((l) => `  ${l}`),
+  ]
+  if (lines.length <= CHANGE_MAX_LINES) return lines.join('\n')
+  return [
+    ...lines.slice(0, CHANGE_MAX_LINES),
+    `  … ${plural(lines.length - CHANGE_MAX_LINES, 'more line')}`,
+  ].join('\n')
 }

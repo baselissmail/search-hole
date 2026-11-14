@@ -175,7 +175,7 @@ export function planUninstall(o: { roots: Roots; home: string; platform?: NodeJS
     refused: [],
     keys: [...KEYED],
     elsewhere: [
-      'Claude Code plugin (and the keys you gave it): claude plugin uninstall search-hole@search-hole-local, then claude plugin marketplace remove search-hole-local',
+      'Claude Code plugin (and the keys you gave it): claude plugin uninstall search-hole@search-hole, then claude plugin marketplace remove search-hole (installed from a checkout: search-hole@search-hole-local and search-hole-local)',
       'Claude Desktop extension (and its keychain keys): Settings → Extensions → search-hole → Uninstall',
       'MCP configs written by `searchhole setup` (VS Code, Cursor, Windsurf, Zed, Goose, Codex): remove the "search-hole" entry; setup left a .bak copy next to each file it changed',
       'A private SearXNG container, if you started one: run `searchhole searxng down` first',
