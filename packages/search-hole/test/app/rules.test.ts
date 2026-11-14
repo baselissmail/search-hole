@@ -166,6 +166,26 @@ rules:
     expect(out.lines.at(-1)).toMatch(/^→ kept, weighted ×1\.30 by raise 2 docs\.example\.com/)
     expect((await h.app.rules.explain('https://example.com/')).decision).toBe('hidden')
   })
+
+  it('explain checks a bare site as https and refuses what is not a site or URL', async () => {
+    const h = await setup({ rules: 'version: 1\nrules:\n  - { match: example.com, action: block }\n' })
+    const bare = await h.app.rules.explain('example.com')
+    expect(bare.decision).toBe('hidden')
+    expect(bare.lines[0]).toBe('url: https://example.com')
+    expect((await h.app.rules.explain('  example.com/blog/post ')).decision).toBe('hidden')
+    expect((await h.app.rules.explain('http://example.com:8080/x')).decision).toBe('hidden')
+    expect((await h.app.rules.explain('other.example')).decision).toBe('kept')
+    for (const bad of ['notaurl', '', 'two words.com', 'ftp://example.com/file', 'https://']) {
+      await expect(h.app.rules.explain(bad)).rejects.toMatchObject({ code: 'invalid_argument' })
+    }
+  })
+
+  it('explain names the lift an official source gets from the default profile', async () => {
+    const h = await setup({})
+    const out = await h.app.rules.explain('developer.mozilla.org/en-US/docs/Web')
+    expect(out.decision).toBe('kept')
+    expect(out.lines.at(-1)).toMatch(/^→ kept, lifted ×1\.45 because profile "default" prefers this source$/)
+  })
 })
 
 describe('project rules and trust (ADR-0008)', () => {

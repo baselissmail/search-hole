@@ -863,8 +863,13 @@ export class RulesService {
     return { path, sha256 }
   }
 
-  /** Every match for a URL plus the decision, as lines for `searchhole explain <url>`. */
-  explain(rc: RuleContext, url: string, profile: string, now: number): { decision: string; lines: string[] } {
+  /**
+   * Every match for a URL plus the decision, as lines for `searchhole explain <url>`. A bare
+   * site (`example.com`) is checked as `https://example.com`; anything that is not a site or
+   * an http(s) URL is refused, never answered with "kept".
+   */
+  explain(rc: RuleContext, input: string, profile: string, now: number): { decision: string; lines: string[] } {
+    const url = explainTarget(input)
     const decision: RuleDecision = rc.ruleSet.decide(url, { profile, now })
     const byId = new Map(rc.userRules.map((r) => [r.id, r]))
     const lines: string[] = [`url: ${url}`, `profile: ${profile}`]
@@ -891,6 +896,10 @@ export class RulesService {
     else if (decision.weight.rule)
       verdict = `kept, weighted ×${decision.weight.factor.toFixed(2)} by ${decision.weight.rule.text}`
     else verdict = 'kept'
+    // The profile's lift for sources on a preferred list (official docs by default) is part of the ranking.
+    if (decision.visibility !== 'hidden' && decision.preferFactor !== 1) {
+      verdict += `, lifted ×${decision.preferFactor.toFixed(2)} because profile "${profile}" prefers this source`
+    }
     lines.push(`→ ${verdict}`)
     const short = decision.visibility === 'hidden' ? 'hidden' : decision.pin ? 'pinned' : 'kept'
     return { decision: short, lines }
@@ -900,6 +909,30 @@ export class RulesService {
   text(rule: Rule): string {
     return ruleText(rule)
   }
+}
+
+/**
+ * The URL `explain` checks. A bare site or path (`example.com/blog`) gets `https://`; the
+ * input is refused when it is not a site or an http(s) URL.
+ */
+export function explainTarget(input: string): string {
+  const text = input.trim()
+  const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(text) ? text : `https://${text}`
+  let parsed: URL | undefined
+  try {
+    parsed = new URL(candidate)
+  } catch {
+    parsed = undefined
+  }
+  const host = parsed?.hostname ?? ''
+  const web = parsed?.protocol === 'http:' || parsed?.protocol === 'https:'
+  const named = host.includes('.') || host === 'localhost' || host.startsWith('[')
+  if (!web || !named || /\s/.test(text)) {
+    throw new SearchHoleError('invalid_argument', `"${text}" is not a site or a URL.`, {
+      fix: 'Give a site (example.com) or a full URL (https://example.com/page).',
+    })
+  }
+  return candidate
 }
 
 /** Kind of a match expression, for listings that need it without compiling. */
