@@ -264,3 +264,22 @@ ADR-0024.
 2. **Starter-set breadth** (quenhus and csdn.net/segmentfault.com): see P6.
 3. **One-time GitHub and npm setup** before the first release: `docs/release.md` step 0. The private repo and its remote exist (2026-11-01). Still to do: the signing key, npm trusted publishing and the environments.
 4. Publishing, release tags and launch posts are yours.
+
+## Pre-launch review and fixes (2026-11-14)
+
+The checklist is `docs/launch/prelaunch-review.md`; its "Status at the end of 2026-11-14" section is the summary.
+
+- **Public:** `github.com/baselissmail/search-hole` since 2026-11-14. Nothing is released (no tag, no npm package, no marketplace file).
+- **Fixed:** 16 defects from the review, including a path by which the model could sign in to the dashboard, plus what GitHub's scanners found once the repository was public (dependency alerts, missing licence texts of bundled libraries, file races).
+- **New:** the review list and Opened / Seen marks (ADR-0025).
+- **Docs:** README rewritten; every other user-facing document corrected; `docs/dogfood.md` holds the two weeks of use.
+- **Checked locally:** lint, types, layers and SPDX clean; package 2,628 tests (2 skipped), dashboard 120, receipt panel 3; e2e dashboard 15, panel 4; bundle budgets within limits (dashboard 95%, CLI 94%); `claude plugin validate --strict` passes; smoke test passes; all three plugins and the `.mcpb` rebuilt.
+- **CI:** passed on Linux, macOS and Windows at `9babc55`. See the Actions tab for later commits.
+
+## Waiting on Basel (after the review)
+
+1. Delete the stray `.searchhole.yaml` in the repository root (`rm .searchhole.yaml`; search-hole's own guard stops the assistant from doing it).
+2. Restart Claude Code so the rebuilt plugin loads, then use it for a week with an engine on and act on the review list (`/search-hole:review`).
+3. Try the other apps, or leave them labelled "not yet tried".
+4. The owner-only steps of `docs/release.md` step 0, then the rehearsal, the tag and the launch posts.
+
