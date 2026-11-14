@@ -171,6 +171,11 @@ describe('guard matchers', () => {
     ['pnpm dlx search-hole lists add x', true],
     ['searchhole --yes mode engines', true],
     ['searchhole suggestions reject 2', true],
+    // The dashboard can change every rule, so starting it (and getting its sign-in link) is guarded.
+    ['searchhole ui --detach', true],
+    ['node ./dist/searchhole.mjs ui --port 17342', true],
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the skills' literal Claude Code placeholder
+    ['SEARCHHOLE_SKILL=1 node "${CLAUDE_PLUGIN_ROOT}/dist/searchhole.mjs" ui --detach --open', false],
     ['SEARCHHOLE_SKILL=1 searchhole block a.com', false],
     ['searchhole log --hidden', false],
     ['searchhole explain https://a.com', false],

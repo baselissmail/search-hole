@@ -24,7 +24,10 @@
 import { basename, join, resolve, sep } from 'node:path'
 import { type SimpleCommand, scanShell } from './shellwords.ts'
 
-/** CLI verbs that change rules, keys, lists, trust or settings. */
+/**
+ * CLI verbs that change rules, keys, lists, trust or settings. `ui` is here because the
+ * dashboard it starts can change all of them (review 2026-11-14).
+ */
 export const RULE_CHANGING_VERBS: ReadonlySet<string> = new Set([
   'block',
   'allow',
@@ -45,6 +48,7 @@ export const RULE_CHANGING_VERBS: ReadonlySet<string> = new Set([
   'reject',
   'uninstall',
   'setup',
+  'ui',
 ])
 
 /** `suggestions <sub>` sub-verbs that change state (listing stays allowed). */

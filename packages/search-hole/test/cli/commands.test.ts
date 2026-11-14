@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { AddRuleInput, RequestCtx, SearchArgs } from '../../src/app/types.ts'
 import { exitCodeFor } from '../../src/cli/errors.ts'
+import { signInLine } from '../../src/cli/run.ts'
 import { VERSION } from '../../src/cli/version.ts'
 import { SearchHoleError } from '../../src/shared/errors.ts'
 import { type Call, run, sampleDoctor, sampleOutcome } from './helpers.ts'
@@ -511,5 +512,21 @@ describe('mcp', () => {
     const r = await run(['mcp', '--host', 'emacs'])
     expect(r.code).toBe(2)
     expect(r.err).toContain('--host must be one of')
+  })
+})
+
+describe('ui sign-in link', () => {
+  const url = 'http://127.0.0.1:7341/#c=abc'
+
+  it('is printed to a terminal only', () => {
+    expect(signInLine(url, false, true)).toContain(url)
+    const piped = signInLine(url, false, false)
+    expect(piped).not.toContain('#c=')
+    expect(piped).toContain('searchhole ui')
+  })
+
+  it('is not printed when the browser opened', () => {
+    expect(signInLine(url, true, true)).toBeUndefined()
+    expect(signInLine(url, true, false)).toBeUndefined()
   })
 })

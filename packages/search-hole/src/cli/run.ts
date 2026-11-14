@@ -247,6 +247,18 @@ async function runUninstallCommand(
   return files.failed.length + keys.keysFailed.length === 0 ? 0 : 1
 }
 
+/**
+ * The line after "Dashboard: …". The link signs in whoever reads it, so it is printed only to
+ * a terminal: output captured by a skill, a script or a model never carries it (ADR-0004
+ * amendment 2026-11-14).
+ */
+export function signInLine(url: string, opened: boolean, tty: boolean): string | undefined {
+  if (opened) return undefined
+  return tty
+    ? `  Sign in (once, within 60 s): ${url}`
+    : '  To sign in, run `searchhole ui` yourself in a terminal. The sign-in link is shown only there.'
+}
+
 /** `searchhole ui` (ADR-0004 points 2–3): reuse a running dashboard, or start one. */
 async function runUi(cmd: Extract<Command, { name: 'ui' }>, io: CliIo, deps: CliDeps): Promise<number> {
   const ui = await import('../ui/run.ts')
@@ -265,7 +277,8 @@ async function runUi(cmd: Extract<Command, { name: 'ui' }>, io: CliIo, deps: Cli
   const announce = (base: string, url: string): void => {
     const opened = cmd.open && ui.openInBrowser(url)
     line(io, `${style.green('✓')} Dashboard: ${base}`)
-    if (!opened) line(io, `  Sign in (once, within 60 s): ${url}`)
+    const signIn = signInLine(url, opened, io.stdout.isTTY)
+    if (signIn !== undefined) line(io, signIn)
   }
 
   const running = await ui.findRunningUi(paths)
