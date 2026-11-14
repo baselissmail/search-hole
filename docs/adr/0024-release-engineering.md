@@ -34,3 +34,9 @@ P8 needs CI on Linux, macOS and Windows, releases with provenance, and supply-ch
 - **What Basel must set up once:** the repository, rulesets, the `npm` and `release` environments, the npm trusted publisher and the Renovate app (docs/release.md, step 0). Signing the `.mcpb` waits for a certificate.
 - **Plugin evals aren't wired yet.** They need an API key and an eval suite.
 - **The dogfood gate** (two weeks, no open P0/P1 in `docs/dogfood.md`) and the launch posts (drafts in `docs/launch/`) are Basel's.
+
+## Amendment (2026-11-14): pnpm's release-age check is on; the repository is public
+
+- `minimumReleaseAge: 20160` is set in `pnpm-workspace.yaml`. The lockfile aged past 14 days on 2026-11-13, so `pnpm install --frozen-lockfile` passes with no exceptions, and the `minimumReleaseAgeExclude` list (biome 2.6.4, tsdown 0.23.4) was removed. Renovate's 14-day rule stays as the first gate.
+- The repository was made public on 2026-11-14. Private vulnerability reporting and Dependabot alerts are on, and the labels `dependencies`, `security` and `lists` exist. Nothing is released: no tag, no npm package, no root marketplace file.
+- Still to do by hand from `docs/release.md` step 0: workflow permissions, the two rulesets, the Renovate app, the tag-signing key, npm trusted publishing and the two environments. Add the "CI result" required check only once CI runs on the public repository.
