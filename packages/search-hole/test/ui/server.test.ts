@@ -48,6 +48,51 @@ async function harness(opts: { assets?: boolean } = {}) {
 }
 
 describe('security wall', () => {
+  it('a path with an encoded line terminator never gets past the Host check or the sign-in', async () => {
+    // hono GHSA-h7mg-cq63-vhpq: its router could skip wildcard middleware for such paths, and
+    // both walls here are wildcard middleware.
+    const { call } = await harness()
+    const routes = [
+      '/api/overview',
+      '/api/searches',
+      '/api/searches/1',
+      '/api/rules',
+      '/api/rules/remove',
+      '/api/rules/explain',
+      '/api/suggestions',
+      '/api/suggestions/1/approve',
+      '/api/lists',
+      '/api/lists/catalog',
+      '/api/lists/update',
+      '/api/lists/x/mode',
+      '/api/lists/x/update',
+      '/api/engines',
+      '/api/engines/probe',
+      '/api/settings',
+      '/api/doctor',
+    ]
+    const terminators = ['%0A', '%0D', '%0D%0A', '%E2%80%A8', '%E2%80%A9', '%C2%85', '%0a']
+    for (const route of routes) {
+      for (const t of terminators) {
+        const paths = [
+          `${route}${t}`,
+          `${route}/${t}`,
+          route.replace('/api/', `/api/${t}`),
+          `${route}?x=${t}`,
+        ]
+        for (const path of paths) {
+          for (const method of ['GET', 'POST']) {
+            const init = method === 'POST' ? { method, body: '{}' } : { method }
+            const open = await call(path, init)
+            expect([method, path, open.status]).toEqual([method, path, open.status === 404 ? 404 : 401])
+            const foreign = await call(path, { ...init, host: 'evil.example:7341' })
+            expect([method, path, foreign.status]).toEqual([method, path, 403])
+          }
+        }
+      }
+    }
+  })
+
   it('refuses a foreign Host (DNS rebinding) and a cross-origin write; sends CSP, never CORS', async () => {
     const { call, signIn, api } = await harness()
     expect((await call('/health', { host: 'evil.example:7341' })).status).toBe(403)

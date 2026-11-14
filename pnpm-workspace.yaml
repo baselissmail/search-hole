@@ -9,3 +9,14 @@ packageExtensions:
         optional: true
 # Two weeks (in minutes): nothing newer is installed (ADR-0024).
 minimumReleaseAge: 20160
+# Security fixes wait 3 days, not 14 (ADR-0024, the same rule Renovate applies). Each entry
+# names the advisory it answers; drop an entry once its version is two weeks old.
+minimumReleaseAgeExclude:
+  - hono@4.13.16 # GHSA-h7mg-cq63-vhpq and four more; published 2026-11-01
+  - '@hono/node-server@2.1.6' # GHSA-jpvv-r467-5p4w, GHSA-qv5m-9pm6-hqp3; published 2026-11-02
+  - node-forge@1.4.3 # GHSA-6cv4-p8m7-4r25 and three more; published 2026-11-04
+# Patched versions of two libraries that only the .mcpb packing tool (@anthropic-ai/mcpb, a
+# dev dependency) pulls in. Neither is in anything search-hole ships.
+overrides:
+  node-forge: 1.4.3
+  tmp: 0.2.6 # GHSA-ph9p-34f9-6g65, GHSA-52f5-9888-hmc6
