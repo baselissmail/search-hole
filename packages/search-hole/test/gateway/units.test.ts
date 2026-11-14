@@ -172,6 +172,7 @@ describe('guard matchers', () => {
     ['echo hi; search-hole lower a.com', true],
     ['echo hi && "searchhole" keys set brave', true],
     ['node ./dist/searchhole.mjs unrule a.com', true],
+    ['searchhole unblock a.com', true],
     ['pnpm dlx search-hole lists add x', true],
     ['searchhole --yes mode engines', true],
     ['searchhole suggestions reject 2', true],

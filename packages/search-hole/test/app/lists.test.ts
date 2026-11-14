@@ -213,12 +213,15 @@ describe('subscriptions', () => {
     expect(added).toMatchObject({
       id: 'spam',
       source: 'subscribed',
-      mode: 'enforce',
+      mode: 'audit',
       ruleCount: 10,
       copy: 'downloaded',
       lastError: null,
     })
     expect(added.detectedFormat).toBe('domains')
+    // A new subscription starts in audit: nothing is hidden until the user enforces it.
+    expect(await blocked(h.app, 'https://d9.spam.example/x')).toBe(false)
+    expect(await lists.setMode('spam', 'enforce')).toMatchObject({ id: 'spam', mode: 'enforce' })
     const yaml = readFileSync(join(h.home, 'rules.yaml'), 'utf8')
     expect(yaml).toContain('# my rules, by hand')
     expect(yaml).toContain('# keep')

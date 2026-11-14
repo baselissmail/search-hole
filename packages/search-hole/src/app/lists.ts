@@ -553,7 +553,9 @@ export class ListsService {
         'Pick another --name, or change its mode with `searchhole lists enforce|audit|disable`.',
       )
     }
-    const mode = input.mode ?? 'enforce'
+    // A new subscription is someone else's list: it starts in audit, so the user sees what it
+    // would hide before it hides anything (the same default as the dashboard).
+    const mode = input.mode ?? 'audit'
     await this.editGlobal((doc) => {
       const body: Record<string, unknown> = { name: id, url, format, kind, mode }
       if (input.update !== undefined) body.update = input.update

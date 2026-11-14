@@ -134,6 +134,9 @@ export const COMMAND_NAMES = [
   'help',
 ] as const
 
+/** Other names for a command: `unblock` is what the slash command is called. */
+export const COMMAND_ALIASES: Readonly<Record<string, (typeof COMMAND_NAMES)[number]>> = { unblock: 'unrule' }
+
 const RULE_ACTIONS = [
   'block',
   'allow',
@@ -858,10 +861,14 @@ function parseVersion(args: readonly string[]): Command {
  * resolves `--until 7d`. Throws `invalid_argument` for anything malformed.
  */
 export function parseCommand(argv: readonly string[], now: number = Date.now()): Command {
-  const [first, ...rest] = argv
+  const [typed, ...rest] = argv
+  const first = typed === undefined ? undefined : (COMMAND_ALIASES[typed] ?? typed)
   if (first === undefined || first === '-h' || first === '--help') return { name: 'help' }
   if (first === '-v' || first === '--version') return { name: 'version', json: false }
-  if (first === 'help') return rest[0] === undefined ? { name: 'help' } : { name: 'help', topic: rest[0] }
+  if (first === 'help') {
+    const topic = rest[0]
+    return topic === undefined ? { name: 'help' } : { name: 'help', topic: COMMAND_ALIASES[topic] ?? topic }
+  }
   const verb = RULE_ACTIONS.find((a) => a === first)
   if (verb !== undefined) return parseRuleVerb(verb, rest, now)
   switch (first) {

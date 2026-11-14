@@ -36,6 +36,7 @@ export const RULE_CHANGING_VERBS: ReadonlySet<string> = new Set([
   'lower',
   'normal',
   'unrule',
+  'unblock',
   'rules',
   'trust',
   'untrust',

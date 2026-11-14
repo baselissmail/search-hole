@@ -709,7 +709,14 @@ export function renderListStatus(s: ListStatus, { style }: RenderOpts): string {
   const lines = [head]
   if (s.skipped > 0) lines.push(style.dim(`  ${num(s.skipped)} lines could not be used (${skipText(s)})`))
   if (s.lastError !== null) lines.push(`  ${style.yellow('⚠')} ${s.lastError.message}`)
-  if (s.mode === 'audit') lines.push(style.dim('  Audit: it records what it would hide and changes nothing.'))
+  if (s.mode === 'audit') {
+    lines.push(style.dim('  Audit: it records what it would hide and changes nothing.'))
+    lines.push(
+      style.dim(
+        `  See its effect with \`searchhole lists\`; enforce it with \`searchhole lists enforce ${s.id}\`.`,
+      ),
+    )
+  }
   return lines.join('\n')
 }
 

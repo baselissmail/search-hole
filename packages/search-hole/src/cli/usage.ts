@@ -14,7 +14,7 @@ Search and rules
   raise <match>         Rank a site higher (--weight 1-10)
   lower <match>         Rank a site lower (--weight 1-10)
   normal <match>        Cancel a raise or lower
-  unrule <id|match>     Remove a rule
+  unrule <id|match>     Remove a rule (also: unblock)
   rules                 List your rules
   lists                 Your block lists and starter lists; "lists catalog" for more
   explain <url>         Say how your rules treat a URL
@@ -97,7 +97,8 @@ Removes a rule by its id (from \`searchhole rules\`) or by its match text.`,
 Block lists hide sites from results, below your own rules (any rule of yours wins).
   lists            every list: mode, source, rules, and what it hid in the last 7 days
   catalog          lists you can add, with their licence; the starter lists are on by default
-  add              subscribe to a catalog list or an https:// list (saved in rules.yaml) and download it
+  add              subscribe to a catalog list or an https:// list (saved in rules.yaml) and download it;
+                   it starts in audit mode unless you pass --mode enforce
   enforce          hide what the list matches
   audit            only record what it would hide (try a list before enforcing it)
   disable          turn a list off (built-in lists can only be disabled, not removed)

@@ -329,6 +329,14 @@ describe('usage errors never quote what was typed', () => {
   })
 })
 
+describe('aliases', () => {
+  it('unblock is unrule, as the slash command is called', () => {
+    expect(parse('unblock', 'pinterest.com', '--yes')).toEqual(parse('unrule', 'pinterest.com', '--yes'))
+    expect(parse('help', 'unblock')).toEqual({ name: 'help', topic: 'unrule' })
+    expect(parse('unblock', '--help')).toEqual({ name: 'help', topic: 'unrule' })
+  })
+})
+
 describe('keys', () => {
   it('set takes only an engine', () => {
     expect(parse('keys', 'set', 'tavily')).toEqual({ name: 'keys-set', engine: 'tavily' })
