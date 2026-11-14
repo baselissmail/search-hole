@@ -386,6 +386,46 @@ describe('modes, removal and imports', () => {
       'already exists',
     )
   })
+
+  it("refuses the names of search-hole's own folders, so removing a list never removes the imports", async () => {
+    const ls = await listServer()
+    ls.files.set('/local.txt', domains(4))
+    ls.files.set('/generation.txt', domains(4))
+    const h = await setup({ host: 'cli', seams: ls.seams })
+    const lists = h.app.lists
+    if (lists === undefined) throw new Error('no list API')
+    const file = join(h.project, 'mine.txt')
+    writeFileSync(file, 'bad.example\n')
+    await lists.import(file, { name: 'mine', kind: 'block', format: 'domains' })
+
+    // A URL whose file name is a reserved word gives no name, and asking for one is refused.
+    expect((await rejection(lists.add({ source: 'https://lists.test/local.txt' }))).why).toContain('name this list')
+    expect((await rejection(lists.add({ source: 'https://lists.test/generation.txt' }))).why).toContain(
+      'name this list',
+    )
+    for (const name of ['local', 'generation']) {
+      expect((await rejection(lists.add({ source: 'https://lists.test/local.txt', name }))).why).toContain(
+        'uses itself',
+      )
+      expect((await rejection(lists.import(file, { name, kind: 'block' }))).why).toContain('uses itself')
+    }
+    const ok = await lists.add({ source: 'https://lists.test/local.txt', name: 'local-copy' })
+    expect(ok.id).toBe('local-copy')
+    await lists.remove('local-copy')
+    expect(existsSync(join(h.home, 'lists', 'local', 'mine', 'source.txt'))).toBe(true)
+    expect(await blocked(h.app, 'https://bad.example/')).toBe(true)
+  })
+
+  it('ignores a hand-written subscription with a reserved name and says so in doctor', async () => {
+    const h = await setup({
+      host: 'cli',
+      rules: 'version: 1\nrules: []\nsubscriptions:\n  - { name: local, url: "https://lists.test/local.txt" }\n',
+    })
+    const lists = h.app.lists
+    if (lists === undefined) throw new Error('no list API')
+    expect((await lists.list()).some((l) => l.id === 'local')).toBe(false)
+    expect(JSON.stringify(await h.app.doctor())).toContain('uses itself')
+  })
 })
 
 describe('background refresh (ADR-0006 point 7)', () => {

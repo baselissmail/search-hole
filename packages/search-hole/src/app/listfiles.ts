@@ -23,7 +23,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
 import { stripVendorHeader, type VendoredList } from '../lists/catalog.ts'
-import { LIST_ID, type LocalListManifest } from '../lists/registry.ts'
+import { LIST_ID, type LocalListManifest, RESERVED_LIST_IDS } from '../lists/registry.ts'
 import { atomicWriteFile, ensureDir } from '../shared/paths.ts'
 
 /** What `source.json` records about the copy in `source.txt`. */
@@ -87,10 +87,13 @@ export class ListFiles {
     this.vendorDirs = vendorDirs
   }
 
-  /** The folder of a list. Ids are validated (`LIST_ID`), so they never leave `root`. */
+  /**
+   * The folder of a list. Ids are validated (`LIST_ID`), so they never leave `root`, and a
+   * subscribed list can never be `local/` (every imported list) or the `generation` stamp.
+   */
   dir(id: string, local: boolean): string {
     const safe = id.toLowerCase()
-    if (!LIST_ID.test(safe)) throw new Error(`invalid list id: ${id}`)
+    if (!LIST_ID.test(safe) || (!local && RESERVED_LIST_IDS.has(safe))) throw new Error(`invalid list id: ${id}`)
     return local ? join(this.root, 'local', safe) : join(this.root, safe)
   }
 

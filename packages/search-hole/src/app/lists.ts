@@ -41,6 +41,7 @@ import {
   idFromUrl,
   isBuiltinId,
   LIST_ID,
+  RESERVED_LIST_IDS,
   type ListEntry,
   type ListErrorCode,
   type LocalListManifest,
@@ -135,6 +136,9 @@ const iso = (ms: number | null | undefined): string | null =>
 
 const bad = (why: string, fix?: string): SearchHoleError =>
   new SearchHoleError('invalid_argument', why, fix === undefined ? {} : { fix })
+
+const reservedName = (id: string): SearchHoleError =>
+  bad(`"${id}" is a name search-hole uses itself.`, 'Give the list another name with --name <id>.')
 
 const refreshable = (e: ListEntry): boolean =>
   e.url !== undefined && e.source !== 'local' && e.source !== 'bundled'
@@ -542,6 +546,7 @@ export class ListsService {
     }
     if (id === null) throw bad('Could not name this list from its URL.', 'Give it a name with --name <id>.')
     if (!LIST_ID.test(id)) throw bad('A list name is 1–64 lower-case letters, digits, ".", "_" or "-".')
+    if (RESERVED_LIST_IDS.has(id)) throw reservedName(id)
     if (isBuiltinId(id) || entries.some((e) => e.id === id)) {
       throw bad(
         `A list named "${id}" already exists.`,
@@ -637,6 +642,7 @@ export class ListsService {
   ): Promise<ListStatus> {
     const id = input.name.trim()
     if (!LIST_ID.test(id)) throw bad('A list name is 1–64 lower-case letters, digits, ".", "_" or "-".')
+    if (RESERVED_LIST_IDS.has(id)) throw reservedName(id)
     if (!KINDS.includes(input.kind))
       throw bad(`Unknown kind "${String(input.kind)}".`, `Use one of: ${KINDS.join(', ')}.`)
     const format = input.format ?? 'auto'

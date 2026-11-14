@@ -105,6 +105,8 @@ export interface Registry {
 
 /** List ids: what subscription names allow, lower case (they name folders under `<data>/lists/`). */
 export const LIST_ID = /^[a-z0-9][a-z0-9._-]{0,63}$/
+/** Names search-hole uses itself under `<data>/lists/`: the imports folder and the change stamp. */
+export const RESERVED_LIST_IDS: ReadonlySet<string> = new Set(['local', 'generation'])
 export const DEFAULT_UPDATE = '7d'
 const HOUR = 3_600_000
 /** A shorter `update` is raised to this. */
@@ -200,6 +202,10 @@ export function resolveRegistry(input: RegistryInput): Registry {
     }
     if (!LIST_ID.test(s.name)) {
       problems.push(`subscription '${s.name}' needs a lower-case name to be stored; it is ignored`)
+      continue
+    }
+    if (RESERVED_LIST_IDS.has(s.name)) {
+      problems.push(`subscription '${s.name}' has a name search-hole uses itself and is ignored; rename it`)
       continue
     }
     subscribed.set(s.name, s)
@@ -335,5 +341,5 @@ export function idFromUrl(url: string): string | null {
     .replace(/^[^a-z0-9]+/, '')
     .replace(/-+$/, '')
     .slice(0, 64)
-  return LIST_ID.test(base) ? base : null
+  return LIST_ID.test(base) && !RESERVED_LIST_IDS.has(base) ? base : null
 }
